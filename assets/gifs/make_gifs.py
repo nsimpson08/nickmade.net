@@ -9,6 +9,7 @@ FG = (232, 230, 225)
 MINT = (126, 224, 181)
 VIOLET = (167, 139, 250)
 AMBER = (245, 180, 81)
+PINK = (255, 126, 182)
 MONO = ImageFont.truetype("/System/Library/Fonts/Menlo.ttc", 17)
 
 
@@ -147,6 +148,45 @@ def movies():
     save(frames, "movies", 60)
 
 
+# --- Music: a spinning record with an equalizer ---
+def music():
+    N = 48
+    frames = []
+    cx, cy, R = 170, 150, 110
+    bars = 7
+    for t in range(N):
+        im = Image.new("RGB", (W, H), BG)
+        d = ImageDraw.Draw(im)
+        d.ellipse((cx - R, cy - R, cx + R, cy + R), fill=(14, 14, 16), outline=DIM, width=2)
+        # sheen that rotates with the record
+        a = t * 360 / N
+        for off in (0, 180):
+            d.pieslice((cx - R + 6, cy - R + 6, cx + R - 6, cy + R - 6), a + off, a + off + 22, fill=(34, 32, 38))
+        for r in range(R - 12, 44, -9):
+            d.ellipse((cx - r, cy - r, cx + r, cy + r), outline=(26, 26, 30), width=1)
+        d.ellipse((cx - 40, cy - 40, cx + 40, cy + 40), fill=PINK)
+        ra = math.radians(a)
+        dx, dy = cx + 24 * math.cos(ra), cy + 24 * math.sin(ra)
+        d.ellipse((dx - 4, dy - 4, dx + 4, dy + 4), fill=(120, 50, 90))
+        d.ellipse((cx - 5, cy - 5, cx + 5, cy + 5), fill=BG)
+        # tonearm
+        d.ellipse((cx + R - 6, cy - R - 2, cx + R + 14, cy - R + 18), fill=DIM)
+        d.line((cx + R + 4, cy - R + 8, cx + 70, cy + 40), fill=(120, 118, 114), width=5)
+        d.rectangle((cx + 60, cy + 34, cx + 76, cy + 48), fill=FG)
+        # equalizer: each bar is a sum of sines that loops every N frames
+        for b in range(bars):
+            h = 0.5 + 0.3 * math.sin(2 * math.pi * (t / N * 2 + b * 0.37)) \
+                + 0.2 * math.sin(2 * math.pi * (t / N * 3 + b * 0.91))
+            h = max(0.1, min(1.0, h))
+            bx = 330 + b * 18
+            top = 230 - int(h * 150) // 6 * 6
+            for yy in range(top, 230, 6):
+                d.rectangle((bx, yy, bx + 11, yy + 3), fill=PINK if yy > top else FG)
+        frames.append(im)
+    save(frames, "music", 60)
+
+
 projects()
 games()
 movies()
+music()

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Music · NickMade</title>
+  <meta name="description" content="What Nick Simpson is listening to.">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500&family=Unbounded:wght@500;600;700;800&display=swap">
+  <link rel="stylesheet" href="/assets/css/site.css">
+</head>
+<body class="page-music">
+  <header class="topbar">
+    <a class="wordmark" href="/">Nick<span>Made</span></a>
+    <nav>
+      <a href="/projects/">Projects</a>
+      <a href="/games/">Video Games</a>
+      <a href="/movies/">Movies</a>
+      <a href="/music/" aria-current="page">Music</a>
+    </nav>
+  </header>
+
+  <main class="content">
+    <header class="page-head">
+      <h1>Music</h1>
+      <p>What I've got on repeat.</p>
+    </header>
+
+    <section class="player" id="player"></section>
+  </main>
+  <script src="playlist.js"></script>
+  <script>
+    (function () {
+      var root = document.getElementById("player");
+      var m = /open\.spotify\.com\/(?:intl-[a-z-]+\/)?(playlist|album|artist|track)\/([A-Za-z0-9]+)/.exec(window.PLAYLIST_URL || "");
+      if (!m) {
+        root.className = "empty";
+        root.textContent = "Playlist coming soon.";
+        return;
+      }
+      var f = document.createElement("iframe");
+      f.src = "https://open.spotify.com/embed/" + m[1] + "/" + m[2] + "?theme=0";
+      f.title = "Spotify playlist";
+      f.loading = "lazy";
+      f.allow = "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture";
+      root.appendChild(f);
+    })();
+  </script>
+</body>
+</html>
