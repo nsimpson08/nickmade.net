@@ -282,6 +282,16 @@ img { display: block; max-width: 100%; }
   background: var(--accent);
   opacity: .8;
 }
+.subhead .sub {
+  margin-right: auto;
+  white-space: nowrap;
+  font-family: var(--body);
+  font-weight: 400;
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--muted);
+}
 .subhead .count {
   flex: none;
   font-family: var(--body);
@@ -431,8 +441,8 @@ button.queue-slot:hover .plus { transform: rotate(90deg); }
   line-height: 1.4;
 }
 
-.poster.suggested .remove {
-  margin-top: 8px;
+.poster.suggested .owner-actions { display: flex; gap: 6px; margin-top: 8px; }
+.poster.suggested .owner-actions button {
   padding: 3px 10px;
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -442,9 +452,43 @@ button.queue-slot:hover .plus { transform: rotate(90deg); }
   font-size: 0.75rem;
   cursor: pointer;
 }
+.poster.suggested .edit:hover { border-color: var(--accent); color: var(--accent); }
 .poster.suggested .remove:hover { border-color: #ff8a8a; color: #ff8a8a; }
+.queue-dialog input[readonly] { color: var(--muted); }
+.poster.suggested .watched-on {
+  margin-top: 4px;
+  font-size: 0.78rem;
+  color: var(--accent);
+}
+.stars {
+  position: relative;
+  display: inline-block;
+  line-height: 1;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--fg) 18%, transparent);
+}
+.stars .on {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(var(--r) / 5 * 100%);
+  overflow: hidden;
+  color: var(--accent);
+}
+.poster.suggested .rating { margin-top: 4px; font-size: 0.95rem; }
+.queue-dialog .rate {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: fit-content;
+  border-radius: 8px;
+}
+.queue-dialog .rate[hidden] { display: none; }
+.queue-dialog .rate:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.queue-dialog .rate .stars { font-size: 2rem; cursor: pointer; }
+.queue-dialog .rate-text { font-size: 0.85rem; color: var(--muted); }
+.queue-dialog .rate-text .phrase { margin-left: 4px; color: var(--accent); font-weight: 500; }
 .owner-bar {
-  margin: -24px 0 28px;
+  margin: -12px 0 28px;
   font-size: 0.8rem;
   color: var(--accent);
 }
@@ -480,6 +524,7 @@ button.queue-slot:hover .plus { transform: rotate(90deg); }
   font-size: 0.95rem;
 }
 .queue-dialog input:focus { outline: none; border-color: var(--accent); }
+.queue-dialog input[type="date"] { color-scheme: dark; }
 .queue-dialog .close {
   position: absolute;
   top: 14px;

@@ -1,12 +1,14 @@
-// Visitor submissions for the Movies "In the Queue" section, backed by the nickmade-queue Worker (worker/).
-// Adds submitted movies after yours, then a "+" card to suggest one (or a closed card when full).
+// The Movies page's live sections, backed by the nickmade-queue Worker (worker/):
+//   In the Queue      visitor suggestions after yours, then a "+" card to suggest one (or a closed card when full)
+//   Recently Watched  movies you log from the site with the date you watched them, newest first
 // Owner mode: open the page with ?admin and enter the ADMIN_TOKEN once; ?logout forgets it.
-// In owner mode the + card is always there, your picks have no "Suggested by", and every added movie gets a Remove button.
+// In owner mode the + cards are always there, your picks have no "Suggested by", and every added movie gets a Remove button.
 (function () {
   var script = document.currentScript;
   var local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
   var API = (local ? script.dataset.apiLocal : script.dataset.api) || "";
   var section = document.getElementById("in-the-queue");
+  var watchedSection = document.getElementById("recently-watched");
   if (!API || !section) return;
 
   function esc(s) {
@@ -49,7 +51,8 @@
     var bar = document.createElement("div");
     bar.className = "owner-bar";
     bar.innerHTML = "<span>Owner mode</span> <a href=\"?logout\">Log out</a>";
-    section.insertBefore(bar, section.querySelector(".subhead").nextSibling);
+    var head = document.querySelector(".page-head");
+    head.parentNode.insertBefore(bar, head.nextSibling);
   }
 
   function login() {
@@ -81,13 +84,14 @@
     });
   }
 
-  function grid() {
-    var g = section.querySelector(".poster-grid");
+  function grid(sec) {
+    sec = sec || section;
+    var g = sec.querySelector(".poster-grid");
     if (!g) {
-      var empty = section.querySelector(".empty");
+      var empty = sec.querySelector(".empty");
       g = document.createElement("div");
       g.className = "poster-grid";
-      if (empty) empty.replaceWith(g); else section.appendChild(g);
+      if (empty) empty.replaceWith(g); else sec.appendChild(g);
     }
     return g;
   }
@@ -99,9 +103,25 @@
     return API + "/img?u=" + encodeURIComponent(u);
   }
 
-  function card(it) {
+  // r out of 5 in halves: a dim row of stars with a lit copy clipped to r/5 of its width
+  function stars(r) {
+    return '<span class="stars" style="--r:' + (+r || 0) + '"><span aria-hidden="true">★★★★★</span><span class="on" aria-hidden="true">★★★★★</span></span>';
+  }
+  function ratingText(r) {
+    return r ? r + " out of 5 stars" : "No rating";
+  }
+
+  function watchedOn(date) {
+    var d = new Date(date + "T00:00:00");
+    return isNaN(d) ? "" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  }
+
+  // kind: "queue" (default) or "watched"
+  function card(it, kind) {
+    var watched = kind === "watched";
     var fig = document.createElement("figure");
     fig.className = "poster suggested";
+    fig.dataset.imdb = it.imdbId;
     var credit = "";
     if (it.credit && it.credit.artist) {
       credit = '<div class="credit">Art by <a href="' + esc(it.credit.url) + '" target="_blank" rel="noopener">' + esc(it.credit.artist) + "</a></div>";
@@ -114,16 +134,24 @@
         : '<div class="art blank">' + esc(it.title) + "</div>") +
       '<figcaption><span class="title">' + esc(it.title) + "</span>" +
       (it.year ? ' <span class="year">' + esc(it.year) + "</span>" : "") + "</figcaption>" +
+      (watched && it.rating ? '<div class="rating" aria-label="' + ratingText(it.rating) + '">' + stars(it.rating) + "</div>" : "") +
       credit +
       (it.suggestedBy ? '<div class="suggested-by">Suggested by ' + esc(it.suggestedBy) + "</div>" : "") +
-      (ADMIN ? '<button class="remove" type="button">Remove</button>' : "");
+      (watched && it.date ? '<div class="watched-on">Watched ' + esc(watchedOn(it.date)) + "</div>" : "") +
+      (ADMIN ? '<div class="owner-actions">' + (watched ? '<button class="edit" type="button">Edit</button>' : "") +
+        '<button class="remove" type="button">Remove</button></div>' : "");
+    if (ADMIN && watched) {
+      fig.querySelector(".edit").addEventListener("click", function () { openDialog(state, "edit", it); });
+    }
     if (ADMIN) {
       fig.querySelector(".remove").addEventListener("click", function () {
-        if (!confirm("Remove " + it.title + " from the queue?")) return;
-        fetch(API + "/queue/" + encodeURIComponent(it.imdbId), { method: "DELETE", headers: authHeaders() })
+        if (!confirm("Remove " + it.title + " from " + (watched ? "Recently Watched" : "the queue") + "?")) return;
+        var path = watched ? "/watched/" + encodeURIComponent(it.id) : "/queue/" + encodeURIComponent(it.imdbId);
+        fetch(API + path, { method: "DELETE", headers: authHeaders() })
           .then(function (r) {
             if (!r.ok) throw new Error();
             fig.remove();
+            if (watched) { updateCount(watchedSection); return; }
             state.remaining += 1;
             state.open = state.remaining > 0;
             updateCount();
@@ -134,10 +162,16 @@
     return fig;
   }
 
-  function updateCount() {
-    var count = section.querySelector(".subhead .count");
-    var n = section.querySelectorAll(".poster-grid > .poster").length;
-    if (count) count.textContent = (n < 10 ? "0" : "") + n;
+  function updateCount(sec) {
+    sec = sec || section;
+    var count = sec.querySelector(".subhead .count");
+    if (!count) {
+      count = document.createElement("span");
+      count.className = "count";
+      sec.querySelector(".subhead").appendChild(count);
+    }
+    var n = sec.querySelectorAll(".poster-grid > .poster").length;
+    count.textContent = (n < 10 ? "0" : "") + n;
   }
 
   var slot; // the + card or the closed card
@@ -148,9 +182,9 @@
     if (ADMIN) {
       slot.type = "button";
       slot.className = "queue-slot add";
-      slot.setAttribute("aria-label", "Add a movie to the queue");
-      slot.innerHTML = '<span class="plus" aria-hidden="true"></span><span class="label">Add a movie</span>';
-      slot.addEventListener("click", function () { openDialog(state); });
+      slot.setAttribute("aria-label", "Submit a movie to the queue");
+      slot.innerHTML = '<span class="plus" aria-hidden="true"></span><span class="label">Suggest me a movie!</span>';
+      slot.addEventListener("click", function () { openDialog(state, "queue"); });
     } else if (!state.open) {
       slot.className = "queue-slot closed";
       slot.innerHTML = "<span>Not taking submissions at this time</span>";
@@ -162,13 +196,14 @@
       slot.className = "queue-slot add";
       slot.setAttribute("aria-label", "Suggest a movie for the queue");
       slot.innerHTML = '<span class="plus" aria-hidden="true"></span><span class="label">Suggest a movie</span>';
-      slot.addEventListener("click", function () { openDialog(state); });
+      slot.addEventListener("click", function () { openDialog(state, "queue"); });
     }
     grid().appendChild(slot);
   }
 
   var state = null;
-  (params.has("admin") && !ADMIN ? login() : Promise.resolve())
+  var ready = (params.has("admin") && !ADMIN ? login() : Promise.resolve());
+  ready
     .then(function () {
       if (ADMIN) ownerBar();
       return fetch(API + "/queue?visitorId=" + encodeURIComponent(VID));
@@ -183,6 +218,40 @@
     })
     .catch(function () { /* service unreachable: just show your own queue */ });
 
+  // ---------- Recently Watched ----------
+
+  var watchedSlot; // owner-only + card
+  function renderWatchedSlot() {
+    if (!ADMIN || !watchedSection) return;
+    if (watchedSlot) watchedSlot.remove();
+    watchedSlot = document.createElement("button");
+    watchedSlot.type = "button";
+    watchedSlot.className = "queue-slot add";
+    watchedSlot.setAttribute("aria-label", "Log a movie you watched");
+    watchedSlot.innerHTML = '<span class="plus" aria-hidden="true"></span><span class="label">Log a movie</span>';
+    watchedSlot.addEventListener("click", function () { openDialog(state, "watched"); });
+    grid(watchedSection).appendChild(watchedSlot);
+  }
+
+  function renderWatched(items) {
+    var g = grid(watchedSection);
+    g.querySelectorAll(".poster").forEach(function (el) { el.remove(); });
+    items.forEach(function (it) { g.appendChild(card(it, "watched")); });
+    updateCount(watchedSection);
+    renderWatchedSlot();
+  }
+
+  if (watchedSection) {
+    ready
+      .then(function () { return fetch(API + "/watched"); })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var items = data.items || [];
+        if (items.length || ADMIN) renderWatched(items); // visitors keep "Coming soon." until there's one
+      })
+      .catch(function () {});
+  }
+
   // ---------- the add-a-movie dialog ----------
 
   var dialog = document.createElement("dialog");
@@ -196,6 +265,12 @@
       '<div class="combo">' +
         '<input id="q-movie" type="text" autocomplete="off" placeholder="Start typing a title" role="combobox" aria-expanded="false" aria-controls="q-results" aria-autocomplete="list">' +
         '<ul id="q-results" role="listbox" hidden></ul>' +
+      "</div>" +
+      '<label for="q-date">Date watched</label>' +
+      '<input id="q-date" type="date">' +
+      '<label id="q-rating-label">Your rating</label>' +
+      '<div class="rate" id="q-rating" role="slider" tabindex="0" aria-labelledby="q-rating-label" aria-valuemin="0" aria-valuemax="5" aria-valuenow="0" aria-valuetext="No rating">' +
+        stars(0) + '<span class="rate-text">No rating</span>' +
       "</div>" +
       '<label for="q-name">Your name</label>' +
       '<input id="q-name" type="text" maxlength="40" autocomplete="nickname" placeholder="So Nick knows who it\'s from">' +
@@ -220,26 +295,105 @@
   try { nameInput.value = localStorage.getItem("nm-name") || ""; } catch (e) {}
 
   var nameLabel = dialog.querySelector('label[for="q-name"]');
+  var dateInput = dialog.querySelector("#q-date");
+  var dateLabel = dialog.querySelector('label[for="q-date"]');
   var heading = dialog.querySelector("h2");
+  var mode = "queue"; // or "watched"
 
-  function openDialog(s) {
+  // Star picker: click (or arrow keys) in half-star steps; clicking the current rating again clears it
+  var rate = dialog.querySelector("#q-rating");
+  var rateLabel = dialog.querySelector("#q-rating-label");
+  var rateStars = rate.querySelector(".stars");
+  var rateText = rate.querySelector(".rate-text");
+  var rating = 0;
+  // Picker-only helper phrases (never shown on the cards), indexed by half stars: 0.5 -> 1, 5 -> 10
+  var PHRASES = ["", "Unwatchable", "Awful", "Bad", "Weak", "Mixed bag", "Good", "Really good", "Great", "Excellent", "Masterpiece"];
+  function showRating(r) {
+    rateStars.style.setProperty("--r", r);
+    rateText.innerHTML = r ? esc(r) + ' <span class="phrase">' + PHRASES[r * 2] + "</span>" : "No rating";
+  }
+  function setRating(r) {
+    rating = Math.max(0, Math.min(5, r));
+    showRating(rating);
+    rate.setAttribute("aria-valuenow", rating);
+    rate.setAttribute("aria-valuetext", ratingText(rating));
+  }
+  function ratingAt(e) {
+    var box = rateStars.getBoundingClientRect();
+    return Math.max(0.5, Math.min(5, Math.ceil(((e.clientX - box.left) / box.width) * 10) / 2));
+  }
+  rateStars.addEventListener("pointermove", function (e) { showRating(ratingAt(e)); });
+  rateStars.addEventListener("pointerleave", function () { showRating(rating); });
+  rateStars.addEventListener("click", function (e) {
+    var r = ratingAt(e);
+    setRating(r === rating ? 0 : r);
+  });
+  rate.addEventListener("keydown", function (e) {
+    var step = { ArrowRight: 0.5, ArrowUp: 0.5, ArrowLeft: -0.5, ArrowDown: -0.5 }[e.key];
+    if (step) setRating(rating + step);
+    else if (e.key === "Home" || e.key === "Delete" || e.key === "Backspace") setRating(0);
+    else if (e.key === "End") setRating(5);
+    else return;
+    e.preventDefault();
+  });
+
+  function today() {
+    var d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+
+  function submitLabel() {
+    return mode === "edit" ? "Save changes" : mode === "watched" ? "Add to Recently Watched" : ADMIN ? "Add to my queue" : "Add to the queue";
+  }
+
+  function resetFields() {
+    chosen = null;
+    movie.value = "";
+    dateInput.value = "";
+    setRating(0);
+  }
+
+  // m: "queue", "watched" (log a movie) or "edit" (change the rating/date of a Recently Watched movie `it`)
+  var editing = null;
+  function openDialog(s, m, it) {
+    if (mode === "edit") resetFields(); // don't carry an edited movie into a new one
+    mode = m || "queue";
+    editing = mode === "edit" ? it : null;
+    var watching = mode === "watched" || !!editing;
     nameLabel.hidden = nameInput.hidden = !!ADMIN;
-    heading.textContent = ADMIN ? "Add a movie" : "Suggest a movie";
-    submit.textContent = ADMIN ? "Add to my queue" : "Add to the queue";
-    hint.textContent = ADMIN
-      ? "Goes straight into your queue. " + s.remaining + " spot" + (s.remaining === 1 ? "" : "s") + " left for visitors."
+    dateLabel.hidden = dateInput.hidden = !watching;
+    rateLabel.hidden = rate.hidden = !watching;
+    movie.readOnly = !!editing;
+    dateInput.max = today();
+    if (editing) {
+      chosen = { id: it.imdbId };
+      movie.value = it.title + (it.year ? " (" + it.year + ")" : "");
+      dateInput.value = it.date;
+      setRating(it.rating || 0);
+    }
+    if (watching && !dateInput.value) dateInput.value = today();
+    heading.textContent = editing ? "Edit " + it.title : watching ? "Log a movie" : ADMIN ? "Submit a movie" : "Suggest a movie";
+    submit.textContent = submitLabel();
+    hint.textContent = editing
+      ? "Change your rating or the date you watched it."
+      : watching
+      ? "Shows up in Recently Watched, newest first. If it's in the queue, it comes out of the queue."
+      : ADMIN
+      ? "Goes straight into your queue. " + (s ? s.remaining : 0) + " spot" + (s && s.remaining === 1 ? "" : "s") + " left for visitors."
       : "You can add " + s.yourRemaining + " more. " + s.remaining + " spot" + (s.remaining === 1 ? "" : "s") + " left in the queue.";
     errorEl.textContent = "";
+    validate();
     dialog.showModal();
-    movie.focus();
+    (editing ? rate : movie).focus();
   }
   dialog.querySelector(".close").addEventListener("click", function () { dialog.close(); });
   dialog.addEventListener("click", function (e) { if (e.target === dialog) dialog.close(); });
 
   function validate() {
-    submit.disabled = !(chosen && (ADMIN || nameInput.value.trim()));
+    submit.disabled = !(chosen && (ADMIN || nameInput.value.trim()) && (mode === "queue" || dateInput.value));
   }
   nameInput.addEventListener("input", validate);
+  dateInput.addEventListener("input", validate);
 
   function showResults() {
     list.innerHTML = results.map(function (r, i) {
@@ -296,21 +450,35 @@
 
   form.addEventListener("submit", function (e) {
     e.preventDefault();
-    if (!chosen || (!ADMIN && !nameInput.value.trim())) return;
+    if (submit.disabled) return;
+    if (editing) return saveEdit();
+    var watching = mode === "watched";
     submit.disabled = true;
     submit.textContent = "Finding poster art…";
     errorEl.textContent = "";
     if (!ADMIN) { try { localStorage.setItem("nm-name", nameInput.value.trim()); } catch (e2) {} }
-    var label = ADMIN ? "Add to my queue" : "Add to the queue";
-    fetch(API + "/queue", {
+    var label = submitLabel();
+    fetch(API + (watching ? "/watched" : "/queue"), {
       method: "POST",
       headers: authHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ imdbId: chosen.id, name: ADMIN ? "" : nameInput.value.trim(), visitorId: VID }),
+      body: JSON.stringify(watching
+        ? { imdbId: chosen.id, date: dateInput.value, rating: rating }
+        : { imdbId: chosen.id, name: ADMIN ? "" : nameInput.value.trim(), visitorId: VID }),
     })
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
       .then(function (res) {
         submit.textContent = label;
         if (!res.ok) { errorEl.textContent = res.d.error || "Couldn't add that one."; validate(); return; }
+        if (watching) {
+          if (res.d.removedFromQueue) {
+            var old = section.querySelector('.poster.suggested[data-imdb="' + res.d.item.imdbId + '"]');
+            if (old) old.remove();
+            state.remaining += 1;
+            state.open = state.remaining > 0;
+            updateCount();
+          }
+          return reloadWatched();
+        }
         grid().insertBefore(card(res.d.item), slot);
         state.yourRemaining = res.d.yourRemaining;
         state.remaining = res.d.remaining;
@@ -328,4 +496,35 @@
         validate();
       });
   });
+
+  function reloadWatched() {
+    return fetch(API + "/watched").then(function (r) { return r.json(); }).then(function (data) {
+      renderWatched(data.items || []);
+      resetFields();
+      validate();
+      dialog.close();
+    });
+  }
+
+  function saveEdit() {
+    submit.disabled = true;
+    submit.textContent = "Saving…";
+    errorEl.textContent = "";
+    fetch(API + "/watched/" + encodeURIComponent(editing.id), {
+      method: "PATCH",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ date: dateInput.value, rating: rating }),
+    })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        submit.textContent = submitLabel();
+        if (!res.ok) { errorEl.textContent = res.d.error || "Couldn't save that."; validate(); return; }
+        return reloadWatched();
+      })
+      .catch(function () {
+        submit.textContent = submitLabel();
+        errorEl.textContent = "Couldn't reach the server. Try again in a bit.";
+        validate();
+      });
+  }
 })();

@@ -2,8 +2,11 @@
 //
 // Each subsection has:
 //   title    the subsection header
+//   subtitle optional small text beside the header
 //   layout   "reviews" (poster with review beside it) or "grid" (posters with titles underneath)
 //   items    the movies, in the order you want them shown
+//
+// "In the Queue" and "Recently Watched" also get movies added from the site (assets/js/queue.js).
 //
 // Movie fields:
 //   title    required
@@ -54,6 +57,23 @@ window.SECTIONS = [
     ]
   },
   {
+    title: "In the Queue",
+    layout: "grid",
+    items: [
+      { title: "Blue Jay", year: 2016, image: "posters/blue-jay.jpg", credit: { label: "Official poster by", artist: "InSync Plus", url: "http://www.impawards.com/2016/blue_jay.html" } },
+      { title: "Apocalypse Now", year: 1979, image: "posters/apocalypse-now.jpg", credit: { artist: "Dan Mumford", url: "http://www.dan-mumford.com" } },
+      { title: "The Florida Project", year: 2017, image: "posters/the-florida-project.jpg", credit: { artist: "Crisella Garcia", url: "https://www.instagram.com/bycrisella/" } },
+      { title: "After Hours", year: 1985, image: "posters/after-hours.jpg", credit: { artist: "Sam Coyle", url: "https://posterspy.com/profile/samcoyle" } }
+    ]
+  },
+  {
+    // Filled in from the site in owner mode (?admin): pick a movie and the date you watched it
+    title: "Recently Watched",
+    subtitle: "w/ personal ratings",
+    layout: "grid",
+    items: []
+  },
+  {
     title: "Favorite Comedies",
     layout: "grid",
     items: [
@@ -69,16 +89,6 @@ window.SECTIONS = [
     items: [
       { title: "Phantom Thread", year: 2017, image: "posters/phantom-thread.jpg", credit: { artist: "Chris Ayers", url: "https://www.instagram.com/filmprintposters/" } },
       { title: "Call Me by Your Name", year: 2017, image: "posters/call-me-by-your-name.jpg", credit: { artist: "Cinzia Cacioppo", url: "https://www.instagram.com/the_cinziettis/" } }
-    ]
-  },
-  {
-    title: "In the Queue",
-    layout: "grid",
-    items: [
-      { title: "Blue Jay", year: 2016, image: "posters/blue-jay.jpg", credit: { label: "Official poster by", artist: "InSync Plus", url: "http://www.impawards.com/2016/blue_jay.html" } },
-      { title: "Apocalypse Now", year: 1979, image: "posters/apocalypse-now.jpg", credit: { artist: "Dan Mumford", url: "http://www.dan-mumford.com" } },
-      { title: "The Florida Project", year: 2017, image: "posters/the-florida-project.jpg", credit: { artist: "Crisella Garcia", url: "https://www.instagram.com/bycrisella/" } },
-      { title: "After Hours", year: 1985, image: "posters/after-hours.jpg", credit: { artist: "Sam Coyle", url: "https://posterspy.com/profile/samcoyle" } }
     ]
   }
 ];
