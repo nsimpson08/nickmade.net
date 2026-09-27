@@ -1,0 +1,23 @@
+name = "nickmade-queue"
+main = "src/index.js"
+compatibility_date = "2024-09-01"
+workers_dev = false
+
+# Serves the Worker at https://api.nickmade.net (Cloudflare creates the DNS record and certificate)
+routes = [
+  { pattern = "api.nickmade.net", custom_domain = true }
+]
+
+[vars]
+SITE_URL = "https://nickmade.net"
+ALLOWED_ORIGINS = "https://nickmade.net,https://www.nickmade.net"
+QUEUE_LIMIT = "10"
+# Used only if the live movies/list.js can't be read
+OWNER_QUEUE_FALLBACK = "4"
+
+# Created with: npx wrangler kv namespace create QUEUE  (paste the id it prints)
+[[kv_namespaces]]
+binding = "QUEUE"
+id = "5bfd7017fdc24cef93ca0afbfe6094ee"
+
+# Secrets (not stored here): npx wrangler secret put ADMIN_TOKEN  /  npx wrangler secret put SALT

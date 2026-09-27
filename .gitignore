@@ -1,2 +1,6 @@
 .claude/
 .DS_Store
+photography/originals/
+photography/.manifest.json
+NOTES.md
+__pycache__/

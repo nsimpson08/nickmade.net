@@ -10,6 +10,7 @@ MINT = (126, 224, 181)
 VIOLET = (167, 139, 250)
 AMBER = (245, 180, 81)
 PINK = (255, 126, 182)
+SKY = (124, 196, 255)
 MONO = ImageFont.truetype("/System/Library/Fonts/Menlo.ttc", 17)
 
 
@@ -186,7 +187,50 @@ def music():
     save(frames, "music", 60)
 
 
+# --- Photography: a viewfinder that focuses and fires ---
+def photography():
+    N = 60
+    frames = []
+    for t in range(N):
+        im = Image.new("RGB", (W, H), BG)
+        d = ImageDraw.Draw(im)
+        # the scene drifts slowly: sky, sun, two ridges
+        drift = 16 * math.sin(2 * math.pi * t / N)
+        d.rectangle((0, 0, W, H), fill=(10, 16, 26))
+        d.ellipse((300 - drift, 70, 350 - drift, 120), fill=(255, 214, 150))
+        d.polygon([(0, 230), (120 - drift, 150), (260 - drift, 220), (W, 190), (W, H), (0, H)], fill=(24, 40, 58))
+        d.polygon([(0, 260), (170 - drift, 200), (330 - drift, 250), (W, 230), (W, H), (0, H)], fill=(14, 24, 36))
+        # focus: brackets start loose and snap tight
+        f = min(1.0, t / 28)
+        ease = 1 - (1 - f) ** 3
+        gap = int(70 - 40 * ease)
+        col = SKY if t >= 28 else FG
+        cx, cy = W // 2, H // 2
+        L = 18
+        for sx, sy in ((-1, -1), (1, -1), (-1, 1), (1, 1)):
+            x = cx + sx * gap * 1.6
+            y = cy + sy * gap
+            d.line((x, y, x - sx * L, y), fill=col, width=3)
+            d.line((x, y, x, y - sy * L), fill=col, width=3)
+        # viewfinder frame and readout
+        d.rectangle((24, 24, W - 24, H - 24), outline=(70, 80, 92), width=2)
+        d.text((40, H - 50), "1/250  f/2.8  ISO 200", font=MONO, fill=(150, 160, 170))
+        d.ellipse((W - 58, 38, W - 44, 52), fill=(255, 80, 80) if (t // 6) % 2 == 0 else (90, 30, 30))
+        # shutter: close, flash, reopen
+        if 34 <= t < 44:
+            k = t - 34
+            closed = 1 - abs(k - 4.5) / 4.5
+            bar = int(H / 2 * max(0.0, min(1.0, closed * 1.3)))
+            d.rectangle((0, 0, W, bar), fill=BG)
+            d.rectangle((0, H - bar, W, H), fill=BG)
+            if k in (4, 5):
+                im = Image.blend(im, Image.new("RGB", (W, H), (235, 245, 255)), 0.55)
+        frames.append(im)
+    save(frames, "photography", 60)
+
+
 projects()
 games()
 movies()
 music()
+photography()

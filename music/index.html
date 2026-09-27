@@ -15,10 +15,11 @@
   <header class="topbar">
     <a class="wordmark" href="/">Nick<span>Made</span></a>
     <nav>
-      <a href="/projects/">Projects</a>
+      <a href="/photography/">Photography</a>
       <a href="/games/">Video Games</a>
       <a href="/movies/">Movies</a>
       <a href="/music/" aria-current="page">Music</a>
+      <a href="/projects/">Projects</a>
     </nav>
   </header>
 
@@ -28,24 +29,46 @@
       <p>What I've got on repeat.</p>
     </header>
 
-    <section class="player" id="player"></section>
+    <div class="playlists" id="playlists"></div>
   </main>
   <script src="playlist.js"></script>
   <script>
     (function () {
-      var root = document.getElementById("player");
-      var m = /open\.spotify\.com\/(?:intl-[a-z-]+\/)?(playlist|album|artist|track)\/([A-Za-z0-9]+)/.exec(window.PLAYLIST_URL || "");
-      if (!m) {
-        root.className = "empty";
-        root.textContent = "Playlist coming soon.";
-        return;
-      }
-      var f = document.createElement("iframe");
-      f.src = "https://open.spotify.com/embed/" + m[1] + "/" + m[2] + "?theme=0";
-      f.title = "Spotify playlist";
-      f.loading = "lazy";
-      f.allow = "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture";
-      root.appendChild(f);
+      var root = document.getElementById("playlists");
+      (window.PLAYLISTS || []).forEach(function (pl) {
+        var section = document.createElement("section");
+        section.className = "playlist";
+
+        var h = document.createElement("h2");
+        h.textContent = pl.title;
+        section.appendChild(h);
+
+        if (pl.description) {
+          var p = document.createElement("p");
+          p.textContent = pl.description;
+          section.appendChild(p);
+        }
+
+        var m = /open\.spotify\.com\/(?:intl-[a-z-]+\/)?(playlist|album|artist|track)\/([A-Za-z0-9]+)/.exec(pl.url || "");
+        if (m) {
+          var player = document.createElement("div");
+          player.className = "player";
+          var f = document.createElement("iframe");
+          f.src = "https://open.spotify.com/embed/" + m[1] + "/" + m[2] + "?theme=0";
+          f.title = pl.title + " on Spotify";
+          f.loading = "lazy";
+          f.allow = "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture";
+          player.appendChild(f);
+          section.appendChild(player);
+        } else {
+          var soon = document.createElement("p");
+          soon.className = "empty";
+          soon.textContent = "Playlist coming soon.";
+          section.appendChild(soon);
+        }
+
+        root.appendChild(section);
+      });
     })();
   </script>
 </body>
