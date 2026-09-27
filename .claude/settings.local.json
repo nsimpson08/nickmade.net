@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -m venv venv)",
+      "Bash(./venv/bin/pip install *)",
+      "Bash(./venv/bin/python -c \"import PIL; print\\(PIL.__version__\\)\")",
+      "Bash(./venv/bin/python -c ' *)",
+      "Bash(./venv/bin/python make_gifs.py /Users/nsimpson/Documents/Personal/nickmade.net/assets/gifs)",
+      "Bash(cp make_gifs.py /Users/nsimpson/Documents/Personal/nickmade.net/assets/gifs/make_gifs.py)"
+    ]
+  }
+}
