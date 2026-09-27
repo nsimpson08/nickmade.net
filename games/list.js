@@ -38,7 +38,7 @@ window.SECTIONS = [
     groupStyle: "panel",
     live: "watched",
     title: "Recently Played",
-    subtitle: "w/ personal ratings",
+    subtitle: "",
     layout: "grid",
     items: []
   },

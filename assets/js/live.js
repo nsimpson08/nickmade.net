@@ -121,6 +121,7 @@
   function imgUrl(u, width) {
     if (!u) return "";
     if (/m\.media-amazon\.com/.test(u)) u = u.replace(/\._V1_[^.]*\./, "._V1_UX" + (width || 700) + "_.");
+    if (/store-images\.s-microsoft\.com/.test(u)) u = u.replace(/\?.*$/, "") + "?w=" + (width || 700);
     return API + "/img?u=" + encodeURIComponent(u);
   }
 
@@ -130,6 +131,25 @@
   }
   function ratingText(r) {
     return r ? r + " out of 5 stars" : "No rating";
+  }
+
+  // Minutes played -> "33h 30m" / "45m"
+  function playtime(min) {
+    if (min == null) return "";
+    var h = Math.floor(min / 60);
+    return h ? h + "h" + (min % 60 ? " " + (min % 60) + "m" : "") : min + "m";
+  }
+
+  // Local YYYY-MM-DD for an ISO timestamp
+  function localDate(iso) {
+    var d = new Date(iso);
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+
+  // "2026-05-19" -> "May 2026"; "2026" stays "2026"
+  function releasedOn(r) {
+    if (!/^\d{4}-\d{2}/.test(r)) return String(r);
+    return new Date(r.slice(0, 7) + "-01T00:00:00").toLocaleDateString("en-US", { month: "long", year: "numeric" });
   }
 
   function watchedOn(date) {
@@ -146,7 +166,8 @@
     var credit = "";
     if (it.credit && it.credit.artist) {
       credit = '<div class="credit">Art by <a href="' + esc(it.credit.url) + '" target="_blank" rel="noopener">' + esc(it.credit.artist) + "</a></div>";
-    } else {
+    } else if (!(watched && PAGE === "games")) {
+      // Games' Recently Played is always official art, so it goes unlabeled there
       credit = '<div class="credit">Official poster</div>';
     }
     // In a section with song players, leave the same empty player box the list.js items without a song get
@@ -158,11 +179,19 @@
         ? '<div class="art"><img src="' + esc(imgUrl(it.image)) + '" alt="' + esc(it.title) + ' poster art" loading="lazy"></div>'
         : '<div class="art blank">' + esc(it.title) + "</div>") +
       '<figcaption><span class="title">' + esc(it.title) + "</span>" +
-      (it.year ? ' <span class="year">' + esc(it.year) + "</span>" : "") + "</figcaption>" +
+      (watched && it.xbox && it.released
+        ? ' <span class="year">Released: ' + esc(releasedOn(it.released)) + "</span>"
+        : it.year ? ' <span class="year">' + esc(it.year) + "</span>" : "") + "</figcaption>" +
       (watched && it.rating ? '<div class="rating" aria-label="' + ratingText(it.rating) + '">' + stars(it.rating) + "</div>" : "") +
       credit +
       (it.suggestedBy ? '<div class="suggested-by">Suggested by ' + esc(it.suggestedBy) + "</div>" : "") +
-      (watched && it.date ? '<div class="watched-on">' + DID + " " + esc(watchedOn(it.date)) + "</div>" : "") +
+      (watched && it.xbox
+        ? '<div class="xbox-stats">' +
+            (it.xbox.minutes != null ? "<span>" + esc(playtime(it.xbox.minutes)) + " played</span>" : "") +
+            (it.xbox.percent != null ? '<span title="' + esc(it.xbox.gamerscore + " / " + it.xbox.totalGamerscore + " Gamerscore") + '">Achievements ' + esc(it.xbox.percent) + "%</span>" : "") +
+          "</div>"
+        : "") +
+      (watched && it.date ? '<div class="watched-on">' + (it.xbox ? "Last played" : DID) + " " + esc(watchedOn(it.date)) + "</div>" : "") +
       (ADMIN ? '<div class="owner-actions">' + (watched ? '<button class="edit" type="button">Edit</button>' : "") +
         '<button class="remove" type="button">Remove</button></div>' : "");
     if (ADMIN && watched) {
@@ -301,9 +330,112 @@
     watchedSlot.innerHTML = '<span class="plus" aria-hidden="true"></span><span class="label">Log a ' + KIND + "</span>";
     watchedSlot.addEventListener("click", function () { openDialog(state, "watched"); });
     grid(watchedSection).appendChild(watchedSlot);
+    if (PAGE === "games") {
+      if (xboxSlot) xboxSlot.remove();
+      xboxSlot = document.createElement("button");
+      xboxSlot.type = "button";
+      xboxSlot.className = "queue-slot add xbox";
+      xboxSlot.innerHTML = '<span class="plus" aria-hidden="true"></span><span class="label">Get latest from Xbox</span>';
+      xboxSlot.addEventListener("click", openXbox);
+      grid(watchedSection).insertBefore(xboxSlot, watchedSlot);
+    }
+  }
+  var xboxSlot;
+
+  // ---------- Get latest from Xbox (Games, owner only) ----------
+
+  var watchedItems = [];
+  var xbox = null;
+  function openXbox() {
+    if (!xbox) {
+      xbox = document.createElement("dialog");
+      xbox.className = "queue-dialog xbox-dialog";
+      xbox.innerHTML =
+        '<form method="dialog" novalidate>' +
+          '<button class="close" type="button" aria-label="Close">&times;</button>' +
+          "<h2>Get latest from Xbox</h2>" +
+          '<p class="hint">Your most recently played Xbox games. Pick the ones to show in ' + esc(watchedSec.title) +
+            "; ones already there get their playtime and achievements refreshed.</p>" +
+          '<ul class="xbox-list"></ul>' +
+          '<p class="error" role="alert"></p>' +
+          '<button class="open submit" type="submit" disabled>Add selected</button>' +
+        "</form>";
+      document.body.appendChild(xbox);
+      xbox.querySelector(".close").addEventListener("click", function () { xbox.close(); });
+      xbox.addEventListener("click", function (e) { if (e.target === xbox) xbox.close(); });
+      xbox.querySelector(".xbox-list").addEventListener("change", countXbox);
+      xbox.querySelector("form").addEventListener("submit", importXbox);
+    }
+    var listEl = xbox.querySelector(".xbox-list");
+    xbox.querySelector(".error").textContent = "";
+    listEl.innerHTML = '<li class="none">Loading your Xbox games…</li>';
+    countXbox();
+    xbox.showModal();
+    fetch(API + "/xbox/recent", { headers: authHeaders() })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (!res.ok) { listEl.innerHTML = ""; xbox.querySelector(".error").textContent = res.d.error || "Couldn't load your Xbox games."; return; }
+        var have = {};
+        watchedItems.forEach(function (it) { if (it.xbox) have[it.xbox.titleId] = true; });
+        listEl.innerHTML = (res.d.games || []).map(function (g) {
+          var bits = ["Last played " + watchedOn(localDate(g.lastPlayed))];
+          if (g.minutes != null) bits.push(playtime(g.minutes) + " played");
+          if (g.percent != null) bits.push(g.percent + "% achievements");
+          return '<li><label>' +
+            '<input type="checkbox" value="' + esc(g.titleId) + '" data-date="' + esc(localDate(g.lastPlayed)) + '">' +
+            (g.image ? '<img src="' + esc(imgUrl(g.image, 96)) + '" alt="" loading="lazy">' : '<span class="noimg"></span>') +
+            '<span class="t">' + esc(g.name) + (have[g.titleId] ? ' <span class="tag">Update</span>' : "") +
+              '<span class="s">' + esc(bits.join(" · ")) + "</span></span>" +
+          "</label></li>";
+        }).join("") || '<li class="none">No recent games found.</li>';
+        countXbox();
+      })
+      .catch(function () { listEl.innerHTML = ""; xbox.querySelector(".error").textContent = "Couldn't reach the server. Try again in a bit."; });
+  }
+
+  function countXbox() {
+    var n = xbox.querySelectorAll(".xbox-list input:checked").length;
+    var btn = xbox.querySelector(".submit");
+    btn.disabled = !n;
+    btn.textContent = n ? "Add " + n + " to " + watchedSec.title : "Add selected";
+  }
+
+  function importXbox(e) {
+    e.preventDefault();
+    var picked = [].map.call(xbox.querySelectorAll(".xbox-list input:checked"), function (c) {
+      return { titleId: c.value, date: c.dataset.date };
+    });
+    if (!picked.length) return;
+    var btn = xbox.querySelector(".submit");
+    var err = xbox.querySelector(".error");
+    btn.disabled = true;
+    btn.textContent = "Getting poster art…";
+    err.textContent = "";
+    fetch(API + "/xbox/import", {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ games: picked }),
+    })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (!res.ok) { err.textContent = res.d.error || "Couldn't add those."; countXbox(); return; }
+        return reloadWatched().then(function () {
+          if (!section) return;
+          // importing can take games out of the queue, so refresh it too
+          return fetch(API + "/queue?" + PQ + "&visitorId=" + encodeURIComponent(VID)).then(function (r) { return r.json(); }).then(function (data) {
+            grid().querySelectorAll(".poster.suggested").forEach(function (el) { el.remove(); });
+            (data.items || []).forEach(function (it) { if (!inSection(section, it.title)) grid().insertBefore(card(it), slot); });
+            state = data;
+            renderSlot(data);
+            updateCount();
+          });
+        }).then(function () { xbox.close(); });
+      })
+      .catch(function () { err.textContent = "Couldn't reach the server. Try again in a bit."; countXbox(); });
   }
 
   function renderWatched(items) {
+    watchedItems = items;
     var g = grid(watchedSection);
     g.querySelectorAll(".poster").forEach(function (el) { el.remove(); });
     items.forEach(function (it) { g.appendChild(card(it, "watched")); });

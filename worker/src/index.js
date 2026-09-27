@@ -16,6 +16,9 @@
 //   GET    /lists?page=movies   Nick's site-added picks for each live section of a page: { lists: { <key>: [items] } }
 //   POST   /lists               { page, list, imdbId } (admin) -> adds a movie/game to that section
 //   DELETE /lists/:page/:list/:imdbId  remove one (admin)
+//   GET    /xbox/recent         (admin) your most recently played Xbox games via OpenXBL, with playtime and achievements
+//   POST   /xbox/import         { games: [{ titleId, date }] } (admin) -> logs them in Games' Recently Played
+//                               (or refreshes their Xbox stats if already there), poster from the Xbox store
 //   GET    /img?u=url           image proxy for posters (allowlisted hosts only)
 //
 // Storage: one KV namespace (QUEUE). Keys (Movies keeps the original unprefixed names):
@@ -23,6 +26,7 @@
 //   watched / watched:games        JSON array of Recently Watched / Recently Played
 //   lists:<page>                   JSON object { <section key>: [items] } for the other live sections
 //   visitor:<hash> / visitor:games:<hash>  number of queue submissions from that visitor (browser id or hashed IP)
+//   xbox:recent                    10-minute cache of /xbox/recent (OpenXBL allows 150 requests/hour, shared with the Montage app)
 
 const PER_VISITOR = 3;
 const MOVIE_TYPES = new Set(["movie", "tvMovie", "video"]);
@@ -38,7 +42,8 @@ function queueKey(page) {
 function watchedKey(page) {
   return page === "movies" ? "watched" : "watched:" + page;
 }
-const IMG_HOSTS = ["m.media-amazon.com", "alternativemovieposters.com"];
+const IMG_HOSTS = ["m.media-amazon.com", "alternativemovieposters.com", "store-images.s-microsoft.com"];
+const XBOX_RECENT = 30; // how many recent Xbox games /xbox/recent lists
 const BLOCKED = ["fuck", "shit", "cunt", "nigg", "fag", "retard", "bitch", "whore", "slut", "nazi", "rape", "porn", "dick", "cock", "pussy"];
 
 export default {
@@ -51,6 +56,8 @@ export default {
 
     try {
       if (url.pathname === "/search" && request.method === "GET") return await search(url, cors, ctx);
+      if (url.pathname === "/xbox/recent" && request.method === "GET") return await xboxRecent(request, env, cors);
+      if (url.pathname === "/xbox/import" && request.method === "POST") return await xboxImport(request, env, cors);
       if (url.pathname === "/lists" && request.method === "GET") return await getLists(url, env, cors);
       if (url.pathname === "/lists" && request.method === "POST") return await addToList(request, env, cors);
       if (url.pathname.startsWith("/lists/") && request.method === "DELETE") return await removeFromList(request, url, env, cors);
@@ -443,4 +450,175 @@ async function removeFromList(request, url, env, cors) {
   if (!lists[key].length) delete lists[key];
   await env.QUEUE.put("lists:" + page, JSON.stringify(lists));
   return json({ removed: before - (lists[key] || []).length }, 200, cors);
+}
+
+// ---------- Xbox (OpenXBL), owner only ----------
+
+class XblError extends Error {}
+
+async function xbl(env, path, body) {
+  if (!env.OPENXBL_API_KEY) throw new XblError("OPENXBL_API_KEY isn't set on the Worker.");
+  const res = await fetch("https://xbl.io/api/v2" + path, {
+    method: body ? "POST" : "GET",
+    headers: { "X-Authorization": env.OPENXBL_API_KEY, Accept: "application/json", ...(body ? { "Content-Type": "application/json" } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (res.status === 429) throw new XblError("Xbox lookup limit reached for this hour. Try again later.");
+  if (res.status === 401 || res.status === 403) throw new XblError("OpenXBL rejected the API key.");
+  if (!res.ok) throw new XblError("Xbox Live didn't answer (" + res.status + "). Try again in a bit.");
+  const data = await res.json();
+  return data.content || data;
+}
+
+function cleanTitle(name) {
+  return String(name || "").replace(/[™®©]/g, "").replace(/\s+/g, " ").trim();
+}
+
+// Your latest Xbox games: title history (newest first) plus MinutesPlayed for each, in 2 OpenXBL requests
+async function recentXboxGames(env) {
+  const cached = await env.QUEUE.get("xbox:recent", "json");
+  if (cached) return cached;
+  const history = await xbl(env, "/titles");
+  const games = (history.titles || [])
+    .filter((t) => t.type === "Game" && t.titleHistory && t.titleHistory.lastTimePlayed)
+    .slice(0, XBOX_RECENT)
+    .map((t) => ({
+      titleId: String(t.titleId),
+      name: cleanTitle(t.name),
+      lastPlayed: t.titleHistory.lastTimePlayed,
+      percent: t.achievement ? t.achievement.progressPercentage : null,
+      gamerscore: t.achievement ? t.achievement.currentGamerscore : null,
+      totalGamerscore: t.achievement ? t.achievement.totalGamerscore : null,
+      image: t.displayImage ? t.displayImage.replace(/^http:/, "https:") : null,
+      minutes: null,
+    }));
+  if (games.length) {
+    try {
+      const stats = await xbl(env, "/player/stats", {
+        xuids: [String(history.xuid)],
+        stats: games.map((g) => ({ name: "MinutesPlayed", titleId: g.titleId })),
+      });
+      const minutes = {};
+      for (const list of stats.statlistscollection || []) {
+        for (const st of list.stats || []) if (st.value != null) minutes[String(st.titleid)] = parseInt(st.value, 10);
+      }
+      games.forEach((g) => { if (minutes[g.titleId] >= 0) g.minutes = minutes[g.titleId]; });
+    } catch (e) { /* playtime is a nice-to-have */ }
+  }
+  await env.QUEUE.put("xbox:recent", JSON.stringify(games), { expirationTtl: 600 });
+  return games;
+}
+
+async function xboxRecent(request, env, cors) {
+  if (!isAdmin(request, env)) return json({ error: "Unauthorized" }, 401, cors);
+  try {
+    return json({ games: await recentXboxGames(env) }, 200, cors);
+  } catch (e) {
+    if (e instanceof XblError) return json({ error: e.message }, 502, cors);
+    throw e;
+  }
+}
+
+// A plausible release date: the store uses placeholders like 9998-12-30 for some titles
+function realDate(iso) {
+  const d = String(iso || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
+  const year = parseInt(d.slice(0, 4), 10);
+  return year >= 1970 && year <= new Date().getFullYear() + 1 ? d : null;
+}
+
+// The Xbox store's portrait "Poster" art (2:3) and release date ("YYYY-MM-DD", or "YYYY" from the IMDb fallback)
+async function xboxStoreInfo(env, titleId, name) {
+  let image = null;
+  let released = null;
+  try {
+    const data = await xbl(env, "/marketplace/title/" + titleId);
+    const product = (data.Products || [])[0];
+    if (product) {
+      const images = ((product.LocalizedProperties || [])[0] || {}).Images || [];
+      const pick = images.find((i) => i.ImagePurpose === "Poster") || images.find((i) => i.ImagePurpose === "BoxArt");
+      image = pick ? "https:" + pick.Uri.replace(/^https?:/, "") : null;
+      released = realDate(((product.MarketProperties || [])[0] || {}).OriginalReleaseDate);
+      if (!released) {
+        // Fallback 1, same response: pre-order release dates (early access editions come first, so take the latest)
+        const dates = [...JSON.stringify(product.DisplaySkuAvailabilities || []).matchAll(/"PreOrderReleaseDate":"([^"]+)"/g)]
+          .map((m) => realDate(m[1])).filter(Boolean).sort();
+        released = dates.length ? dates[dates.length - 1] : null;
+      }
+    }
+  } catch (e) { /* poster and date are best-effort */ }
+  if (!released && name) released = await imdbGameYear(name); // fallback 2: IMDb (no OpenXBL request used)
+  return { image, released };
+}
+
+// Release year of a video game on IMDb with exactly this title, as "YYYY"
+async function imdbGameYear(name) {
+  try {
+    const res = await fetch("https://v3.sg.media-imdb.com/suggestion/x/" + encodeURIComponent(name.toLowerCase().slice(0, 60)) + ".json");
+    const data = await res.json();
+    const hit = (data.d || []).find((r) => GAME_TYPES.has(r.qid) && normalize(r.l) === normalize(name) && r.y);
+    return hit ? String(hit.y) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function xboxImport(request, env, cors) {
+  if (!isAdmin(request, env)) return json({ error: "Unauthorized" }, 401, cors);
+  let body;
+  try { body = await request.json(); } catch (e) { return json({ error: "Bad request." }, 400, cors); }
+  const picks = (body.games || []).filter((g) => /^\d{1,12}$/.test(String(g.titleId)) && /^\d{4}-\d{2}-\d{2}$/.test(String(g.date))).slice(0, 30);
+  if (!picks.length) return json({ error: "Pick at least one game." }, 400, cors);
+
+  let recent;
+  try { recent = await recentXboxGames(env); } catch (e) {
+    if (e instanceof XblError) return json({ error: e.message }, 502, cors);
+    throw e;
+  }
+  const items = await getList(env, watchedKey("games"));
+  let added = 0;
+  let updated = 0;
+  const importedTitles = [];
+  for (const pick of picks) {
+    const g = recent.find((r) => r.titleId === String(pick.titleId));
+    if (!g) continue;
+    const xbox = { titleId: g.titleId, minutes: g.minutes, percent: g.percent, gamerscore: g.gamerscore, totalGamerscore: g.totalGamerscore, lastPlayed: g.lastPlayed };
+    const existing = items.find((it) => it.xbox && it.xbox.titleId === g.titleId);
+    if (existing) {
+      existing.xbox = xbox; // refresh the stats and move it to the latest play date; keep poster and rating
+      existing.date = pick.date;
+      existing.id = existing.imdbId + "-" + pick.date;
+      if (!existing.released) { // added before release dates were kept
+        const store = await xboxStoreInfo(env, g.titleId, g.name);
+        existing.released = store.released;
+        existing.year = store.released ? parseInt(store.released.slice(0, 4), 10) : existing.year;
+      }
+      updated++;
+      continue;
+    }
+    const store = await xboxStoreInfo(env, g.titleId, g.name);
+    items.push({
+      imdbId: "xbl" + g.titleId,
+      title: g.name,
+      year: store.released ? parseInt(store.released.slice(0, 4), 10) : null,
+      released: store.released,
+      image: store.image || g.image,
+      credit: { label: "Official poster", artist: "" },
+      id: "xbl" + g.titleId + "-" + pick.date,
+      date: pick.date,
+      rating: null,
+      xbox,
+      createdAt: new Date().toISOString(),
+    });
+    importedTitles.push(g.name);
+    added++;
+  }
+  await env.QUEUE.put(watchedKey("games"), JSON.stringify(items));
+
+  // Playing something from the queue takes it out of the queue (matched by title, since queue games come from IMDb)
+  const queue = await getQueue(env, "games");
+  const kept = queue.filter((it) => !importedTitles.some((t) => normalize(t) === normalize(it.title)));
+  if (kept.length !== queue.length) await env.QUEUE.put(queueKey("games"), JSON.stringify(kept));
+
+  return json({ added, updated }, 200, cors);
 }

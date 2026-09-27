@@ -12,7 +12,8 @@ Personal site, served by GitHub Pages from the root of `main`. Plain HTML, no bu
 - `assets/js/live.js`: the live sections on the Movies and Games pages. In owner mode (`?admin`, then the admin
   password) the owner can add movies/games to any section marked `live: "key"` in list.js, log Recently
   Watched movies / Recently Played games with a date and rating, and remove site additions. Visitors can suggest
-  movies and games for each page's In the Queue. These are stored by the Worker, not in this repo.
+  movies and games for each page's In the Queue. On Games, "Get latest from Xbox" lists recently played
+  Xbox games (via [OpenXBL](https://xbl.io)) to add with their playtime, achievement progress, and last played date. These are stored by the Worker, not in this repo.
 - `tools/pull_live.py`: copies site additions into list.js and posters/ (then commit and push); run it again
   after pushing to clear the now-duplicate live copies. Also saves a snapshot to `backups/`.
 - `photography/`: the Photography page. Drop photos into `photography/originals/` (not published),
