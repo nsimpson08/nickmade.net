@@ -3,6 +3,9 @@
 //   GET    /search?q=title      movie title autocomplete (IMDb suggestions)
 //   GET    /queue               visitor submissions + whether the queue is open + this visitor's remaining count
 //   POST   /queue               { imdbId, name, visitorId } -> adds a movie
+//                               with Authorization: Bearer ADMIN_TOKEN it's Nick's own pick:
+//                               no name, no per-visitor limit, allowed past the cap
+//   GET    /admin/check         200 if the Authorization token is the admin token
 //   DELETE /queue/:imdbId       remove a submission (needs Authorization: Bearer ADMIN_TOKEN)
 //   GET    /img?u=url           image proxy for posters (allowlisted hosts only)
 //
@@ -28,6 +31,9 @@ export default {
       if (url.pathname === "/img" && request.method === "GET") return await image(url, ctx);
       if (url.pathname === "/queue" && request.method === "GET") return await listQueue(request, url, env, cors);
       if (url.pathname === "/queue" && request.method === "POST") return await addToQueue(request, env, cors);
+      if (url.pathname === "/admin/check" && request.method === "GET") {
+        return isAdmin(request, env) ? json({ ok: true }, 200, cors) : json({ error: "Wrong password." }, 401, cors);
+      }
       if (url.pathname.startsWith("/queue/") && request.method === "DELETE") return await removeFromQueue(request, url, env, cors);
       return json({ error: "Not found" }, 404, cors);
     } catch (err) {
@@ -54,6 +60,11 @@ function json(data, status, cors) {
     status: status || 200,
     headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...cors },
   });
+}
+
+function isAdmin(request, env) {
+  const token = (request.headers.get("Authorization") || "").replace(/^Bearer\s+/, "");
+  return !!env.ADMIN_TOKEN && token === env.ADMIN_TOKEN;
 }
 
 async function sha256(text) {
@@ -158,7 +169,7 @@ async function listQueue(request, url, env, cors) {
 }
 
 function publicItem(it) {
-  return { imdbId: it.imdbId, title: it.title, year: it.year, image: it.image, credit: it.credit, suggestedBy: it.suggestedBy };
+  return { imdbId: it.imdbId, title: it.title, year: it.year, image: it.image, credit: it.credit, suggestedBy: it.suggestedBy || null, owner: !!it.owner };
 }
 
 async function addToQueue(request, env, cors) {
@@ -166,18 +177,22 @@ async function addToQueue(request, env, cors) {
   try { body = await request.json(); } catch (e) { return json({ error: "Bad request." }, 400, cors); }
   const imdbId = String(body.imdbId || "");
   const name = String(body.name || "").replace(/\s+/g, " ").trim();
+  const owner = isAdmin(request, env);
 
   if (!/^tt\d{5,10}$/.test(imdbId)) return json({ error: "Pick a movie from the list." }, 400, cors);
-  if (name.length < 1 || name.length > 40) return json({ error: "Add your name (up to 40 characters)." }, 400, cors);
-  const lowered = normalize(name).replace(/ /g, "");
-  if (BLOCKED.some((w) => lowered.includes(w))) return json({ error: "Please use a different name." }, 400, cors);
-
-  const keys = await visitorKeys(request, body.visitorId, env);
-  const used = await usedBy(keys, env);
-  if (used >= PER_VISITOR) return json({ error: "You've already added " + PER_VISITOR + " movies. Thanks!" }, 429, cors);
+  let keys = [];
+  let used = 0;
+  if (!owner) {
+    if (name.length < 1 || name.length > 40) return json({ error: "Add your name (up to 40 characters)." }, 400, cors);
+    const lowered = normalize(name).replace(/ /g, "");
+    if (BLOCKED.some((w) => lowered.includes(w))) return json({ error: "Please use a different name." }, 400, cors);
+    keys = await visitorKeys(request, body.visitorId, env);
+    used = await usedBy(keys, env);
+    if (used >= PER_VISITOR) return json({ error: "You've already added " + PER_VISITOR + " movies. Thanks!" }, 429, cors);
+  }
 
   const state = await queueState(env);
-  if (!state.open) return json({ error: "Not taking submissions at this time." }, 409, cors);
+  if (!state.open && !owner) return json({ error: "Not taking submissions at this time." }, 409, cors);
   if (state.items.some((it) => it.imdbId === imdbId)) return json({ error: "That one's already in the queue." }, 409, cors);
 
   // Look the movie up by id so the title/year/poster come from IMDb, not the browser
@@ -194,13 +209,14 @@ async function addToQueue(request, env, cors) {
     year: movie.y || null,
     image: art ? art.image : movie.i ? movie.i.imageUrl : null,
     credit: art ? { artist: art.artist, url: art.url } : { label: "Official poster", artist: "" },
-    suggestedBy: name,
+    suggestedBy: owner ? null : name,
+    owner,
     createdAt: new Date().toISOString(),
   };
 
   // Re-read right before writing to keep the cap honest if two people submit at once
   const latest = await queueState(env);
-  if (!latest.open) return json({ error: "Not taking submissions at this time." }, 409, cors);
+  if (!latest.open && !owner) return json({ error: "Not taking submissions at this time." }, 409, cors);
   latest.items.push(item);
   await env.QUEUE.put("queue", JSON.stringify(latest.items));
   for (const k of keys) await env.QUEUE.put(k, String(used + 1));
@@ -208,7 +224,8 @@ async function addToQueue(request, env, cors) {
   return json({
     item: publicItem(item),
     open: latest.remaining - 1 > 0,
-    yourRemaining: Math.max(0, PER_VISITOR - used - 1),
+    remaining: Math.max(0, latest.remaining - 1),
+    yourRemaining: owner ? PER_VISITOR : Math.max(0, PER_VISITOR - used - 1),
   }, 201, cors);
 }
 
@@ -245,8 +262,7 @@ function decode(s) {
 }
 
 async function removeFromQueue(request, url, env, cors) {
-  const token = (request.headers.get("Authorization") || "").replace(/^Bearer\s+/, "");
-  if (!env.ADMIN_TOKEN || token !== env.ADMIN_TOKEN) return json({ error: "Unauthorized" }, 401, cors);
+  if (!isAdmin(request, env)) return json({ error: "Unauthorized" }, 401, cors);
   const id = decodeURIComponent(url.pathname.split("/")[2] || "");
   const items = await getQueue(env);
   const kept = items.filter((it) => it.imdbId !== id);

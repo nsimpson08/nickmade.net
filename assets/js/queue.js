@@ -1,5 +1,7 @@
 // Visitor submissions for the Movies "In the Queue" section, backed by the nickmade-queue Worker (worker/).
 // Adds submitted movies after yours, then a "+" card to suggest one (or a closed card when full).
+// Owner mode: open the page with ?admin and enter the ADMIN_TOKEN once; ?logout forgets it.
+// In owner mode the + card is always there, your picks have no "Suggested by", and every added movie gets a Remove button.
 (function () {
   var script = document.currentScript;
   var local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
@@ -27,6 +29,57 @@
     return id;
   }
   var VID = visitorId();
+
+  // ---------- owner mode ----------
+
+  var params = new URLSearchParams(location.search);
+  var ADMIN = null;
+  try {
+    if (params.has("logout")) localStorage.removeItem("nm-admin-token");
+    ADMIN = localStorage.getItem("nm-admin-token");
+  } catch (e) {}
+
+  function authHeaders(h) {
+    h = h || {};
+    if (ADMIN) h.Authorization = "Bearer " + ADMIN;
+    return h;
+  }
+
+  function ownerBar() {
+    var bar = document.createElement("div");
+    bar.className = "owner-bar";
+    bar.innerHTML = "<span>Owner mode</span> <a href=\"?logout\">Log out</a>";
+    section.insertBefore(bar, section.querySelector(".subhead").nextSibling);
+  }
+
+  function login() {
+    return new Promise(function (resolve) {
+      var d = document.createElement("dialog");
+      d.className = "queue-dialog";
+      d.innerHTML =
+        '<form novalidate><h2>Owner login</h2>' +
+        '<p class="hint">Enter your admin password. This browser will remember it.</p>' +
+        '<label for="q-admin">Password</label><input id="q-admin" type="password" autocomplete="current-password">' +
+        '<p class="error" role="alert"></p><button class="open submit" type="submit">Log in</button></form>';
+      document.body.appendChild(d);
+      var input = d.querySelector("input");
+      var err = d.querySelector(".error");
+      d.addEventListener("close", function () { d.remove(); resolve(); });
+      d.querySelector("form").addEventListener("submit", function (e) {
+        e.preventDefault();
+        var token = input.value.trim();
+        fetch(API + "/admin/check", { headers: { Authorization: "Bearer " + token } }).then(function (r) {
+          if (!r.ok) { err.textContent = "Wrong password."; return; }
+          ADMIN = token;
+          try { localStorage.setItem("nm-admin-token", token); } catch (e2) {}
+          history.replaceState(null, "", location.pathname + location.hash);
+          d.close();
+        }).catch(function () { err.textContent = "Couldn't reach the server."; });
+      });
+      d.showModal();
+      input.focus();
+    });
+  }
 
   function grid() {
     var g = section.querySelector(".poster-grid");
@@ -62,7 +115,22 @@
       '<figcaption><span class="title">' + esc(it.title) + "</span>" +
       (it.year ? ' <span class="year">' + esc(it.year) + "</span>" : "") + "</figcaption>" +
       credit +
-      '<div class="suggested-by">Suggested by ' + esc(it.suggestedBy) + "</div>";
+      (it.suggestedBy ? '<div class="suggested-by">Suggested by ' + esc(it.suggestedBy) + "</div>" : "") +
+      (ADMIN ? '<button class="remove" type="button">Remove</button>' : "");
+    if (ADMIN) {
+      fig.querySelector(".remove").addEventListener("click", function () {
+        if (!confirm("Remove " + it.title + " from the queue?")) return;
+        fetch(API + "/queue/" + encodeURIComponent(it.imdbId), { method: "DELETE", headers: authHeaders() })
+          .then(function (r) {
+            if (!r.ok) throw new Error();
+            fig.remove();
+            state.remaining += 1;
+            state.open = state.remaining > 0;
+            updateCount();
+          })
+          .catch(function () { alert("Couldn't remove it. Try logging in again."); });
+      });
+    }
     return fig;
   }
 
@@ -75,8 +143,15 @@
   var slot; // the + card or the closed card
   function renderSlot(state) {
     if (slot) slot.remove();
-    slot = document.createElement(state.open && state.yourRemaining > 0 ? "button" : "div");
-    if (!state.open) {
+    var canAdd = ADMIN || (state.open && state.yourRemaining > 0);
+    slot = document.createElement(canAdd ? "button" : "div");
+    if (ADMIN) {
+      slot.type = "button";
+      slot.className = "queue-slot add";
+      slot.setAttribute("aria-label", "Add a movie to the queue");
+      slot.innerHTML = '<span class="plus" aria-hidden="true"></span><span class="label">Add a movie</span>';
+      slot.addEventListener("click", function () { openDialog(state); });
+    } else if (!state.open) {
       slot.className = "queue-slot closed";
       slot.innerHTML = "<span>Not taking submissions at this time</span>";
     } else if (state.yourRemaining <= 0) {
@@ -93,7 +168,11 @@
   }
 
   var state = null;
-  fetch(API + "/queue?visitorId=" + encodeURIComponent(VID))
+  (params.has("admin") && !ADMIN ? login() : Promise.resolve())
+    .then(function () {
+      if (ADMIN) ownerBar();
+      return fetch(API + "/queue?visitorId=" + encodeURIComponent(VID));
+    })
     .then(function (r) { return r.json(); })
     .then(function (data) {
       state = data;
@@ -140,8 +219,16 @@
 
   try { nameInput.value = localStorage.getItem("nm-name") || ""; } catch (e) {}
 
+  var nameLabel = dialog.querySelector('label[for="q-name"]');
+  var heading = dialog.querySelector("h2");
+
   function openDialog(s) {
-    hint.textContent = "You can add " + s.yourRemaining + " more. " + s.remaining + " spot" + (s.remaining === 1 ? "" : "s") + " left in the queue.";
+    nameLabel.hidden = nameInput.hidden = !!ADMIN;
+    heading.textContent = ADMIN ? "Add a movie" : "Suggest a movie";
+    submit.textContent = ADMIN ? "Add to my queue" : "Add to the queue";
+    hint.textContent = ADMIN
+      ? "Goes straight into your queue. " + s.remaining + " spot" + (s.remaining === 1 ? "" : "s") + " left for visitors."
+      : "You can add " + s.yourRemaining + " more. " + s.remaining + " spot" + (s.remaining === 1 ? "" : "s") + " left in the queue.";
     errorEl.textContent = "";
     dialog.showModal();
     movie.focus();
@@ -150,7 +237,7 @@
   dialog.addEventListener("click", function (e) { if (e.target === dialog) dialog.close(); });
 
   function validate() {
-    submit.disabled = !(chosen && nameInput.value.trim());
+    submit.disabled = !(chosen && (ADMIN || nameInput.value.trim()));
   }
   nameInput.addEventListener("input", validate);
 
@@ -172,7 +259,7 @@
     results = [];
     showResults();
     validate();
-    nameInput.focus();
+    (ADMIN ? submit : nameInput).focus();
   }
 
   movie.addEventListener("input", function () {
@@ -209,23 +296,24 @@
 
   form.addEventListener("submit", function (e) {
     e.preventDefault();
-    if (!chosen || !nameInput.value.trim()) return;
+    if (!chosen || (!ADMIN && !nameInput.value.trim())) return;
     submit.disabled = true;
     submit.textContent = "Finding poster art…";
     errorEl.textContent = "";
-    try { localStorage.setItem("nm-name", nameInput.value.trim()); } catch (e2) {}
+    if (!ADMIN) { try { localStorage.setItem("nm-name", nameInput.value.trim()); } catch (e2) {} }
+    var label = ADMIN ? "Add to my queue" : "Add to the queue";
     fetch(API + "/queue", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ imdbId: chosen.id, name: nameInput.value.trim(), visitorId: VID }),
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ imdbId: chosen.id, name: ADMIN ? "" : nameInput.value.trim(), visitorId: VID }),
     })
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
       .then(function (res) {
-        submit.textContent = "Add to the queue";
+        submit.textContent = label;
         if (!res.ok) { errorEl.textContent = res.d.error || "Couldn't add that one."; validate(); return; }
         grid().insertBefore(card(res.d.item), slot);
         state.yourRemaining = res.d.yourRemaining;
-        state.remaining = Math.max(0, state.remaining - 1);
+        state.remaining = res.d.remaining;
         state.open = res.d.open;
         renderSlot(state);
         updateCount();
@@ -235,7 +323,7 @@
         dialog.close();
       })
       .catch(function () {
-        submit.textContent = "Add to the queue";
+        submit.textContent = label;
         errorEl.textContent = "Couldn't reach the server. Try again in a bit.";
         validate();
       });

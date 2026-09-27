@@ -431,6 +431,26 @@ button.queue-slot:hover .plus { transform: rotate(90deg); }
   line-height: 1.4;
 }
 
+.poster.suggested .remove {
+  margin-top: 8px;
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.poster.suggested .remove:hover { border-color: #ff8a8a; color: #ff8a8a; }
+.owner-bar {
+  margin: -24px 0 28px;
+  font-size: 0.8rem;
+  color: var(--accent);
+}
+.owner-bar a { margin-left: 8px; color: var(--muted); }
+.queue-dialog [hidden] { display: none; }
+
 .queue-dialog {
   width: min(460px, calc(100vw - 32px));
   padding: 28px;

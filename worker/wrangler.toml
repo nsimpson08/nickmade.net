@@ -11,7 +11,7 @@ routes = [
 [vars]
 SITE_URL = "https://nickmade.net"
 ALLOWED_ORIGINS = "https://nickmade.net,https://www.nickmade.net"
-QUEUE_LIMIT = "10"
+QUEUE_LIMIT = "20"
 # Used only if the live movies/list.js can't be read
 OWNER_QUEUE_FALLBACK = "4"
 
