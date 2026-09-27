@@ -1,7 +1,8 @@
-// nickmade-queue: visitor submissions for the Movies page "In the Queue" section,
-// plus Nick's "Recently Watched" list.
+// nickmade-queue: the live sections of the Movies and Games pages: visitor suggestions for "In the Queue",
+// Nick's "Recently Watched"/"Recently Played" lists, and Nick's site-added picks for other sections.
+// The queue and watched routes take a page (?page= or "page" in the body): movies (default) or games.
 //
-//   GET    /search?q=title      movie title autocomplete (IMDb suggestions)
+//   GET    /search?q=title      title autocomplete (IMDb suggestions); &kind=game searches video games instead of movies
 //   GET    /queue               visitor submissions + whether the queue is open + this visitor's remaining count
 //   POST   /queue               { imdbId, name, visitorId } -> adds a movie
 //                               with Authorization: Bearer ADMIN_TOKEN it's Nick's own pick:
@@ -12,15 +13,31 @@
 //   POST   /watched             { imdbId, date: "YYYY-MM-DD", rating: 0.5-5 in halves, optional } (admin) -> adds a movie; also drops it from the queue
 //   PATCH  /watched/:id         { rating, date } (admin) -> change the rating and/or date watched
 //   DELETE /watched/:id         remove one (admin)
+//   GET    /lists?page=movies   Nick's site-added picks for each live section of a page: { lists: { <key>: [items] } }
+//   POST   /lists               { page, list, imdbId } (admin) -> adds a movie/game to that section
+//   DELETE /lists/:page/:list/:imdbId  remove one (admin)
 //   GET    /img?u=url           image proxy for posters (allowlisted hosts only)
 //
-// Storage: one KV namespace (QUEUE). Keys:
-//   queue            JSON array of submissions
-//   watched          JSON array of Recently Watched movies
-//   visitor:<hash>   number of submissions from that visitor (browser id or hashed IP)
+// Storage: one KV namespace (QUEUE). Keys (Movies keeps the original unprefixed names):
+//   queue / queue:games            JSON array of queue submissions
+//   watched / watched:games        JSON array of Recently Watched / Recently Played
+//   lists:<page>                   JSON object { <section key>: [items] } for the other live sections
+//   visitor:<hash> / visitor:games:<hash>  number of queue submissions from that visitor (browser id or hashed IP)
 
 const PER_VISITOR = 3;
 const MOVIE_TYPES = new Set(["movie", "tvMovie", "video"]);
+const GAME_TYPES = new Set(["videoGame"]);
+const PAGES = { movies: "movie", games: "game" }; // page -> kind of title it lists
+
+function pageOf(p) {
+  return PAGES[p] ? p : "movies";
+}
+function queueKey(page) {
+  return page === "movies" ? "queue" : "queue:" + page;
+}
+function watchedKey(page) {
+  return page === "movies" ? "watched" : "watched:" + page;
+}
 const IMG_HOSTS = ["m.media-amazon.com", "alternativemovieposters.com"];
 const BLOCKED = ["fuck", "shit", "cunt", "nigg", "fag", "retard", "bitch", "whore", "slut", "nazi", "rape", "porn", "dick", "cock", "pussy"];
 
@@ -34,6 +51,9 @@ export default {
 
     try {
       if (url.pathname === "/search" && request.method === "GET") return await search(url, cors, ctx);
+      if (url.pathname === "/lists" && request.method === "GET") return await getLists(url, env, cors);
+      if (url.pathname === "/lists" && request.method === "POST") return await addToList(request, env, cors);
+      if (url.pathname.startsWith("/lists/") && request.method === "DELETE") return await removeFromList(request, url, env, cors);
       if (url.pathname === "/img" && request.method === "GET") return await image(url, ctx);
       if (url.pathname === "/queue" && request.method === "GET") return await listQueue(request, url, env, cors);
       if (url.pathname === "/queue" && request.method === "POST") return await addToQueue(request, env, cors);
@@ -41,7 +61,9 @@ export default {
         return isAdmin(request, env) ? json({ ok: true }, 200, cors) : json({ error: "Wrong password." }, 401, cors);
       }
       if (url.pathname.startsWith("/queue/") && request.method === "DELETE") return await removeFromQueue(request, url, env, cors);
-      if (url.pathname === "/watched" && request.method === "GET") return json({ items: sortWatched(await getList(env, "watched")) }, 200, cors);
+      if (url.pathname === "/watched" && request.method === "GET") {
+        return json({ items: sortWatched(await getList(env, watchedKey(pageOf(url.searchParams.get("page"))))) }, 200, cors);
+      }
       if (url.pathname === "/watched" && request.method === "POST") return await addWatched(request, env, cors);
       if (url.pathname.startsWith("/watched/") && request.method === "PATCH") return await editWatched(request, url, env, cors);
       if (url.pathname.startsWith("/watched/") && request.method === "DELETE") return await removeWatched(request, url, env, cors);
@@ -83,12 +105,14 @@ async function sha256(text) {
 }
 
 // Two identities per visitor: the random id their browser keeps, and their IP (hashed, never stored raw).
-async function visitorKeys(request, visitorId, env) {
+// Each page has its own 3-per-visitor allowance.
+async function visitorKeys(request, visitorId, env, page) {
   const salt = env.SALT || "nickmade";
+  const prefix = page === "movies" ? "visitor:" : "visitor:" + page + ":";
   const keys = [];
-  if (visitorId && /^[a-z0-9-]{8,64}$/i.test(visitorId)) keys.push("visitor:" + (await sha256(salt + "id:" + visitorId)));
+  if (visitorId && /^[a-z0-9-]{8,64}$/i.test(visitorId)) keys.push(prefix + (await sha256(salt + "id:" + visitorId)));
   const ip = request.headers.get("CF-Connecting-IP");
-  if (ip) keys.push("visitor:" + (await sha256(salt + "ip:" + ip)));
+  if (ip) keys.push(prefix + (await sha256(salt + "ip:" + ip)));
   return keys;
 }
 
@@ -102,8 +126,8 @@ async function getList(env, key) {
   try { return JSON.parse((await env.QUEUE.get(key)) || "[]"); } catch (e) { return []; }
 }
 
-function getQueue(env) {
-  return getList(env, "queue");
+function getQueue(env, page) {
+  return getList(env, queueKey(page));
 }
 
 function normalize(s) {
@@ -111,26 +135,30 @@ function normalize(s) {
     .replace(/&/g, "and").replace(/[^a-z0-9]+/g, " ").trim();
 }
 
-// Your own "In the Queue" movies, read from the live site so the cap stays right when you edit list.js.
-async function ownerQueueTitles(env) {
+// Your own "In the Queue" titles, read from the live site's list.js so the cap stays right when you edit it.
+async function ownerQueueTitles(env, page) {
   try {
-    const res = await fetch(env.SITE_URL.replace(/\/$/, "") + "/movies/list.js", { cf: { cacheTtl: 300 } });
+    const res = await fetch(env.SITE_URL.replace(/\/$/, "") + "/" + page + "/list.js", { cf: { cacheTtl: 300 } });
     const text = await res.text();
-    const start = text.indexOf('title: "In the Queue"');
+    let start = text.indexOf('live: "queue"');
+    if (start < 0) start = text.indexOf('title: "In the Queue"');
     if (start < 0) throw new Error("no queue section");
-    const end = text.indexOf("\n    ]", start);
-    const section = text.slice(start, end > 0 ? end : undefined);
+    const open = text.indexOf("items: [", start);
+    if (open < 0) throw new Error("no items");
+    if (text[open + 8] === "]") return []; // items: []
+    const end = text.indexOf("\n    ]", open);
+    const section = text.slice(open, end > 0 ? end : undefined);
     return [...section.matchAll(/\{\s*title:\s*"([^"]+)"/g)].map((m) => m[1]);
   } catch (e) {
     return null;
   }
 }
 
-async function queueState(env) {
+async function queueState(env, page) {
   const limit = parseInt(env.QUEUE_LIMIT, 10) || 10;
-  const owner = await ownerQueueTitles(env);
-  const ownerCount = owner ? owner.length : parseInt(env.OWNER_QUEUE_FALLBACK, 10) || 0;
-  const items = await getQueue(env);
+  const owner = await ownerQueueTitles(env, page);
+  const ownerCount = owner ? owner.length : page === "movies" ? parseInt(env.OWNER_QUEUE_FALLBACK, 10) || 0 : 0;
+  const items = await getQueue(env, page);
   return { limit, owner: owner || [], items, open: ownerCount + items.length < limit, remaining: Math.max(0, limit - ownerCount - items.length) };
 }
 
@@ -143,8 +171,9 @@ async function search(url, cors, ctx) {
     cf: { cacheTtl: 3600, cacheEverything: true },
   });
   const data = await res.json();
+  const types = url.searchParams.get("kind") === "game" ? GAME_TYPES : MOVIE_TYPES;
   const results = (data.d || [])
-    .filter((r) => /^tt\d+$/.test(r.id) && MOVIE_TYPES.has(r.qid))
+    .filter((r) => /^tt\d+$/.test(r.id) && types.has(r.qid))
     .slice(0, 8)
     .map((r) => ({ id: r.id, title: r.l, year: r.y || null, stars: r.s || "", image: r.i ? r.i.imageUrl : null }));
   return json({ results }, 200, cors);
@@ -170,8 +199,9 @@ async function image(url, ctx) {
 }
 
 async function listQueue(request, url, env, cors) {
-  const state = await queueState(env);
-  const keys = await visitorKeys(request, url.searchParams.get("visitorId"), env);
+  const page = pageOf(url.searchParams.get("page"));
+  const state = await queueState(env, page);
+  const keys = await visitorKeys(request, url.searchParams.get("visitorId"), env, page);
   const used = await usedBy(keys, env);
   return json({
     items: state.items.map(publicItem),
@@ -192,34 +222,36 @@ async function addToQueue(request, env, cors) {
   const imdbId = String(body.imdbId || "");
   const name = String(body.name || "").replace(/\s+/g, " ").trim();
   const owner = isAdmin(request, env);
+  const page = pageOf(body.page);
+  const noun = PAGES[page];
 
-  if (!/^tt\d{5,10}$/.test(imdbId)) return json({ error: "Pick a movie from the list." }, 400, cors);
+  if (!/^tt\d{5,10}$/.test(imdbId)) return json({ error: "Pick a " + noun + " from the list." }, 400, cors);
   let keys = [];
   let used = 0;
   if (!owner) {
     if (name.length < 1 || name.length > 40) return json({ error: "Add your name (up to 40 characters)." }, 400, cors);
     const lowered = normalize(name).replace(/ /g, "");
     if (BLOCKED.some((w) => lowered.includes(w))) return json({ error: "Please use a different name." }, 400, cors);
-    keys = await visitorKeys(request, body.visitorId, env);
+    keys = await visitorKeys(request, body.visitorId, env, page);
     used = await usedBy(keys, env);
-    if (used >= PER_VISITOR) return json({ error: "You've already added " + PER_VISITOR + " movies. Thanks!" }, 429, cors);
+    if (used >= PER_VISITOR) return json({ error: "You've already added " + PER_VISITOR + " " + noun + "s. Thanks!" }, 429, cors);
   }
 
-  const state = await queueState(env);
+  const state = await queueState(env, page);
   if (!state.open && !owner) return json({ error: "Not taking submissions at this time." }, 409, cors);
   if (state.items.some((it) => it.imdbId === imdbId)) return json({ error: "That one's already in the queue." }, 409, cors);
 
-  const movie = await lookupMovie(imdbId);
-  if (!movie) return json({ error: "Couldn't find that movie." }, 404, cors);
+  const movie = await lookupMovie(imdbId, noun);
+  if (!movie) return json({ error: "Couldn't find that " + noun + "." }, 404, cors);
   if (state.owner.some((t) => normalize(t) === normalize(movie.title))) return json({ error: "That one's already in the queue." }, 409, cors);
 
   const item = { ...movie, suggestedBy: owner ? null : name, owner, createdAt: new Date().toISOString() };
 
   // Re-read right before writing to keep the cap honest if two people submit at once
-  const latest = await queueState(env);
+  const latest = await queueState(env, page);
   if (!latest.open && !owner) return json({ error: "Not taking submissions at this time." }, 409, cors);
   latest.items.push(item);
-  await env.QUEUE.put("queue", JSON.stringify(latest.items));
+  await env.QUEUE.put(queueKey(page), JSON.stringify(latest.items));
   for (const k of keys) await env.QUEUE.put(k, String(used + 1));
 
   return json({
@@ -230,14 +262,14 @@ async function addToQueue(request, env, cors) {
   }, 201, cors);
 }
 
-// Look the movie up by id so the title/year/poster come from IMDb, not the browser.
-// Poster: alternative art if AMP has it, else the official IMDb poster.
-async function lookupMovie(imdbId) {
+// Look the title up by id so the title/year/poster come from IMDb, not the browser.
+// Poster: for movies, alternative art if AMP has it; otherwise (and for games) the official IMDb poster/box art.
+async function lookupMovie(imdbId, kind) {
   const res = await fetch("https://v3.sg.media-imdb.com/suggestion/x/" + imdbId + ".json");
   const data = await res.json();
   const movie = (data.d || []).find((r) => r.id === imdbId);
-  if (!movie || !MOVIE_TYPES.has(movie.qid)) return null;
-  const art = await findAlternativeArt(movie.l, movie.y);
+  if (!movie || !(kind === "game" ? GAME_TYPES : MOVIE_TYPES).has(movie.qid)) return null;
+  const art = kind === "game" ? null : await findAlternativeArt(movie.l, movie.y);
   return {
     imdbId,
     title: movie.l,
@@ -282,9 +314,10 @@ function decode(s) {
 async function removeFromQueue(request, url, env, cors) {
   if (!isAdmin(request, env)) return json({ error: "Unauthorized" }, 401, cors);
   const id = decodeURIComponent(url.pathname.split("/")[2] || "");
-  const items = await getQueue(env);
+  const page = pageOf(url.searchParams.get("page"));
+  const items = await getQueue(env, page);
   const kept = items.filter((it) => it.imdbId !== id);
-  await env.QUEUE.put("queue", JSON.stringify(kept));
+  await env.QUEUE.put(queueKey(page), JSON.stringify(kept));
   return json({ removed: items.length - kept.length }, 200, cors);
 }
 
@@ -300,23 +333,25 @@ async function addWatched(request, env, cors) {
   try { body = await request.json(); } catch (e) { return json({ error: "Bad request." }, 400, cors); }
   const imdbId = String(body.imdbId || "");
   const date = String(body.date || "");
-  if (!/^tt\d{5,10}$/.test(imdbId)) return json({ error: "Pick a movie from the list." }, 400, cors);
+  const page = pageOf(body.page);
+  const noun = PAGES[page];
+  if (!/^tt\d{5,10}$/.test(imdbId)) return json({ error: "Pick a " + noun + " from the list." }, 400, cors);
   const bad = checkWatched(date, body.rating);
   if (bad) return json({ error: bad }, 400, cors);
   const rating = toRating(body.rating);
 
-  const movie = await lookupMovie(imdbId);
-  if (!movie) return json({ error: "Couldn't find that movie." }, 404, cors);
+  const movie = await lookupMovie(imdbId, noun);
+  if (!movie) return json({ error: "Couldn't find that " + noun + "." }, 404, cors);
   const item = { ...movie, id: imdbId + "-" + date, date, rating, createdAt: new Date().toISOString() };
 
-  const items = (await getList(env, "watched")).filter((it) => it.id !== item.id);
+  const items = (await getList(env, watchedKey(page))).filter((it) => it.id !== item.id);
   items.push(item);
-  await env.QUEUE.put("watched", JSON.stringify(items));
+  await env.QUEUE.put(watchedKey(page), JSON.stringify(items));
 
-  // Watching a movie from the queue takes it out of the queue
-  const queue = await getQueue(env);
+  // Watching/playing something from the queue takes it out of the queue
+  const queue = await getQueue(env, page);
   const kept = queue.filter((it) => it.imdbId !== imdbId);
-  if (kept.length !== queue.length) await env.QUEUE.put("queue", JSON.stringify(kept));
+  if (kept.length !== queue.length) await env.QUEUE.put(queueKey(page), JSON.stringify(kept));
 
   return json({ item, removedFromQueue: kept.length !== queue.length }, 201, cors);
 }
@@ -326,7 +361,7 @@ function toRating(r) {
 }
 
 function checkWatched(date, r) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || isNaN(Date.parse(date))) return "Pick the date you watched it.";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || isNaN(Date.parse(date))) return "Pick a date.";
   const rating = toRating(r);
   if (rating !== null && !(Number.isInteger(rating * 2) && rating >= 0.5 && rating <= 5)) return "Ratings go from half a star to 5 stars.";
   return null;
@@ -337,7 +372,8 @@ async function editWatched(request, url, env, cors) {
   let body;
   try { body = await request.json(); } catch (e) { return json({ error: "Bad request." }, 400, cors); }
   const id = decodeURIComponent(url.pathname.split("/")[2] || "");
-  const items = await getList(env, "watched");
+  const page = pageOf(url.searchParams.get("page"));
+  const items = await getList(env, watchedKey(page));
   const item = items.find((it) => it.id === id);
   if (!item) return json({ error: "Couldn't find that one. Try reloading." }, 404, cors);
   const date = body.date == null ? item.date : String(body.date);
@@ -349,15 +385,62 @@ async function editWatched(request, url, env, cors) {
   item.id = item.imdbId + "-" + date;
   // A new date could collide with another viewing of the same movie; keep the edited one
   const kept = items.filter((it) => it === item || it.id !== item.id);
-  await env.QUEUE.put("watched", JSON.stringify(kept));
+  await env.QUEUE.put(watchedKey(page), JSON.stringify(kept));
   return json({ item }, 200, cors);
 }
 
 async function removeWatched(request, url, env, cors) {
   if (!isAdmin(request, env)) return json({ error: "Unauthorized" }, 401, cors);
   const id = decodeURIComponent(url.pathname.split("/")[2] || "");
-  const items = await getList(env, "watched");
+  const page = pageOf(url.searchParams.get("page"));
+  const items = await getList(env, watchedKey(page));
   const kept = items.filter((it) => it.id !== id);
-  await env.QUEUE.put("watched", JSON.stringify(kept));
+  await env.QUEUE.put(watchedKey(page), JSON.stringify(kept));
   return json({ removed: items.length - kept.length }, 200, cors);
+}
+
+// ---------- Live sections on Movies/Games (owner only) ----------
+
+async function readLists(env, page) {
+  try { return JSON.parse((await env.QUEUE.get("lists:" + page)) || "{}"); } catch (e) { return {}; }
+}
+
+async function getLists(url, env, cors) {
+  const page = url.searchParams.get("page") || "";
+  if (!PAGES[page]) return json({ error: "Unknown page." }, 400, cors);
+  return json({ lists: await readLists(env, page) }, 200, cors);
+}
+
+async function addToList(request, env, cors) {
+  if (!isAdmin(request, env)) return json({ error: "Unauthorized" }, 401, cors);
+  let body;
+  try { body = await request.json(); } catch (e) { return json({ error: "Bad request." }, 400, cors); }
+  const page = String(body.page || "");
+  const key = String(body.list || "");
+  const imdbId = String(body.imdbId || "");
+  if (!PAGES[page] || !/^[a-z0-9-]{1,40}$/.test(key)) return json({ error: "Unknown section." }, 400, cors);
+  if (!/^tt\d{5,10}$/.test(imdbId)) return json({ error: "Pick one from the list." }, 400, cors);
+
+  const lists = await readLists(env, page);
+  if ((lists[key] || []).some((it) => it.imdbId === imdbId)) return json({ error: "That one's already in this section." }, 409, cors);
+  const found = await lookupMovie(imdbId, PAGES[page]);
+  if (!found) return json({ error: "Couldn't find that one." }, 404, cors);
+  const item = { ...found, createdAt: new Date().toISOString() };
+
+  const latest = await readLists(env, page); // re-read after the slow poster lookup
+  latest[key] = (latest[key] || []).filter((it) => it.imdbId !== imdbId).concat(item);
+  await env.QUEUE.put("lists:" + page, JSON.stringify(latest));
+  return json({ item }, 201, cors);
+}
+
+async function removeFromList(request, url, env, cors) {
+  if (!isAdmin(request, env)) return json({ error: "Unauthorized" }, 401, cors);
+  const [, , page, key, id] = url.pathname.split("/").map(decodeURIComponent);
+  if (!PAGES[page]) return json({ error: "Unknown page." }, 400, cors);
+  const lists = await readLists(env, page);
+  const before = (lists[key] || []).length;
+  lists[key] = (lists[key] || []).filter((it) => it.imdbId !== id);
+  if (!lists[key].length) delete lists[key];
+  await env.QUEUE.put("lists:" + page, JSON.stringify(lists));
+  return json({ removed: before - (lists[key] || []).length }, 200, cors);
 }

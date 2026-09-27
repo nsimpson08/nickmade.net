@@ -22,6 +22,7 @@
   }
 
   function credit(it) {
+    if (it.credit && it.credit.official) return '<div class="credit">Official poster</div>';
     if (!it.credit || !it.credit.artist) return "";
     var name = it.credit.url
       ? '<a href="' + esc(it.credit.url) + '" target="_blank" rel="noopener">' + esc(it.credit.artist) + "</a>"
@@ -103,19 +104,38 @@
     return '<div class="entries">' + items.map(reviewEntry).join("") + "</div>";
   }
 
-  var titled = sections.filter(function (s) { return s.title; });
-  var jump = titled.length > 1
-    ? '<nav class="jump" aria-label="Sections">' + titled.map(function (s) {
-        return '<a href="#' + slug(s.title) + '">' + esc(s.title) + "</a>";
-      }).join("") + "</nav>"
-    : "";
-
-  root.innerHTML = jump + sections.map(function (sec) {
+  function sectionHtml(sec) {
     return '<section class="subsection"' + (sec.title ? ' id="' + slug(sec.title) + '"' : "") + ">" +
       (sec.title ? '<h2 class="subhead"><span>' + esc(sec.title) + "</span>" +
         (sec.subtitle ? '<small class="sub">' + esc(sec.subtitle) + "</small>" : "") +
         ((sec.items || []).length ? '<span class="count">' + (sec.items.length < 10 ? "0" : "") + sec.items.length + "</span>" : "") +
         "</h2>" : "") +
       body(sec) + "</section>";
+  }
+
+  // Consecutive sections sharing a `group` go together; the first one's groupNote/groupStyle describe the group
+  var groups = [];
+  sections.forEach(function (sec) {
+    var last = groups[groups.length - 1];
+    if (last && sec.group && last.name === sec.group) last.sections.push(sec);
+    else groups.push({ name: sec.group || "", note: sec.groupNote, style: sec.groupStyle, sections: [sec] });
+  });
+
+  var titled = sections.filter(function (s) { return s.title; });
+  var jump = titled.length > 1
+    ? '<nav class="jump" aria-label="Sections">' + groups.map(function (g) {
+        return '<span class="jump-group">' + g.sections.filter(function (s) { return s.title; }).map(function (s) {
+          return '<a href="#' + slug(s.title) + '">' + esc(s.title) + "</a>";
+        }).join("") + "</span>";
+      }).join("") + "</nav>"
+    : "";
+
+  root.innerHTML = jump + groups.map(function (g) {
+    var inner = g.sections.map(sectionHtml).join("");
+    if (!g.name) return inner;
+    return '<div class="group' + (g.style === "panel" ? " panel" : "") + '" id="' + slug(g.name) + '">' +
+      '<div class="group-head"><span class="group-name">' + esc(g.name) + "</span>" +
+        (g.note ? '<span class="group-note">' + esc(g.note) + "</span>" : "") + "</div>" +
+      inner + "</div>";
   }).join("");
 })();

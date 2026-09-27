@@ -1,15 +1,36 @@
-// The Movies page's live sections, backed by the nickmade-queue Worker (worker/):
-//   In the Queue      visitor suggestions after yours, then a "+" card to suggest one (or a closed card when full)
-//   Recently Watched  movies you log from the site with the date you watched them, newest first
+// Live sections on the Movies and Games pages, backed by the nickmade-queue Worker (worker/):
+//   live: "queue"    In the Queue: visitor suggestions after yours, then a "+" card to suggest one (or a closed card when full)
+//   live: "watched"  Recently Watched/Played: what you log from the site with the date and a rating, newest first
+//   live: any other key: movies/games you add from the site, shown after the ones in list.js
 // Owner mode: open the page with ?admin and enter the ADMIN_TOKEN once; ?logout forgets it.
-// In owner mode the + cards are always there, your picks have no "Suggested by", and every added movie gets a Remove button.
+// In owner mode the + cards are always there, your picks have no "Suggested by", and every site-added one gets a Remove button.
+// Site additions live in Cloudflare, not in this repo; tools/pull_live.py copies them into list.js.
 (function () {
   var script = document.currentScript;
   var local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
   var API = (local ? script.dataset.apiLocal : script.dataset.api) || "";
-  var section = document.getElementById("in-the-queue");
-  var watchedSection = document.getElementById("recently-watched");
-  if (!API || !section) return;
+  var PAGE = script.dataset.page || "movies";
+  var KIND = PAGE === "games" ? "game" : "movie";
+  var DID = PAGE === "games" ? "Played" : "Watched"; // "Watched Sep 4, 2026" / "Played Sep 4, 2026"
+  var PQ = "page=" + PAGE;
+  if (!API) return;
+
+  function slug(s) {
+    return String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  }
+  function sectionFor(key) {
+    var sec = (window.SECTIONS || []).filter(function (s) { return s.live === key && s.title; })[0];
+    return sec ? { title: sec.title, el: document.getElementById(slug(sec.title)) } : { title: "", el: null };
+  }
+  var queueSec = sectionFor("queue");
+  var watchedSec = sectionFor("watched");
+  var section = queueSec.el;
+  var watchedSection = watchedSec.el;
+
+  // Other sections marked live: "key" in list.js (the key names their storage, so renaming the title is safe)
+  var LISTS = (window.SECTIONS || []).filter(function (s) { return s.live && s.live !== "queue" && s.live !== "watched" && s.title; }).map(function (s) {
+    return { key: s.live, title: s.title, el: document.getElementById(slug(s.title)), slot: null };
+  }).filter(function (l) { return l.el; });
 
   function esc(s) {
     return String(s).replace(/[&<>"']/g, function (c) {
@@ -116,8 +137,8 @@
     return isNaN(d) ? "" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   }
 
-  // kind: "queue" (default) or "watched"
-  function card(it, kind) {
+  // kind: "queue" (default), "watched", or "list" (then l is the live section it belongs to)
+  function card(it, kind, l) {
     var watched = kind === "watched";
     var fig = document.createElement("figure");
     fig.className = "poster suggested";
@@ -128,7 +149,11 @@
     } else {
       credit = '<div class="credit">Official poster</div>';
     }
-    fig.innerHTML =
+    // In a section with song players, leave the same empty player box the list.js items without a song get
+    var track = l && l.el.querySelector(".track")
+      ? '<div class="track track-empty"><div class="track-row"><span class="track-play"></span><div class="track-text"><span class="track-title"></span></div></div><div class="track-bar"><span></span></div></div>'
+      : "";
+    fig.innerHTML = track +
       (it.image
         ? '<div class="art"><img src="' + esc(imgUrl(it.image)) + '" alt="' + esc(it.title) + ' poster art" loading="lazy"></div>'
         : '<div class="art blank">' + esc(it.title) + "</div>") +
@@ -137,7 +162,7 @@
       (watched && it.rating ? '<div class="rating" aria-label="' + ratingText(it.rating) + '">' + stars(it.rating) + "</div>" : "") +
       credit +
       (it.suggestedBy ? '<div class="suggested-by">Suggested by ' + esc(it.suggestedBy) + "</div>" : "") +
-      (watched && it.date ? '<div class="watched-on">Watched ' + esc(watchedOn(it.date)) + "</div>" : "") +
+      (watched && it.date ? '<div class="watched-on">' + DID + " " + esc(watchedOn(it.date)) + "</div>" : "") +
       (ADMIN ? '<div class="owner-actions">' + (watched ? '<button class="edit" type="button">Edit</button>' : "") +
         '<button class="remove" type="button">Remove</button></div>' : "");
     if (ADMIN && watched) {
@@ -145,12 +170,14 @@
     }
     if (ADMIN) {
       fig.querySelector(".remove").addEventListener("click", function () {
-        if (!confirm("Remove " + it.title + " from " + (watched ? "Recently Watched" : "the queue") + "?")) return;
-        var path = watched ? "/watched/" + encodeURIComponent(it.id) : "/queue/" + encodeURIComponent(it.imdbId);
+        if (!confirm("Remove " + it.title + " from " + (l ? l.title : watched ? watchedSec.title : "the queue") + "?")) return;
+        var path = l ? "/lists/" + PAGE + "/" + encodeURIComponent(l.key) + "/" + encodeURIComponent(it.imdbId)
+          : (watched ? "/watched/" + encodeURIComponent(it.id) : "/queue/" + encodeURIComponent(it.imdbId)) + "?" + PQ;
         fetch(API + path, { method: "DELETE", headers: authHeaders() })
           .then(function (r) {
             if (!r.ok) throw new Error();
             fig.remove();
+            if (l) { updateCount(l.el); return; }
             if (watched) { updateCount(watchedSection); return; }
             state.remaining += 1;
             state.open = state.remaining > 0;
@@ -182,8 +209,8 @@
     if (ADMIN) {
       slot.type = "button";
       slot.className = "queue-slot add";
-      slot.setAttribute("aria-label", "Submit a movie to the queue");
-      slot.innerHTML = '<span class="plus" aria-hidden="true"></span><span class="label">Suggest me a movie!</span>';
+      slot.setAttribute("aria-label", "Add a " + KIND + " to the queue");
+      slot.innerHTML = '<span class="plus" aria-hidden="true"></span><span class="label">Suggest me a ' + KIND + "!</span>";
       slot.addEventListener("click", function () { openDialog(state, "queue"); });
     } else if (!state.open) {
       slot.className = "queue-slot closed";
@@ -194,8 +221,8 @@
     } else {
       slot.type = "button";
       slot.className = "queue-slot add";
-      slot.setAttribute("aria-label", "Suggest a movie for the queue");
-      slot.innerHTML = '<span class="plus" aria-hidden="true"></span><span class="label">Suggest a movie</span>';
+      slot.setAttribute("aria-label", "Suggest a " + KIND + " for the queue");
+      slot.innerHTML = '<span class="plus" aria-hidden="true"></span><span class="label">Suggest a ' + KIND + "</span>";
       slot.addEventListener("click", function () { openDialog(state, "queue"); });
     }
     grid().appendChild(slot);
@@ -203,22 +230,65 @@
 
   var state = null;
   var ready = (params.has("admin") && !ADMIN ? login() : Promise.resolve());
-  ready
-    .then(function () {
-      if (ADMIN) ownerBar();
-      return fetch(API + "/queue?visitorId=" + encodeURIComponent(VID));
-    })
-    .then(function (r) { return r.json(); })
-    .then(function (data) {
-      state = data;
-      var g = grid();
-      (data.items || []).forEach(function (it) { g.appendChild(card(it)); });
-      updateCount();
-      renderSlot(data);
-    })
-    .catch(function () { /* service unreachable: just show your own queue */ });
+  ready.then(function () { if (ADMIN) ownerBar(); });
+  if (section) {
+    ready
+      .then(function () { return fetch(API + "/queue?" + PQ + "&visitorId=" + encodeURIComponent(VID)); })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        state = data;
+        var g = grid();
+        (data.items || []).forEach(function (it) { if (!inSection(section, it.title)) g.appendChild(card(it)); });
+        updateCount();
+        renderSlot(data);
+      })
+      .catch(function () { /* service unreachable: just show your own queue */ });
+  }
 
-  // ---------- Recently Watched ----------
+  // ---------- live sections (owner adds from the site) ----------
+
+  // Is this title already in the section? Once tools/pull_live.py copies a site addition into list.js and it's
+  // pushed, both copies exist until the script's next run clears the live one; show just the list.js one.
+  function inSection(el, title) {
+    return [].some.call(el.querySelectorAll(".poster:not(.suggested) .title"), function (t) {
+      return t.textContent.trim().toLowerCase() === String(title).toLowerCase();
+    });
+  }
+
+  function renderListSlot(l) {
+    if (!ADMIN) return;
+    if (l.slot) l.slot.remove();
+    l.slot = document.createElement("button");
+    l.slot.type = "button";
+    l.slot.className = "queue-slot add";
+    l.slot.setAttribute("aria-label", "Add a " + KIND + " to " + l.title);
+    l.slot.innerHTML = '<span class="plus" aria-hidden="true"></span><span class="label">Add a ' + KIND + "</span>";
+    l.slot.addEventListener("click", function () { openDialog(state, "list", l); });
+    grid(l.el).appendChild(l.slot);
+    // In a section with song players, line the card up with the posters, not the players
+    var track = l.el.querySelector(".poster .track");
+    if (track) l.slot.style.marginTop = (track.nextElementSibling.offsetTop - track.offsetTop) + "px";
+  }
+
+  if (LISTS.length) {
+    ready
+      .then(function () { return fetch(API + "/lists?page=" + PAGE); })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var lists = data.lists || {};
+        LISTS.forEach(function (l) {
+          var items = (lists[l.key] || []).filter(function (it) { return !inSection(l.el, it.title); });
+          if (!items.length && !ADMIN) return;
+          var g = grid(l.el);
+          items.forEach(function (it) { g.appendChild(card(it, "list", l)); });
+          if (items.length) updateCount(l.el);
+          renderListSlot(l);
+        });
+      })
+      .catch(function () { /* service unreachable: just show list.js */ });
+  }
+
+  // ---------- Recently Watched / Recently Played ----------
 
   var watchedSlot; // owner-only + card
   function renderWatchedSlot() {
@@ -227,8 +297,8 @@
     watchedSlot = document.createElement("button");
     watchedSlot.type = "button";
     watchedSlot.className = "queue-slot add";
-    watchedSlot.setAttribute("aria-label", "Log a movie you watched");
-    watchedSlot.innerHTML = '<span class="plus" aria-hidden="true"></span><span class="label">Log a movie</span>';
+    watchedSlot.setAttribute("aria-label", "Log a " + KIND + " you " + DID.toLowerCase());
+    watchedSlot.innerHTML = '<span class="plus" aria-hidden="true"></span><span class="label">Log a ' + KIND + "</span>";
     watchedSlot.addEventListener("click", function () { openDialog(state, "watched"); });
     grid(watchedSection).appendChild(watchedSlot);
   }
@@ -243,7 +313,7 @@
 
   if (watchedSection) {
     ready
-      .then(function () { return fetch(API + "/watched"); })
+      .then(function () { return fetch(API + "/watched?" + PQ); })
       .then(function (r) { return r.json(); })
       .then(function (data) {
         var items = data.items || [];
@@ -252,7 +322,7 @@
       .catch(function () {});
   }
 
-  // ---------- the add-a-movie dialog ----------
+  // ---------- the add dialog ----------
 
   var dialog = document.createElement("dialog");
   dialog.className = "queue-dialog";
@@ -261,12 +331,12 @@
       '<button class="close" type="button" aria-label="Close">&times;</button>' +
       "<h2>Suggest a movie</h2>" +
       '<p class="hint"></p>' +
-      '<label for="q-movie">Movie</label>' +
+      '<label for="q-movie">' + (KIND === "game" ? "Game" : "Movie") + "</label>" +
       '<div class="combo">' +
         '<input id="q-movie" type="text" autocomplete="off" placeholder="Start typing a title" role="combobox" aria-expanded="false" aria-controls="q-results" aria-autocomplete="list">' +
         '<ul id="q-results" role="listbox" hidden></ul>' +
       "</div>" +
-      '<label for="q-date">Date watched</label>' +
+      '<label for="q-date">Date ' + DID.toLowerCase() + "</label>" +
       '<input id="q-date" type="date">' +
       '<label id="q-rating-label">Your rating</label>' +
       '<div class="rate" id="q-rating" role="slider" tabindex="0" aria-labelledby="q-rating-label" aria-valuemin="0" aria-valuemax="5" aria-valuenow="0" aria-valuetext="No rating">' +
@@ -307,7 +377,7 @@
   var rateText = rate.querySelector(".rate-text");
   var rating = 0;
   // Picker-only helper phrases (never shown on the cards), indexed by half stars: 0.5 -> 1, 5 -> 10
-  var PHRASES = ["", "Unwatchable", "Awful", "Bad", "Weak", "Mixed bag", "Good", "Really good", "Great", "Excellent", "Masterpiece"];
+  var PHRASES = ["", KIND === "game" ? "Unplayable" : "Unwatchable", "Awful", "Bad", "Weak", "Mixed bag", "Good", "Really good", "Great", "Excellent", "Masterpiece"];
   function showRating(r) {
     rateStars.style.setProperty("--r", r);
     rateText.innerHTML = r ? esc(r) + ' <span class="phrase">' + PHRASES[r * 2] + "</span>" : "No rating";
@@ -343,22 +413,29 @@
   }
 
   function submitLabel() {
-    return mode === "edit" ? "Save changes" : mode === "watched" ? "Add to Recently Watched" : ADMIN ? "Add to my queue" : "Add to the queue";
+    return mode === "edit" ? "Save changes" : mode === "watched" ? "Add to " + watchedSec.title : mode === "list" ? "Add to " + target.title
+      : ADMIN ? "Add to my queue" : "Add to the queue";
   }
 
   function resetFields() {
     chosen = null;
     movie.value = "";
+    results = [];
+    noMatch = false;
+    showResults();
     dateInput.value = "";
     setRating(0);
   }
 
-  // m: "queue", "watched" (log a movie) or "edit" (change the rating/date of a Recently Watched movie `it`)
+  // m: "queue", "watched" (log a movie), "edit" (change the rating/date of a Recently Watched movie `it`)
+  // or "list" (add to the live section `it`)
   var editing = null;
+  var target = null; // the live section being added to
   function openDialog(s, m, it) {
     if (mode === "edit") resetFields(); // don't carry an edited movie into a new one
     mode = m || "queue";
     editing = mode === "edit" ? it : null;
+    target = mode === "list" ? it : null;
     var watching = mode === "watched" || !!editing;
     nameLabel.hidden = nameInput.hidden = !!ADMIN;
     dateLabel.hidden = dateInput.hidden = !watching;
@@ -372,12 +449,14 @@
       setRating(it.rating || 0);
     }
     if (watching && !dateInput.value) dateInput.value = today();
-    heading.textContent = editing ? "Edit " + it.title : watching ? "Log a movie" : ADMIN ? "Submit a movie" : "Suggest a movie";
+    heading.textContent = editing ? "Edit " + it.title : watching ? "Log a " + KIND : target ? "Add a " + KIND : ADMIN ? "Submit a " + KIND : "Suggest a " + KIND;
     submit.textContent = submitLabel();
     hint.textContent = editing
-      ? "Change your rating or the date you watched it."
+      ? "Change your rating or the date you " + DID.toLowerCase() + " it."
+      : target
+      ? "Goes at the end of " + target.title + ". Poster art is picked automatically."
       : watching
-      ? "Shows up in Recently Watched, newest first. If it's in the queue, it comes out of the queue."
+      ? "Shows up in " + watchedSec.title + ", newest first. If it's in the queue, it comes out of the queue."
       : ADMIN
       ? "Goes straight into your queue. " + (s ? s.remaining : 0) + " spot" + (s && s.remaining === 1 ? "" : "s") + " left for visitors."
       : "You can add " + s.yourRemaining + " more. " + s.remaining + " spot" + (s.remaining === 1 ? "" : "s") + " left in the queue.";
@@ -387,27 +466,32 @@
     (editing ? rate : movie).focus();
   }
   dialog.querySelector(".close").addEventListener("click", function () { dialog.close(); });
+  dialog.addEventListener("close", function () { resetFields(); errorEl.textContent = ""; });
   dialog.addEventListener("click", function (e) { if (e.target === dialog) dialog.close(); });
 
   function validate() {
-    submit.disabled = !(chosen && (ADMIN || nameInput.value.trim()) && (mode === "queue" || dateInput.value));
+    submit.disabled = !(chosen && (ADMIN || nameInput.value.trim()) && (mode === "queue" || mode === "list" || dateInput.value));
   }
   nameInput.addEventListener("input", validate);
   dateInput.addEventListener("input", validate);
 
+  var noMatch = false; // last search came back empty
   function showResults() {
-    list.innerHTML = results.map(function (r, i) {
+    list.innerHTML = noMatch && !results.length
+      ? '<li class="none">No matching ' + KIND + 's on IMDb</li>'
+      : results.map(function (r, i) {
       return '<li role="option" id="q-opt-' + i + '"' + (i === active ? ' aria-selected="true"' : "") + ' data-i="' + i + '">' +
         (r.image ? '<img src="' + esc(imgUrl(r.image, 80)) + '" alt="">' : '<span class="noimg"></span>') +
         '<span class="t">' + esc(r.title) + (r.year ? ' <span class="y">' + r.year + "</span>" : "") +
         (r.stars ? '<span class="s">' + esc(r.stars) + "</span>" : "") + "</span></li>";
     }).join("");
-    list.hidden = !results.length;
+    list.hidden = !results.length && !noMatch;
     movie.setAttribute("aria-expanded", String(!!results.length));
     movie.setAttribute("aria-activedescendant", active >= 0 ? "q-opt-" + active : "");
   }
 
   function pick(i) {
+    if (!results[i]) return;
     chosen = results[i];
     movie.value = chosen.title + (chosen.year ? " (" + chosen.year + ")" : "");
     results = [];
@@ -418,17 +502,19 @@
 
   movie.addEventListener("input", function () {
     chosen = null;
+    noMatch = false;
     validate();
     clearTimeout(timer);
     var q = movie.value.trim();
     if (q.length < 2) { results = []; showResults(); return; }
     timer = setTimeout(function () {
       var mine = ++seq;
-      fetch(API + "/search?q=" + encodeURIComponent(q))
+      fetch(API + "/search?kind=" + KIND + "&q=" + encodeURIComponent(q))
         .then(function (r) { return r.json(); })
         .then(function (data) {
           if (mine !== seq) return;
           results = data.results || [];
+          noMatch = !results.length;
           active = -1;
           showResults();
         })
@@ -441,7 +527,7 @@
     if (e.key === "ArrowDown") { active = Math.min(results.length - 1, active + 1); showResults(); e.preventDefault(); }
     else if (e.key === "ArrowUp") { active = Math.max(0, active - 1); showResults(); e.preventDefault(); }
     else if (e.key === "Enter" && active >= 0) { pick(active); e.preventDefault(); }
-    else if (e.key === "Escape") { results = []; showResults(); e.preventDefault(); }
+    else if (e.key === "Escape") { results = []; noMatch = false; showResults(); e.preventDefault(); }
   });
   list.addEventListener("mousedown", function (e) {
     var li = e.target.closest("li");
@@ -452,6 +538,7 @@
     e.preventDefault();
     if (submit.disabled) return;
     if (editing) return saveEdit();
+    if (target) return saveToList();
     var watching = mode === "watched";
     submit.disabled = true;
     submit.textContent = "Finding poster art…";
@@ -462,8 +549,8 @@
       method: "POST",
       headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify(watching
-        ? { imdbId: chosen.id, date: dateInput.value, rating: rating }
-        : { imdbId: chosen.id, name: ADMIN ? "" : nameInput.value.trim(), visitorId: VID }),
+        ? { page: PAGE, imdbId: chosen.id, date: dateInput.value, rating: rating }
+        : { page: PAGE, imdbId: chosen.id, name: ADMIN ? "" : nameInput.value.trim(), visitorId: VID }),
     })
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
       .then(function (res) {
@@ -497,8 +584,40 @@
       });
   });
 
+  function saveToList() {
+    var l = target;
+    // list.js entries aren't in the Worker, so check those here
+    var have = inSection(l.el, chosen.title) || [].some.call(l.el.querySelectorAll(".poster.suggested .title"), function (t) {
+      return t.textContent.trim().toLowerCase() === String(chosen.title).toLowerCase();
+    });
+    if (have) { errorEl.textContent = chosen.title + " is already in " + l.title + "."; return; }
+    submit.disabled = true;
+    submit.textContent = "Finding poster art…";
+    errorEl.textContent = "";
+    fetch(API + "/lists", {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ page: PAGE, list: l.key, imdbId: chosen.id }),
+    })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        submit.textContent = submitLabel();
+        if (!res.ok) { errorEl.textContent = res.d.error || "Couldn't add that one."; validate(); return; }
+        grid(l.el).insertBefore(card(res.d.item, "list", l), l.slot);
+        updateCount(l.el);
+        resetFields();
+        validate();
+        dialog.close();
+      })
+      .catch(function () {
+        submit.textContent = submitLabel();
+        errorEl.textContent = "Couldn't reach the server. Try again in a bit.";
+        validate();
+      });
+  }
+
   function reloadWatched() {
-    return fetch(API + "/watched").then(function (r) { return r.json(); }).then(function (data) {
+    return fetch(API + "/watched?" + PQ).then(function (r) { return r.json(); }).then(function (data) {
       renderWatched(data.items || []);
       resetFields();
       validate();
@@ -510,7 +629,7 @@
     submit.disabled = true;
     submit.textContent = "Saving…";
     errorEl.textContent = "";
-    fetch(API + "/watched/" + encodeURIComponent(editing.id), {
+    fetch(API + "/watched/" + encodeURIComponent(editing.id) + "?" + PQ, {
       method: "PATCH",
       headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ date: dateInput.value, rating: rating }),

@@ -3,6 +3,14 @@
 // Each subsection has:
 //   title    the subsection header
 //   layout   "reviews" (poster with review beside it) or "grid" (posters with titles underneath)
+//   subtitle optional small text beside the header
+//   group    optional: consecutive sections with the same group are shown together under that label.
+//            On a group's first section, groupNote adds a line of text and groupStyle: "panel" gives it a raised box.
+//   live     optional: a short fixed key like "horror" lets you add more from the site in owner mode (?admin).
+//            Two keys are special: "queue" (In the Queue: visitors can suggest, 3 each, 20 total)
+//            and "watched" (Recently Played: dated and rated, newest first).
+//            Those additions are stored in Cloudflare, not here; run tools/pull_live.py to copy them into this file.
+//            Don't change a key once set (the title can change freely).
 //   items    the games, in the order you want them shown
 //
 // Game fields:
@@ -13,7 +21,7 @@
 //   review   your review; a blank line starts a new paragraph (reviews layout)
 //   image    poster art: a file in games/posters/ (e.g. "posters/outer-wilds.jpg") or a full URL
 //   credit   the artist, when the art came from the web: { artist: "Name", url: "https://..." }
-//            for official art add label: "Official art from" (shown instead of "Art by")
+//            for official art (no fan art found) use credit: { official: true }, shown as "Official poster" with no link
 //   song     a 30-second Apple Music preview with a play button (grid layout):
 //            { id: 1134673053, title: "Song", artist: "Artist" }
 //            id is the number after ?i= in the song's Apple Music link
@@ -24,6 +32,27 @@
 
 window.SECTIONS = [
   {
+    // Filled in from the site in owner mode (?admin): pick a game, the date you played it, and a rating
+    group: "Lately",
+    groupNote: "What I just played, and what's up next",
+    groupStyle: "panel",
+    live: "watched",
+    title: "Recently Played",
+    subtitle: "w/ personal ratings",
+    layout: "grid",
+    items: []
+  },
+  {
+    // Visitors can suggest games here (3 each, 20 total including these); yours from the site go in too
+    group: "Lately",
+    live: "queue",
+    title: "In the Queue",
+    layout: "grid",
+    items: []
+  },
+  {
+    group: "Favorites",
+    groupNote: "The ones I keep coming back to",
     title: "All Time Favorites",
     layout: "reviews",
     items: [
@@ -56,7 +85,7 @@ window.SECTIONS = [
         year: 2018,
         details: "Unknown Worlds",
         image: "posters/subnautica.jpg",
-        credit: { label: "Official art from", artist: "Unknown Worlds", url: "https://store.steampowered.com/app/264710/" },
+        credit: { official: true },
         review: ""
       },
       {
@@ -64,7 +93,7 @@ window.SECTIONS = [
         year: 2015,
         details: "Psyonix",
         image: "posters/rocket-league.jpg",
-        credit: { label: "Official art from", artist: "Psyonix", url: "https://store.steampowered.com/app/252950/" },
+        credit: { official: true },
         review: ""
       },
       {
@@ -72,12 +101,14 @@ window.SECTIONS = [
         year: 2007,
         details: "Neversoft",
         image: "posters/guitar-hero-iii.jpg",
-        credit: { label: "Official art from", artist: "Activision" },
+        credit: { official: true },
         review: ""
       }
     ]
   },
   {
+    group: "Favorites",
+    live: "soundtracks",
     title: "Best Soundtracks",
     layout: "grid",
     items: [
@@ -104,21 +135,25 @@ window.SECTIONS = [
     ]
   },
   {
+    group: "Favorites",
+    live: "horror",
     title: "Best Horror",
     layout: "grid",
     items: [
       { title: "Dead Space", year: 2008, image: "posters/dead-space.jpg", credit: { artist: "Estevan Silveira", url: "https://posterspy.com/profile/estevansilveira" } },
-      { title: "ROUTINE", year: 2025, image: "posters/routine.jpg", credit: { label: "Official art from", artist: "Lunar Software", url: "https://store.steampowered.com/app/606160/" } },
-      { title: "The Evil Within", year: 2014, image: "posters/the-evil-within.jpg", credit: { label: "Official art from", artist: "Tango Gameworks", url: "https://store.steampowered.com/app/268050/" } },
+      { title: "ROUTINE", year: 2025, image: "posters/routine.jpg", credit: { official: true } },
+      { title: "The Evil Within", year: 2014, image: "posters/the-evil-within.jpg", credit: { official: true } },
       { title: "Resident Evil 7: Biohazard", year: 2017, image: "posters/resident-evil-7.jpg", credit: { artist: "DComp", url: "https://posterspy.com/profile/dcomp" } },
-      { title: "F.E.A.R. 2: Project Origin", year: 2009, image: "posters/fear-2.jpg", credit: { label: "Official art from", artist: "Monolith Productions", url: "https://store.steampowered.com/app/16450/" } }
+      { title: "F.E.A.R. 2: Project Origin", year: 2009, image: "posters/fear-2.jpg", credit: { official: true } }
     ]
   },
   {
+    group: "Favorites",
+    live: "indie",
     title: "Best Indie",
     layout: "grid",
     items: [
-      { title: "Void Bastards", year: 2019, image: "posters/void-bastards.jpg", credit: { label: "Official art from", artist: "Blue Manchu", url: "https://store.steampowered.com/app/857980/" } }
+      { title: "Void Bastards", year: 2019, image: "posters/void-bastards.jpg", credit: { official: true } }
     ]
   }
 ];
