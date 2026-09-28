@@ -108,7 +108,6 @@
     return '<section class="subsection"' + (sec.title ? ' id="' + slug(sec.title) + '"' : "") + ">" +
       (sec.title ? '<h2 class="subhead"><span>' + esc(sec.title) + "</span>" +
         (sec.subtitle ? '<small class="sub">' + esc(sec.subtitle) + "</small>" : "") +
-        ((sec.items || []).length ? '<span class="count">' + (sec.items.length < 10 ? "0" : "") + sec.items.length + "</span>" : "") +
         "</h2>" : "") +
       body(sec) + "</section>";
   }

@@ -3,36 +3,37 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Movies · NickMade</title>
-  <meta name="description" content="Nick Simpson's favorite movies, reviewed.">
+  <title>Golf · NickMade</title>
+  <meta name="description" content="Nick Simpson's recent golf rounds on Trackman, X-Golf, and 18Birdies, and what's in the bag.">
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500&family=Unbounded:wght@500;600;700;800&display=swap">
   <link rel="stylesheet" href="/assets/css/site.css">
 </head>
-<body class="page-movies">
+<body class="page-projects">
   <header class="topbar">
     <a class="wordmark" href="/">Nick<span>Made</span></a>
     <nav>
       <a href="/games/">Games</a>
-      <a href="/movies/" aria-current="page">Movies</a>
+      <a href="/movies/">Movies</a>
       <a href="/music/">Music</a>
       <a href="/photography/">Photography</a>
-      <a href="/projects/">Extras</a>
+      <a href="/projects/" aria-current="page">Extras</a>
     </nav>
   </header>
 
   <main class="content">
     <header class="page-head">
-      <h1>Movies</h1>
-      <p>My favorite movies, and what I think of them.</p>
+      <a class="back" href="/projects/">&larr; Extras</a>
+      <h1>Golf</h1>
+      <p>Recent rounds in the sim and on the course, and what's in the bag.</p>
     </header>
 
-    <div class="sections" id="entries"></div>
+    <div class="sections" id="golf"></div>
   </main>
-  <script src="list.js"></script>
-  <script src="/assets/js/reviews.js"></script>
-  <script src="/assets/js/live.js" data-page="movies" data-api="https://api.nickmade.net" data-api-local="http://localhost:8787"></script>
+  <script src="scores.js"></script>
+  <script src="trackman.js"></script>
+  <script src="/assets/js/golf.js"></script>
 </body>
 </html>

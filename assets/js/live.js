@@ -166,8 +166,8 @@
     var credit = "";
     if (it.credit && it.credit.artist) {
       credit = '<div class="credit">Art by <a href="' + esc(it.credit.url) + '" target="_blank" rel="noopener">' + esc(it.credit.artist) + "</a></div>";
-    } else if (!(watched && PAGE === "games")) {
-      // Games' Recently Played is always official art, so it goes unlabeled there
+    } else if (!(PAGE === "games" && (watched || !l))) {
+      // Games' Recently Played and In the Queue are always official art, so they go unlabeled there
       credit = '<div class="credit">Official poster</div>';
     }
     // In a section with song players, leave the same empty player box the list.js items without a song get
@@ -206,28 +206,14 @@
           .then(function (r) {
             if (!r.ok) throw new Error();
             fig.remove();
-            if (l) { updateCount(l.el); return; }
-            if (watched) { updateCount(watchedSection); return; }
+            if (l || watched) return;
             state.remaining += 1;
             state.open = state.remaining > 0;
-            updateCount();
           })
           .catch(function () { alert("Couldn't remove it. Try logging in again."); });
       });
     }
     return fig;
-  }
-
-  function updateCount(sec) {
-    sec = sec || section;
-    var count = sec.querySelector(".subhead .count");
-    if (!count) {
-      count = document.createElement("span");
-      count.className = "count";
-      sec.querySelector(".subhead").appendChild(count);
-    }
-    var n = sec.querySelectorAll(".poster-grid > .poster").length;
-    count.textContent = (n < 10 ? "0" : "") + n;
   }
 
   var slot; // the + card or the closed card
@@ -268,7 +254,6 @@
         state = data;
         var g = grid();
         (data.items || []).forEach(function (it) { if (!inSection(section, it.title)) g.appendChild(card(it)); });
-        updateCount();
         renderSlot(data);
       })
       .catch(function () { /* service unreachable: just show your own queue */ });
@@ -310,7 +295,6 @@
           if (!items.length && !ADMIN) return;
           var g = grid(l.el);
           items.forEach(function (it) { g.appendChild(card(it, "list", l)); });
-          if (items.length) updateCount(l.el);
           renderListSlot(l);
         });
       })
@@ -427,7 +411,6 @@
             (data.items || []).forEach(function (it) { if (!inSection(section, it.title)) grid().insertBefore(card(it), slot); });
             state = data;
             renderSlot(data);
-            updateCount();
           });
         }).then(function () { xbox.close(); });
       })
@@ -439,7 +422,6 @@
     var g = grid(watchedSection);
     g.querySelectorAll(".poster").forEach(function (el) { el.remove(); });
     items.forEach(function (it) { g.appendChild(card(it, "watched")); });
-    updateCount(watchedSection);
     renderWatchedSlot();
   }
 
@@ -694,7 +676,6 @@
             if (old) old.remove();
             state.remaining += 1;
             state.open = state.remaining > 0;
-            updateCount();
           }
           return reloadWatched();
         }
@@ -703,7 +684,6 @@
         state.remaining = res.d.remaining;
         state.open = res.d.open;
         renderSlot(state);
-        updateCount();
         chosen = null;
         movie.value = "";
         validate();
@@ -736,7 +716,6 @@
         submit.textContent = submitLabel();
         if (!res.ok) { errorEl.textContent = res.d.error || "Couldn't add that one."; validate(); return; }
         grid(l.el).insertBefore(card(res.d.item, "list", l), l.slot);
-        updateCount(l.el);
         resetFields();
         validate();
         dialog.close();

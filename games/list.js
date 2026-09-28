@@ -48,11 +48,16 @@ window.SECTIONS = [
     live: "queue",
     title: "In the Queue",
     layout: "grid",
-    items: []
+    items: [
+      { title: "Grand Theft Auto VI", year: 2026, image: "posters/grand-theft-auto-vi.jpg", credit: { official: true } },
+      { title: "Gears of War: E-Day", year: 2026, image: "posters/gears-of-war-e-day.jpg", credit: { official: true } },
+      { title: "Well Dweller", year: 2026, image: "posters/well-dweller.jpg", credit: { official: true } },
+      { title: "Kingdom Come: Deliverance", year: 2018, image: "posters/kingdom-come-deliverance.jpg", credit: { official: true } }
+    ]
   },
   {
     group: "Favorites",
-    groupNote: "The ones I keep coming back to",
+    groupNote: "",
     title: "All Time Favorites",
     layout: "reviews",
     items: [
@@ -97,11 +102,11 @@ window.SECTIONS = [
         review: ""
       },
       {
-        title: "Guitar Hero III: Legends of Rock",
-        year: 2007,
-        details: "Neversoft",
-        image: "posters/guitar-hero-iii.jpg",
-        credit: { official: true },
+        title: "The Witcher 3: Wild Hunt",
+        year: 2015,
+        details: "CD Projekt Red",
+        image: "posters/the-witcher-3.jpg",
+        credit: { artist: "Joe Cosentino", url: "https://posterspy.com/profile/joecosentinodesign/" },
         review: ""
       }
     ]
@@ -131,6 +136,10 @@ window.SECTIONS = [
       {
         title: "Assassin's Creed II", year: 2009, image: "posters/assassins-creed-ii.jpg", credit: { artist: "Koke Núñez", url: "https://posterspy.com/profile/koke" },
         song: { id: 1640108517, title: "Ezio's Family", artist: "Jesper Kyd" }
+      },
+      {
+        title: "Halo 3: ODST", year: 2009, image: "posters/halo-3-odst.jpg", credit: { artist: "Noble-6 Design", url: "https://posterspy.com/profile/noble-6/" },
+        song: { id: 1682503376, title: "Deference for Darkness", artist: "Martin O'Donnell & Michael Salvatori" }
       }
     ]
   },

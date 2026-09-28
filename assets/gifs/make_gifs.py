@@ -25,23 +25,30 @@ def tri(t, period):
     return 1 - abs(2 * p - 1)
 
 
-# --- Projects: a terminal that types itself ---
-def projects():
-    lines = [
-        ("$ ", "nickmade new --idea"),
-        ("", "  [ok] sketching"),
-        ("", "  [ok] caffeinating"),
-        ("", "  [ok] shipping"),
-    ]
+# --- Extras: coding, then a golf shot, then a best-of list, looping ---
+def star(d, cx, cy, r, fill):
+    pts = []
+    for k in range(10):
+        a = math.pi / 2 + k * math.pi / 5
+        rr = r if k % 2 == 0 else r * 0.45
+        pts.append((cx + rr * math.cos(a), cy - rr * math.sin(a)))
+    d.polygon(pts, fill=fill)
+
+
+def fade(frames, n=5):
+    """Fade the last n frames to black so scenes hand off smoothly"""
+    for k in range(n):
+        i = len(frames) - n + k
+        frames[i] = Image.blend(frames[i], Image.new("RGB", (W, H), BG), (k + 1) / (n + 1))
+
+
+def extras():
     frames = []
-    typed = 0
-    total = len(lines[0][1])
-    steps = []
-    for i in range(0, total + 1, 1):
-        steps.append((i, 0))
-    for extra in range(1, 4):
-        steps += [(total, extra)] * 6
-    steps += [(total, 3)] * 14
+
+    # 1) coding: a terminal types a command and the checks come in
+    cmd = "nickmade new --idea"
+    checks = ["  [ok] sketching", "  [ok] caffeinating", "  [ok] shipping"]
+    steps = [(i, 0) for i in range(len(cmd) + 1)] + [(len(cmd), k) for k in (1, 1, 1, 1, 2, 2, 2, 2, 3)] + [(len(cmd), 3)] * 12
     for n, (chars, shown) in enumerate(steps):
         im = Image.new("RGB", (W, H), BG)
         d = ImageDraw.Draw(im)
@@ -50,25 +57,116 @@ def projects():
             d.ellipse((60 + k * 20, 58, 71 + k * 20, 69), fill=c)
         y = 96
         d.text((64, y), "$ ", font=MONO, fill=MINT)
-        d.text((84, y), lines[0][1][:chars], font=MONO, fill=FG)
-        cx = 84 + d.textlength(lines[0][1][:chars], font=MONO)
-        for k in range(1, shown + 1):
+        d.text((84, y), cmd[:chars], font=MONO, fill=FG)
+        cx = 84 + d.textlength(cmd[:chars], font=MONO)
+        for k in range(shown):
             y += 30
-            txt = lines[k][1]
-            d.text((64, y), txt[:6], font=MONO, fill=MINT)
-            d.text((64 + d.textlength(txt[:6], font=MONO), y), txt[6:], font=MONO, fill=FG)
-            cx = 64 + d.textlength(txt, font=MONO) + 6
-        if shown == 3:
-            y += 30
-            d.text((64, y), "$ ", font=MONO, fill=MINT)
-            cx = 84
-        if (n // 4) % 2 == 0 or chars < total:
+            d.text((64, y), checks[k][:6], font=MONO, fill=MINT)
+            d.text((64 + d.textlength(checks[k][:6], font=MONO), y), checks[k][6:], font=MONO, fill=FG)
+            cx = 64 + d.textlength(checks[k], font=MONO) + 6
+        if chars < len(cmd) or (n // 4) % 2 == 0:
             d.rectangle((cx + 2, y + 2, cx + 11, y + 20), fill=MINT)
         frames.append(im)
-    save(frames, "projects", 80)
+    fade(frames)
+
+    # 2) golf: backswing, strike, the ball arcs onto the green and drops in the cup
+    ground = 232
+    gx, bx0, hole = 92, 118, 392
+    N = 60
+    strike, land, cup = 16, 42, 48
+    for t in range(N):
+        im = Image.new("RGB", (W, H), BG)
+        d = ImageDraw.Draw(im)
+        d.rectangle((0, ground, W, H), fill=(14, 30, 22))
+        d.ellipse((hole - 70, ground - 6, hole + 70, ground + 10), fill=(22, 52, 36))  # the green
+        d.line((0, ground, W, ground), fill=(40, 82, 58), width=2)
+        # flag, waving
+        d.line((hole, ground - 84, hole, ground), fill=FG, width=2)
+        wave = 5 * math.sin(2 * math.pi * t / 20)
+        d.polygon([(hole, ground - 84), (hole + 34, ground - 76 + wave * 0.4), (hole, ground - 64)], fill=MINT)
+        d.ellipse((hole - 7, ground - 2, hole + 7, ground + 4), fill=BG)  # cup
+        # golfer: head, body, legs, arms and club rotating around the shoulders
+        sx, sy = gx, ground - 58
+        d.ellipse((sx - 9, sy - 26, sx + 9, sy - 8), fill=FG)
+        d.line((sx, sy - 8, sx, sy + 24), fill=FG, width=4)
+        d.line((sx, sy + 24, sx - 10, ground), fill=FG, width=4)
+        d.line((sx, sy + 24, sx + 10, ground), fill=FG, width=4)
+        if t < 11:  # backswing: club from resting behind the ball up over the shoulder
+            a = -60 - (t / 10) * 200
+        elif t <= strike:  # fast downswing
+            a = -260 + ((t - 10) / (strike - 10)) * 200
+        elif t < 24:  # follow-through, finishing high toward the flag
+            a = -60 + ((t - strike) / 8) * 115
+        else:
+            a = 55
+        r = math.radians(a)
+        hx, hy = sx + 30 * math.cos(r), sy + 2 - 30 * math.sin(r)  # hands
+        d.line((sx, sy, hx, hy), fill=FG, width=3)
+        cx2, cy2 = sx + 66 * math.cos(r), sy + 2 - 66 * math.sin(r)  # clubhead
+        d.line((hx, hy, cx2, cy2), fill=(150, 148, 144), width=3)
+        d.rectangle((cx2 - 4, cy2 - 3, cx2 + 4, cy2 + 3), fill=(150, 148, 144))
+        # the ball
+        def flight(u):  # u 0..1 along the arc
+            return bx0 + (hole - 18 - bx0) * u, ground - 5 - 150 * 4 * u * (1 - u)
+        if t <= strike:
+            ball = (bx0, ground - 5)
+        elif t <= land:
+            u = (t - strike) / (land - strike)
+            for k in range(1, 7):  # dotted trail
+                uu = max(0.0, u - k * 0.05)
+                tx, ty = flight(uu)
+                c = tuple(int(v * (0.55 - k * 0.07)) for v in MINT)
+                d.ellipse((tx - 2, ty - 2, tx + 2, ty + 2), fill=c)
+            ball = flight(u)
+        elif t <= cup:  # roll into the cup
+            u = (t - land) / (cup - land)
+            ball = (hole - 18 + 18 * u, ground - 5)
+        else:
+            ball = None
+        if ball:
+            d.ellipse((ball[0] - 5, ball[1] - 5, ball[0] + 5, ball[1] + 5), fill=(250, 250, 248))
+        if cup < t < cup + 8:  # little burst from the cup
+            k = t - cup
+            for j in range(6):
+                ang = math.pi * (0.15 + 0.7 * j / 5)
+                rr = 8 + k * 4
+                px, py = hole + rr * math.cos(ang), ground - 4 - rr * math.sin(ang)
+                d.ellipse((px - 2, py - 2, px + 2, py + 2), fill=MINT)
+        frames.append(im)
+    fade(frames)
+
+    # 3) a best-of list: ranked rows slide in, then the stars pop
+    widths = [210, 170, 190, 140, 160]
+    stars = [5, 5, 4, 4, 3]
+    N = 56
+    for t in range(N):
+        im = Image.new("RGB", (W, H), BG)
+        d = ImageDraw.Draw(im)
+        d.rounded_rectangle((64, 30, W - 64, H - 30), 14, fill=(12, 12, 14), outline=DIM, width=2)
+        d.text((88, 48), "BEST OF", font=MONO, fill=MINT)
+        d.line((88, 72, 88 + d.textlength("BEST OF", font=MONO), 72), fill=MINT, width=2)
+        for i in range(5):
+            start = 4 + i * 4
+            if t < start:
+                continue
+            e = min(1.0, (t - start) / 6)
+            e = 1 - (1 - e) ** 3
+            off = int((1 - e) * 120)
+            y = 90 + i * 32
+            d.text((88 + off, y), "%02d" % (i + 1), font=MONO, fill=MINT)
+            d.rounded_rectangle((122 + off, y + 5, 122 + off + widths[i] * 0.9, y + 15), 4, fill=(62, 62, 66) if i else FG)
+            for k in range(stars[i]):  # stars pop in after the rows land
+                pop = t - (26 + i * 3 + k)
+                if pop >= 0:
+                    sc = min(1.0, 0.4 + pop * 0.3)
+                    star(d, 338 + k * 14 + off, y + 10, 6 * sc, AMBER if i == 0 else (150, 148, 144))
+        frames.append(im)
+    fade(frames)
+
+    save(frames, "extras", 60)
 
 
-# --- Video Games: a pong rally that loops ---
+# --- Games: a pong rally that loops ---
 def games():
     N = 64
     frames = []
@@ -229,8 +327,7 @@ def photography():
     save(frames, "photography", 60)
 
 
-projects()
-games()
-movies()
-music()
-photography()
+# python3 make_gifs.py <out folder> [names...]  (no names = all of them)
+ALL = {"extras": extras, "games": games, "movies": movies, "music": music, "photography": photography}
+for name in sys.argv[2:] or ALL:
+    ALL[name]()
