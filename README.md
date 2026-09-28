@@ -14,6 +14,8 @@ Personal site, served by GitHub Pages from the root of `main`. Plain HTML, no bu
   Watched movies / Recently Played games with a date and rating, and remove site additions. Visitors can suggest
   movies and games for each page's In the Queue. On Games, "Get latest from Xbox" lists recently played
   Xbox games (via [OpenXBL](https://xbl.io)) to add with their playtime, achievement progress, and last played date. These are stored by the Worker, not in this repo.
+- `projects/rapture/`: the built Rapture: ADAM & Dice game (one self-contained file). Its source is a separate project;
+  don't edit this copy, publish a new build from the game's folder with `npm run publish:site`
 - `projects/golf/`: the Golf page (Extras). Rounds and bag in `scores.js`; Trackman rounds are imported into `trackman.js`
   (and course photos into `courses/`) by `python3 tools/import_trackman.py`, from the round cards' HTML copied off Trackman's site
 - `tools/pull_live.py`: copies site additions into list.js and posters/ (then commit and push); run it again
