@@ -19,7 +19,7 @@
 //   GET    /xbox/recent         (admin) your most recently played Xbox games via OpenXBL, with playtime and achievements
 //   POST   /xbox/import         { games: [{ titleId, date }] } (admin) -> logs them in Games' Recently Played
 //   POST   /xbox/sync           (admin) run the nightly Recently Played refresh now (see scheduled() below)
-//                               (or refreshes their Xbox stats if already there), poster from the Xbox store
+//                               (or refreshes their Xbox stats if already there), poster from PosterSpy or the Xbox store
 //   GET    /spotify/top?playlist=<id>  the first song on a public Spotify playlist (home page "Lately" strip)
 //   GET    /spotify/now         what Nick is playing on Spotify now, or his last played song (home "Lately" strip)
 //   GET    /spotify/recent      his last 10 songs (now playing first, marked live) for the Music page
@@ -49,7 +49,7 @@ function queueKey(page) {
 function watchedKey(page) {
   return page === "movies" ? "watched" : "watched:" + page;
 }
-const IMG_HOSTS = ["m.media-amazon.com", "alternativemovieposters.com", "store-images.s-microsoft.com"];
+const IMG_HOSTS = ["m.media-amazon.com", "alternativemovieposters.com", "store-images.s-microsoft.com", "media.posterspy.com"];
 const XBOX_RECENT = 30; // how many recent Xbox games /xbox/recent lists
 const BLOCKED = ["fuck", "shit", "cunt", "nigg", "fag", "retard", "bitch", "whore", "slut", "nazi", "rape", "porn", "dick", "cock", "pussy"];
 
@@ -296,13 +296,13 @@ async function addToQueue(request, env, cors) {
 }
 
 // Look the title up by id so the title/year/poster come from IMDb, not the browser.
-// Poster: for movies, alternative art if AMP has it; otherwise (and for games) the official IMDb poster/box art.
+// Poster: alternative art if AMP (movies only) or PosterSpy has it; otherwise the official IMDb poster/box art.
 async function lookupMovie(imdbId, kind) {
   const res = await fetch("https://v3.sg.media-imdb.com/suggestion/x/" + imdbId + ".json");
   const data = await res.json();
   const movie = (data.d || []).find((r) => r.id === imdbId);
   if (!movie || !(kind === "game" ? GAME_TYPES : MOVIE_TYPES).has(movie.qid)) return null;
-  const art = kind === "game" ? null : await findAlternativeArt(movie.l, movie.y);
+  const art = (kind === "game" ? null : await findAlternativeArt(movie.l, movie.y)) || await findPosterSpyArt(movie.l);
   return {
     imdbId,
     title: movie.l,
@@ -332,6 +332,51 @@ async function findAlternativeArt(title, year) {
       const page = await (await fetch(link, { headers: { "User-Agent": "Mozilla/5.0 (nickmade.net queue)" } })).text();
       const img = (page.match(/<meta property="og:image" content="([^"]+)"/) || [])[1];
       if (img && /\.(jpe?g|png)$/i.test(img)) return { image: img, artist: decode(artist).trim(), url: link };
+    }
+  } catch (e) {}
+  return null;
+}
+
+// Search PosterSpy (fan posters for movies and games) and use the first portrait poster whose title is exactly this one.
+// Artists title their own uploads ("ELDEN RING (2022) – Video Game Poster Design", "Alien (1979) Homage Poster"),
+// so their "(year)", anything after a dash, "by <artist>", "#2" and filler words are dropped, and roman numerals read
+// as numbers. What's left must equal the title, so "Alien Earth" isn't used for Alien, nor a plain "Gears of War"
+// poster for "Gears of War: E-Day". Titles like "Gta 6 Tribute" are missed; that's the price of not guessing.
+const POSTERSPY_FILLER = /\b(alternative|alternate|alt|official|tribute|homage|fan ?art|fanart|fan ?made|poster|posters|artwork|art|cover|design|variant|version|print|minimalist|minimal|illustration|concept|redesign|movie|film|video ?game|game)\b/g;
+const ROMAN = { ii: "2", iii: "3", iv: "4", v: "5", vi: "6", vii: "7", viii: "8", ix: "9", x: "10" };
+
+function plainTitle(s) {
+  return normalize(s).replace(/\b[ivx]+\b/g, (r) => ROMAN[r] || r);
+}
+// A PosterSpy upload's title as is, and without the filler words (only ever stripped from their side,
+// so a real title like "The Game" still has to match in full)
+function posterTitles(s) {
+  const raw = s.replace(/\(\s*(19|20)\d\d\s*\)|#\s*\d+/g, " ");
+  const clean = (x) => plainTitle(x).replace(/ (dir )?by .*$/, "");
+  const t = clean(raw.split(/\s[–—|-]\s/)[0]);
+  return [clean(raw), t, t.replace(POSTERSPY_FILLER, " ").replace(/\s+/g, " ").trim()];
+}
+
+async function findPosterSpyArt(title) {
+  try {
+    const res = await fetch("https://posterspy.com/?s=" + encodeURIComponent(title), {
+      headers: { "User-Agent": "Mozilla/5.0 (nickmade.net queue)" },
+    });
+    const html = await res.text();
+    const want = plainTitle(title);
+    if (!want) return null;
+    for (const card of html.split('class="wpps-poster-card').slice(1)) {
+      const link = (card.match(/href="(https:\/\/posterspy\.com\/posters\/[^"]+)"/) || [])[1];
+      const thumb = card.match(/<img src="(https:\/\/media\.posterspy\.com\/[^"]+)" width="(\d+)" height="(\d+)"/);
+      const name = (card.match(/class="imagetitle">([^<]+)</) || [])[1];
+      const artist = (card.match(/href="https:\/\/posterspy\.com\/profile\/[^"]+">([^<]+)</) || [])[1];
+      if (!link || !thumb || !name || !artist) continue;
+      if (!posterTitles(decode(name)).includes(want)) continue;
+      const ratio = thumb[3] / thumb[2];
+      if (ratio < 1.25 || ratio > 1.75) continue; // portrait (about 2:3) only
+      const image = thumb[1].replace(/-\d+x\d+(\.\w+)$/, "$1"); // full size instead of the 480px thumbnail
+      if (!/\.(jpe?g|png)$/i.test(image)) continue;
+      return { image, artist: decode(artist).trim(), url: link };
     }
   } catch (e) {}
   return null;
@@ -623,13 +668,14 @@ async function xboxImport(request, env, cors) {
       continue;
     }
     const store = await xboxStoreInfo(env, g.titleId, g.name);
+    const art = await findPosterSpyArt(g.name); // fan art first, else the store's poster
     items.push({
       imdbId: "xbl" + g.titleId,
       title: g.name,
       year: store.released ? parseInt(store.released.slice(0, 4), 10) : null,
       released: store.released,
-      image: store.image || g.image,
-      credit: { label: "Official poster", artist: "" },
+      image: art ? art.image : store.image || g.image,
+      credit: art ? { artist: art.artist, url: art.url } : { label: "Official poster", artist: "" },
       id: "xbl" + g.titleId + "-" + pick.date,
       date: pick.date,
       rating: null,
