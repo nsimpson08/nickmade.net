@@ -1,4 +1,4 @@
-// My golf rounds and bag, shown on the Golf page (projects/golf/). Newest first isn't required; the page sorts by date.
+// My golf rounds and bag, shown on the Golf page (extras/golf/). Newest first isn't required; the page sorts by date.
 //
 // Each round:
 //   date     "YYYY-MM-DD"
@@ -18,7 +18,7 @@
 //   model    model name
 //   loft     e.g. "10.5°"
 //   details  shaft, flex, length, grip, whatever you like
-//   image    optional product photo in projects/golf/bag/ (official TaylorMade shots, 240px square)
+//   image    optional product photo in extras/golf/bag/ (official TaylorMade shots, 240px square)
 //   url      optional product page; the photo and model name link to it
 
 window.GOLF = {

@@ -3,7 +3,7 @@
 Personal site, served by GitHub Pages from the root of `main`. Plain HTML, no build step.
 
 - `index.html`: home page with the section tiles
-- `projects/`: the Extras page (hobbies, projects, and lists; edit the HTML directly)
+- `extras/`: the Extras page (hobbies, projects, and lists; edit the HTML directly)
 - `games/list.js`, `movies/list.js`: favorite games and movies with reviews; the format is described at the top of each file
 - `games/posters/`, `movies/posters/`: poster art
 - `music/playlist.js`: the Spotify playlists shown on the Music page
@@ -13,10 +13,11 @@ Personal site, served by GitHub Pages from the root of `main`. Plain HTML, no bu
   password) the owner can add movies/games to any section marked `live: "key"` in list.js, log Recently
   Watched movies / Recently Played games with a date and rating, and remove site additions. Visitors can suggest
   movies and games for each page's In the Queue. On Games, "Get latest from Xbox" lists recently played
-  Xbox games (via [OpenXBL](https://xbl.io)) to add with their playtime, achievement progress, and last played date. These are stored by the Worker, not in this repo.
-- `projects/rapture/`: the built Rapture: ADAM & Dice game (one self-contained file). Its source is a separate project;
+  Xbox games (via [OpenXBL](https://xbl.io)) to add with their playtime, achievement progress, and last played date.
+  Every night at midnight Central the Worker refreshes those games' last played date, achievements, and playtime. These are stored by the Worker, not in this repo.
+- `extras/rapture/`: the built Rapture: ADAM & Dice game (one self-contained file). Its source is a separate project;
   don't edit this copy, publish a new build from the game's folder with `npm run publish:site`
-- `projects/golf/`: the Golf page (Extras). Rounds and bag in `scores.js`; Trackman rounds are imported into `trackman.js`
+- `extras/golf/`: the Golf page (Extras). Rounds and bag in `scores.js`; Trackman rounds are imported into `trackman.js`
   (and course photos into `courses/`) by `python3 tools/import_trackman.py`, from the round cards' HTML copied off Trackman's site
 - `tools/pull_live.py`: copies site additions into list.js and posters/ (then commit and push); run it again
   after pushing to clear the now-duplicate live copies. Also saves a snapshot to `backups/`.

@@ -1,8 +1,8 @@
-// Renders projects/golf/scores.js (window.GOLF) into the Golf page: a score grid per source, then What's In The Bag.
+// Renders extras/golf/scores.js (window.GOLF) into the Golf page: a score grid per source, then What's In The Bag.
 (function () {
   var root = document.getElementById("golf");
   var data = window.GOLF || {};
-  // Trackman rounds come from projects/golf/trackman.js (tools/import_trackman.py), plus any typed into scores.js
+  // Trackman rounds come from extras/golf/trackman.js (tools/import_trackman.py), plus any typed into scores.js
   data.trackman = (window.GOLF_TRACKMAN || []).concat(data.trackman || []);
 
   var SOURCES = [

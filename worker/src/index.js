@@ -18,7 +18,12 @@
 //   DELETE /lists/:page/:list/:imdbId  remove one (admin)
 //   GET    /xbox/recent         (admin) your most recently played Xbox games via OpenXBL, with playtime and achievements
 //   POST   /xbox/import         { games: [{ titleId, date }] } (admin) -> logs them in Games' Recently Played
+//   POST   /xbox/sync           (admin) run the nightly Recently Played refresh now (see scheduled() below)
 //                               (or refreshes their Xbox stats if already there), poster from the Xbox store
+//   GET    /spotify/top?playlist=<id>  the first song on a public Spotify playlist (home page "Lately" strip)
+//   GET    /spotify/now         what Nick is playing on Spotify now, or his last played song (home "Lately" strip)
+//   POST   /spotify/auth-url    (admin) a Spotify sign-in link for connecting his account (tools/spotify_connect.py)
+//   GET    /spotify/callback    where Spotify sends him back after he agrees; saves the refresh token
 //   GET    /img?u=url           image proxy for posters (allowlisted hosts only)
 //
 // Storage: one KV namespace (QUEUE). Keys (Movies keeps the original unprefixed names):
@@ -26,6 +31,7 @@
 //   watched / watched:games        JSON array of Recently Watched / Recently Played
 //   lists:<page>                   JSON object { <section key>: [items] } for the other live sections
 //   visitor:<hash> / visitor:games:<hash>  number of queue submissions from that visitor (browser id or hashed IP)
+//   spotify:refresh / spotify:access / spotify:now / spotify:state:<x>  Spotify login and a 1-minute cache
 //   xbox:recent                    10-minute cache of /xbox/recent (OpenXBL allows 150 requests/hour, shared with the Montage app)
 
 const PER_VISITOR = 3;
@@ -58,10 +64,21 @@ export default {
       if (url.pathname === "/search" && request.method === "GET") return await search(url, cors, ctx);
       if (url.pathname === "/xbox/recent" && request.method === "GET") return await xboxRecent(request, env, cors);
       if (url.pathname === "/xbox/import" && request.method === "POST") return await xboxImport(request, env, cors);
+      if (url.pathname === "/xbox/sync" && request.method === "POST") {
+        if (!isAdmin(request, env)) return json({ error: "Unauthorized" }, 401, cors);
+        try { return json(await syncRecentlyPlayed(env), 200, cors); } catch (e) {
+          if (e instanceof XblError) return json({ error: e.message }, 502, cors);
+          throw e;
+        }
+      }
       if (url.pathname === "/lists" && request.method === "GET") return await getLists(url, env, cors);
       if (url.pathname === "/lists" && request.method === "POST") return await addToList(request, env, cors);
       if (url.pathname.startsWith("/lists/") && request.method === "DELETE") return await removeFromList(request, url, env, cors);
       if (url.pathname === "/img" && request.method === "GET") return await image(url, ctx);
+      if (url.pathname === "/spotify/now" && request.method === "GET") return await spotifyNow(env, cors);
+      if (url.pathname === "/spotify/auth-url" && request.method === "POST") return await spotifyAuthUrl(request, url, env, cors);
+      if (url.pathname === "/spotify/callback" && request.method === "GET") return await spotifyCallback(url, env);
+      if (url.pathname === "/spotify/top" && request.method === "GET") return await spotifyTop(url, cors);
       if (url.pathname === "/queue" && request.method === "GET") return await listQueue(request, url, env, cors);
       if (url.pathname === "/queue" && request.method === "POST") return await addToQueue(request, env, cors);
       if (url.pathname === "/admin/check" && request.method === "GET") {
@@ -78,6 +95,13 @@ export default {
     } catch (err) {
       return json({ error: "Something went wrong. Try again in a bit." }, 500, cors);
     }
+  },
+
+  // Cron triggers (wrangler.toml) fire at 05:00 and 06:00 UTC; only the one that lands on midnight in
+  // TIMEZONE (America/Chicago: 05:00 in daylight time, 06:00 in standard time) does the work.
+  async scheduled(event, env, ctx) {
+    if (hourIn(env.TIMEZONE, new Date(event.scheduledTime)) !== 0) return;
+    ctx.waitUntil(syncRecentlyPlayed(env).catch((e) => console.log("nightly Xbox sync failed:", e.message)));
   },
 };
 
@@ -621,4 +645,214 @@ async function xboxImport(request, env, cors) {
   if (kept.length !== queue.length) await env.QUEUE.put(queueKey("games"), JSON.stringify(kept));
 
   return json({ added, updated }, 200, cors);
+}
+
+// ---------- Nightly refresh of Games' Recently Played (owner's Xbox data) ----------
+
+function hourIn(tz, date) {
+  return parseInt(new Intl.DateTimeFormat("en-US", { timeZone: tz || "America/Chicago", hour: "numeric", hourCycle: "h23" }).format(date), 10);
+}
+
+// "YYYY-MM-DD" for an ISO timestamp, in TIMEZONE (so a 11pm session counts for that evening's date)
+function dateIn(tz, iso) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: tz || "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
+}
+
+// For every game already in Recently Played, pull its latest played date, achievements, and playtime
+// from Xbox (2 OpenXBL requests total, however many games). Games logged by hand get linked to Xbox
+// the first time their title exactly matches one in the Xbox history. Ratings and posters are kept.
+async function syncRecentlyPlayed(env) {
+  const key = watchedKey("games");
+  const items = await getList(env, key);
+  if (!items.length) return { checked: 0, updated: 0 };
+
+  const history = await xbl(env, "/titles");
+  const titles = (history.titles || []).filter((t) => t.type === "Game");
+  const byId = new Map(titles.map((t) => [String(t.titleId), t]));
+  const byName = new Map(titles.map((t) => [normalize(cleanTitle(t.name)), t]));
+  const matched = [];
+  for (const it of items) {
+    const t = it.xbox ? byId.get(it.xbox.titleId) : byName.get(normalize(it.title));
+    if (t && t.titleHistory && t.titleHistory.lastTimePlayed) matched.push([it, t]);
+  }
+  if (!matched.length) return { checked: items.length, updated: 0 };
+
+  const minutes = {};
+  try {
+    const stats = await xbl(env, "/player/stats", {
+      xuids: [String(history.xuid)],
+      stats: matched.map(([, t]) => ({ name: "MinutesPlayed", titleId: String(t.titleId) })),
+    });
+    for (const list of stats.statlistscollection || []) {
+      for (const st of list.stats || []) if (st.value != null) minutes[String(st.titleid)] = parseInt(st.value, 10);
+    }
+  } catch (e) { /* keep the last known playtime */ }
+
+  let updated = 0;
+  for (const [it, t] of matched) {
+    const id = String(t.titleId);
+    const a = t.achievement || {};
+    const xbox = {
+      titleId: id,
+      minutes: minutes[id] >= 0 ? minutes[id] : it.xbox ? it.xbox.minutes : null,
+      percent: a.progressPercentage != null ? a.progressPercentage : null,
+      gamerscore: a.currentGamerscore != null ? a.currentGamerscore : null,
+      totalGamerscore: a.totalGamerscore != null ? a.totalGamerscore : null,
+      lastPlayed: t.titleHistory.lastTimePlayed,
+    };
+    const date = dateIn(env.TIMEZONE, xbox.lastPlayed);
+    if (JSON.stringify(xbox) === JSON.stringify(it.xbox) && date === it.date) continue;
+    it.xbox = xbox;
+    it.date = date;
+    it.id = it.imdbId + "-" + date;
+    updated++;
+  }
+  // Two entries can't share an id (same game and date); keep the first
+  const seen = new Set();
+  const kept = items.filter((it) => (seen.has(it.id) ? false : seen.add(it.id)));
+  if (updated || kept.length !== items.length) await env.QUEUE.put(key, JSON.stringify(kept));
+  const result = { checked: items.length, linked: matched.length, updated, at: new Date().toISOString() };
+  await env.QUEUE.put("xbox:lastSync", JSON.stringify(result));
+  return result;
+}
+
+// ---------- Spotify: top song of a public playlist ----------
+
+// Spotify's embed page carries the playlist's track list in its __NEXT_DATA__ JSON, so no API key or
+// login is needed. That JSON isn't a documented API: if it changes, this returns 502 and the page falls
+// back to the playlist's name. Cached for an hour.
+async function spotifyTop(url, cors) {
+  const id = url.searchParams.get("playlist") || "";
+  if (!/^[A-Za-z0-9]{10,40}$/.test(id)) return json({ error: "Bad playlist id." }, 400, cors);
+  const res = await fetch("https://open.spotify.com/embed/playlist/" + id, {
+    headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36" },
+    cf: { cacheTtl: 3600, cacheEverything: true },
+  });
+  if (!res.ok) return json({ error: "Spotify didn't answer." }, 502, cors);
+  const html = await res.text();
+  const m = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+  let entity;
+  try { entity = JSON.parse(m[1]).props.pageProps.state.data.entity; } catch (e) { entity = null; }
+  const first = entity && (entity.trackList || [])[0];
+  if (!first) return json({ error: "Couldn't read that playlist." }, 502, cors);
+  const trackId = String(first.uri || "").split(":").pop();
+  return new Response(JSON.stringify({
+    playlist: entity.name || null,
+    title: first.title,
+    artist: first.subtitle || null,
+    url: trackId ? "https://open.spotify.com/track/" + trackId : null,
+  }), { headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=3600", ...cors } });
+}
+
+// ---------- Spotify: now playing / last played (owner's account) ----------
+//
+// One-time setup: a Spotify developer app (SPOTIFY_CLIENT_ID in wrangler.toml, SPOTIFY_CLIENT_SECRET as a
+// secret) with this Worker's /spotify/callback as a redirect URI, then tools/spotify_connect.py to sign in.
+// Scopes are read-only: currently playing and recently played.
+
+const SPOTIFY_SCOPES = "user-read-currently-playing user-read-recently-played";
+
+function spotifyRedirect(url) {
+  return url.origin + "/spotify/callback";
+}
+
+async function spotifyToken(env, params) {
+  const res = await fetch("https://accounts.spotify.com/api/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: "Basic " + btoa(env.SPOTIFY_CLIENT_ID + ":" + env.SPOTIFY_CLIENT_SECRET),
+    },
+    body: new URLSearchParams(params),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error_description || data.error || "Spotify token request failed");
+  return data;
+}
+
+async function spotifyAuthUrl(request, url, env, cors) {
+  if (!isAdmin(request, env)) return json({ error: "Unauthorized" }, 401, cors);
+  if (!env.SPOTIFY_CLIENT_ID || !env.SPOTIFY_CLIENT_SECRET) return json({ error: "Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET on the Worker first." }, 500, cors);
+  const state = crypto.randomUUID();
+  await env.QUEUE.put("spotify:state:" + state, "1", { expirationTtl: 600 });
+  const auth = "https://accounts.spotify.com/authorize?" + new URLSearchParams({
+    client_id: env.SPOTIFY_CLIENT_ID,
+    response_type: "code",
+    redirect_uri: spotifyRedirect(url),
+    scope: SPOTIFY_SCOPES,
+    state,
+  });
+  return json({ url: auth, redirect: spotifyRedirect(url) }, 200, cors);
+}
+
+function page(title, message) {
+  return new Response('<!doctype html><meta charset="utf-8"><title>' + title + '</title>' +
+    '<body style="background:#000;color:#ecebe7;font:17px system-ui;display:grid;place-items:center;min-height:90vh;text-align:center">' +
+    '<div><h1 style="font-size:1.4rem">' + title + "</h1><p style=\"color:#8a8882\">" + message + "</p></div>", {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
+async function spotifyCallback(url, env) {
+  const state = url.searchParams.get("state") || "";
+  if (!state || !(await env.QUEUE.get("spotify:state:" + state))) return page("Link expired", "Run tools/spotify_connect.py again.");
+  await env.QUEUE.delete("spotify:state:" + state);
+  if (url.searchParams.get("error")) return page("Not connected", "Spotify said: " + url.searchParams.get("error"));
+  try {
+    const t = await spotifyToken(env, { grant_type: "authorization_code", code: url.searchParams.get("code") || "", redirect_uri: spotifyRedirect(url) });
+    await env.QUEUE.put("spotify:refresh", t.refresh_token);
+    await env.QUEUE.put("spotify:access", t.access_token, { expirationTtl: Math.max(60, (t.expires_in || 3600) - 120) });
+    await env.QUEUE.delete("spotify:now");
+  } catch (e) {
+    return page("Not connected", String(e.message));
+  }
+  return page("Spotify connected", "The home page will show what you're listening to. You can close this tab.");
+}
+
+async function spotifyAccess(env) {
+  const cached = await env.QUEUE.get("spotify:access");
+  if (cached) return cached;
+  const refresh = await env.QUEUE.get("spotify:refresh");
+  if (!refresh) return null;
+  const t = await spotifyToken(env, { grant_type: "refresh_token", refresh_token: refresh });
+  if (t.refresh_token) await env.QUEUE.put("spotify:refresh", t.refresh_token);
+  await env.QUEUE.put("spotify:access", t.access_token, { expirationTtl: Math.max(60, (t.expires_in || 3600) - 120) });
+  return t.access_token;
+}
+
+function trackInfo(track) {
+  return {
+    title: track.name,
+    artist: (track.artists || []).map((a) => a.name).join(", ") || null,
+    url: track.external_urls ? track.external_urls.spotify : null,
+  };
+}
+
+// Now playing if something is, else the last played song. Cached a minute so visitors don't each ask Spotify.
+async function spotifyNow(env, cors) {
+  const cached = await env.QUEUE.get("spotify:now", "json");
+  if (cached) return json(cached, 200, cors);
+  let out = null;
+  try {
+    const token = await spotifyAccess(env);
+    if (!token) return json({ error: "Spotify isn't connected." }, 404, cors);
+    const auth = { headers: { Authorization: "Bearer " + token } };
+    const cur = await fetch("https://api.spotify.com/v1/me/player/currently-playing", auth);
+    if (cur.status === 200) {
+      const d = await cur.json();
+      if (d.is_playing && d.item && d.currently_playing_type === "track") out = { ...trackInfo(d.item), nowPlaying: true, playedAt: new Date().toISOString() };
+    }
+    if (!out) {
+      const rec = await fetch("https://api.spotify.com/v1/me/player/recently-played?limit=1", auth);
+      if (rec.ok) {
+        const item = ((await rec.json()).items || [])[0];
+        if (item) out = { ...trackInfo(item.track), nowPlaying: false, playedAt: item.played_at };
+      }
+    }
+  } catch (e) {
+    return json({ error: "Spotify didn't answer." }, 502, cors);
+  }
+  if (!out) return json({ error: "Nothing played yet." }, 404, cors);
+  await env.QUEUE.put("spotify:now", JSON.stringify(out), { expirationTtl: 60 });
+  return json(out, 200, cors);
 }

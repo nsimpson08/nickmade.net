@@ -14,10 +14,20 @@ ALLOWED_ORIGINS = "https://nickmade.net,https://www.nickmade.net"
 QUEUE_LIMIT = "20"
 # Used only if the live movies/list.js can't be read
 OWNER_QUEUE_FALLBACK = "4"
+# Spotify developer app (developer.spotify.com/dashboard) for the home page's "listening to";
+# its Client Secret is a secret: npx wrangler secret put SPOTIFY_CLIENT_SECRET
+SPOTIFY_CLIENT_ID = "1c18f59367834eaf9edd982c5858fa9b"
+# Time zone for the nightly Xbox refresh and its "Last played" dates
+TIMEZONE = "America/Chicago"
+
+# Nightly refresh of Games' Recently Played from Xbox. Cron times are UTC: midnight in Chicago is 05:00 UTC
+# in daylight time and 06:00 UTC in standard time, so both fire and scheduled() only works at local midnight.
+[triggers]
+crons = ["0 5 * * *", "0 6 * * *"]
 
 # Created with: npx wrangler kv namespace create QUEUE  (paste the id it prints)
 [[kv_namespaces]]
 binding = "QUEUE"
 id = "5bfd7017fdc24cef93ca0afbfe6094ee"
 
-# Secrets (not stored here): npx wrangler secret put ADMIN_TOKEN  /  npx wrangler secret put SALT
+# Secrets (not stored here): npx wrangler secret put ADMIN_TOKEN  /  SALT  /  OPENXBL_API_KEY  /  SPOTIFY_CLIENT_SECRET

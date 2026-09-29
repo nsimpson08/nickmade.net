@@ -19,7 +19,7 @@
       <a href="/movies/">Movies</a>
       <a href="/music/" aria-current="page">Music</a>
       <a href="/photography/">Photography</a>
-      <a href="/projects/">Extras</a>
+      <a href="/extras/">Extras</a>
     </nav>
   </header>
 
@@ -35,13 +35,16 @@
   <script>
     (function () {
       var root = document.getElementById("playlists");
+      var box = null, boxName = null; // current group wrapper (see "group" in playlist.js)
       (window.PLAYLISTS || []).forEach(function (pl) {
         var section = document.createElement("section");
         section.className = "playlist";
 
-        var h = document.createElement("h2");
-        h.textContent = pl.title;
-        section.appendChild(h);
+        if (pl.title) { // the Spotify player shows the playlist's name, so a title is optional
+          var h = document.createElement("h2");
+          h.textContent = pl.title;
+          section.appendChild(h);
+        }
 
         if (pl.description) {
           var p = document.createElement("p");
@@ -67,7 +70,31 @@
           section.appendChild(soon);
         }
 
-        root.appendChild(section);
+        if (pl.group && pl.group === boxName) {
+          box.appendChild(section);
+        } else if (pl.group) {
+          box = document.createElement("div");
+          box.className = "group playlist-group" + (pl.groupStyle === "panel" ? " panel" : "");
+          boxName = pl.group;
+          var head = document.createElement("div");
+          head.className = "group-head";
+          var name = document.createElement("span");
+          name.className = "group-name";
+          name.textContent = pl.group;
+          head.appendChild(name);
+          if (pl.groupNote) {
+            var note = document.createElement("span");
+            note.className = "group-note";
+            note.textContent = pl.groupNote;
+            head.appendChild(note);
+          }
+          box.appendChild(head);
+          box.appendChild(section);
+          root.appendChild(box);
+        } else {
+          box = boxName = null;
+          root.appendChild(section);
+        }
       });
     })();
   </script>

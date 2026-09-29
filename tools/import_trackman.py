@@ -6,8 +6,8 @@
     2. python3 tools/import_trackman.py            (reads the clipboard)
        python3 tools/import_trackman.py file.html  (or a saved file)
 
-New rounds are added to projects/golf/trackman.js (rounds already there are skipped, matched by
-Trackman's activity id), and each course's photo is saved to projects/golf/courses/.
+New rounds are added to extras/golf/trackman.js (rounds already there are skipped, matched by
+Trackman's activity id), and each course's photo is saved to extras/golf/courses/.
 Then preview, commit, and push.
 """
 import html
@@ -20,8 +20,8 @@ import urllib.request
 from html.parser import HTMLParser
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(ROOT, "projects", "golf", "trackman.js")
-PHOTOS = os.path.join(ROOT, "projects", "golf", "courses")
+OUT = os.path.join(ROOT, "extras", "golf", "trackman.js")
+PHOTOS = os.path.join(ROOT, "extras", "golf", "courses")
 MONTHS = {m: i for i, m in enumerate(["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], 1)}
 
 

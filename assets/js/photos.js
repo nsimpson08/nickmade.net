@@ -28,14 +28,29 @@
     return "100vw";
   }
 
-  root.innerHTML = photos.map(function (p, i) {
+  function photoLink(p, i) {
     var srcset = p.sizes.map(function (s) { return s.src + " " + s.w + "w"; })
       .concat([p.src + " " + p.w + "w"]).join(", ");
     return '<a class="photo" href="' + p.src + '" data-index="' + i + '">' +
       '<img src="' + (p.sizes.length ? p.sizes[0].src : p.src) + '" srcset="' + srcset + '" sizes="100vw"' +
       ' width="' + p.w + '" height="' + p.h + '" alt="Photo ' + (i + 1) + '"' +
       (i > 1 ? ' loading="lazy"' : "") + ' decoding="async"></a>';
-  }).join("");
+  }
+
+  // The first photo sits above the grid in a gilded frame with a "Featured" plaque
+  var featured = document.createElement("div");
+  featured.className = "featured";
+  featured.innerHTML = '<div class="frame"><div class="mat">' + photoLink(photos[0], 0) +
+    '<span class="plaque">Featured</span></div></div>';
+  featured.querySelector("img").sizes = "(max-width: 900px) 100vw, 900px";
+  root.parentNode.insertBefore(featured, root);
+  featured.addEventListener("click", function (e) {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || !e.target.closest(".photo")) return;
+    e.preventDefault();
+    open(0);
+  });
+
+  root.innerHTML = photos.slice(1).map(function (p, i) { return photoLink(p, i + 1); }).join("");
 
   // Column toggle, remembered per visitor
   var buttons = document.querySelectorAll(".layout-toggle button");

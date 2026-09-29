@@ -3,7 +3,18 @@
 //   title        header above the player
 //   description  paragraph under the header (leave "" for none)
 //   url          Spotify share link: playlist ... menu > Share > Copy link to playlist
+//   group        optional: consecutive playlists with the same group are shown together under that label.
+//                On a group's first playlist, groupNote adds a line of text and groupStyle: "panel" gives it a raised box.
 window.PLAYLISTS = [
+  {
+    // Paste the playlist's Spotify link into url (and set the title and description); until then it says "Playlist coming soon."
+    group: "Lately",
+    groupNote: "What I've been listening to",
+    groupStyle: "panel",
+    title: "",
+    description: "",
+    url: "https://open.spotify.com/playlist/19F54mBzCryNrrLIOGFY5Q?si=4f607253cb434b81"
+  },
   {
     title: "Best of the Best",
     description: "This playlist was both extremely easy and extremely difficult to make. I believe everyone should take the time to make their own. It's personal; It's a journey.",

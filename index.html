@@ -16,6 +16,7 @@
     <header class="banner">
       <h1>Nick<span class="made">Made</span></h1>
       <p>Things I play, watch, listen, shoot, and build.</p>
+      <p class="now" id="now" hidden aria-label="What I've been up to lately"></p>
     </header>
 
     <nav class="tiles" aria-label="Sections">
@@ -39,7 +40,7 @@
         <span class="label">Photography <span class="arrow">&rarr;</span></span>
         <span class="sub">Full resolution</span>
       </a>
-      <a class="tile projects" href="/projects/">
+      <a class="tile extras" href="/extras/">
         <div class="frame"><img src="/assets/gifs/extras.gif" alt="" width="480" height="300"></div>
         <span class="label">Extras <span class="arrow">&rarr;</span></span>
         <span class="sub">Hobbies, projects, and lists</span>
@@ -49,5 +50,7 @@
     <footer>&copy; <span id="y">2026</span> Nick Simpson</footer>
   </main>
   <script>document.getElementById('y').textContent = new Date().getFullYear();</script>
+  <script src="/music/playlist.js"></script>
+  <script src="/assets/js/now.js" data-api="https://api.nickmade.net" data-api-local="http://localhost:8787"></script>
 </body>
 </html>
