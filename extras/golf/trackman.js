@@ -1,5 +1,6 @@
 // Trackman rounds, written by tools/import_trackman.py (edit freely; the importer only adds new ids).
 // toPar is Trackman's figure; for net rounds (net: true) it's net to par, so par isn't known.
+// Set "hidden": true to leave a round off the page; keeping it here stops the importer re-adding it.
 window.GOLF_TRACKMAN = [
   {
     "id": "Q291cnNlUGxheUFjdGl2aXR5CmRmODlhMzdlMi05MGFlLTUxZTktYTk5YS02ODEwYWQwZmY2MzQ=",
@@ -17,7 +18,8 @@ window.GOLF_TRACKMAN = [
     "score": 126,
     "toPar": 55,
     "par": 71,
-    "image": "courses/club-de-golf-le-mirage-arizona.webp"
+    "image": "courses/club-de-golf-le-mirage-arizona.webp",
+    "hidden": true
   },
   {
     "id": "Q291cnNlUGxheUFjdGl2aXR5CmQxMTM1NjI3ZC0yNGUwLTU4YmItYTVhMi0yYTJjMTNjZmJiMjA=",
@@ -179,6 +181,7 @@ window.GOLF_TRACKMAN = [
     "score": 99,
     "toPar": 32,
     "net": true,
-    "image": "courses/bandon-trails.webp"
+    "image": "courses/bandon-trails.webp",
+    "hidden": true
   }
 ];

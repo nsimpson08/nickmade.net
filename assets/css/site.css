@@ -79,7 +79,7 @@ img { display: block; max-width: 100%; }
   align-items: baseline;
   gap: 6px 12px;
   margin: 26px auto 0;
-  max-width: 900px;
+  max-width: 1060px;
   font-size: 0.88rem;
   letter-spacing: 0;
   opacity: 0;
@@ -118,7 +118,8 @@ img { display: block; max-width: 100%; }
 .now-extra { color: var(--amber); letter-spacing: 0.04em; font-size: 0.8rem; }
 .now-games .now-extra { color: var(--violet); }
 .now-music .now-extra { color: var(--muted); letter-spacing: 0; font-size: 0.88rem; }
-.now-live .now-when { color: var(--pink); }
+.now-art { display: inline-block; width: 20px; height: 20px; margin: 0 2px 0 1px; border-radius: 4px; vertical-align: -5px; object-fit: cover; }
+.now-eq { margin-left: 3px; vertical-align: -1px; color: var(--pink); }
 .now-when { color: var(--faint); font-size: 0.8rem; }
 .now-sep { color: var(--faint); }
 @media (max-width: 560px) {
@@ -348,6 +349,55 @@ img { display: block; max-width: 100%; }
   background: var(--line);
 }
 .round-photo img { width: 100%; height: 100%; object-fit: cover; }
+/* Score Trend chart (golf.js). Series colors are set inline from SERIES; everything else is text/grid tokens. */
+.trend {
+  position: relative;
+  padding: 18px 18px 8px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+}
+.trend svg { display: block; max-width: 100%; height: auto; overflow: visible; cursor: crosshair; }
+.trend svg:focus-visible { outline: 2px solid var(--accent); outline-offset: 6px; border-radius: 4px; }
+.trend-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0 0 6px 22px; font-size: 0.8rem; color: var(--muted); }
+.trend-legend span { display: inline-flex; align-items: center; gap: 7px; }
+.trend-legend i { width: 16px; height: 2px; border-radius: 1px; }
+.trend-key i { background: var(--faint); opacity: .8; height: 1px !important; }
+.trend-grid { stroke: var(--line); stroke-width: 1; }
+.trend-tick { fill: var(--faint); font-size: 11px; font-variant-numeric: tabular-nums; }
+.trend-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.trend-fit { stroke-width: 1.5; opacity: .45; stroke-linecap: round; }
+.trend-dot { stroke: var(--panel); stroke-width: 2; }
+.trend-callout { fill: var(--fg); font-size: 12px; font-weight: 500; }
+.trend-end { fill: var(--muted); font-size: 12px; }
+.trend-leader { stroke: var(--line); stroke-width: 1; }
+.trend-cross { stroke: var(--faint); stroke-width: 1; }
+.trend-ring { fill: none; stroke-width: 2; }
+.trend-tip {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #151518;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, .9);
+  pointer-events: none;
+  white-space: nowrap;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.trend-tip[hidden] { display: none; }
+.trend-tip b { font-family: var(--display); font-size: 1.2rem; font-weight: 700; color: var(--fg); line-height: 1.1; }
+.trend-tip span:not(.trend-tip-meta) { color: var(--fg); }
+.trend-tip-meta { display: flex; align-items: center; gap: 6px; font-size: 0.72rem; }
+.trend-tip-meta i { width: 12px; height: 2px; border-radius: 1px; }
+.round.flash { animation: round-flash 1.6s ease-out; }
+@keyframes round-flash {
+  0%, 30% { box-shadow: 0 0 0 2px var(--accent), 0 0 40px -6px var(--accent); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
 .round-top { display: flex; justify-content: space-between; gap: 8px; font-size: 0.78rem; color: var(--muted); }
 .round-top .holes { color: var(--accent); }
 .round .course {
@@ -461,7 +511,7 @@ img { display: block; max-width: 100%; }
 }
 
 /* Groups of sections (e.g. Lately / Favorites on Movies) */
-.group + .group { margin-top: 120px; }
+.group + .group { margin-top: 80px; }
 .group-head {
   display: flex;
   align-items: baseline;
@@ -483,13 +533,14 @@ img { display: block; max-width: 100%; }
   border: 1px solid var(--line);
   border-radius: 22px;
   background:
-    radial-gradient(90% 60% at 0% 0%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 70%),
+    radial-gradient(95% 65% at 0% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 74%),
+    radial-gradient(95% 65% at 100% 100%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 74%),
     color-mix(in srgb, var(--fg) 3%, transparent);
 }
 @media (max-width: 560px) {
   .jump-group + .jump-group::before { width: 100%; height: 0; margin: 0; }
   .group.panel { margin: 0 -8px; padding: 28px 16px 36px; border-radius: 16px; }
-  .group + .group { margin-top: 88px; }
+  .group + .group { margin-top: 64px; }
 }
 
 .subsection + .subsection { margin-top: 96px; }
@@ -995,6 +1046,99 @@ button.queue-slot:hover .plus { transform: rotate(90deg); }
 .playlist > p { margin: 10px 0 0; color: var(--muted); max-width: 62ch; }
 .playlist .player { margin-top: 24px; }
 .playlist-group { display: grid; gap: 56px; }
+.playlists .group + .group { margin-top: 0; } /* the .playlists grid gap already spaces the panels */
+
+/* Music "Recently Listened" (assets/js/recent.js) */
+.recent-sub {
+  margin-left: 12px;
+  font-family: var(--body);
+  font-size: 0.8rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  vertical-align: middle;
+}
+/* the list sits in one rounded card, rows split by hairlines */
+.recent-list {
+  margin: 20px 0 0;
+  padding: 6px;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: 0 20px 40px -24px rgba(0, 0, 0, .9);
+}
+.recent-list li + li { border-top: 1px solid var(--line); }
+.recent-player { margin-top: 20px; border-radius: 12px; overflow: hidden; }
+.recent-player iframe { display: block; width: 100% !important; border: 0; } /* the API sets a fixed width */
+.recent-row {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 48px 1fr auto;
+  gap: 14px;
+  align-items: center;
+  padding: 10px 8px;
+  border-radius: 10px;
+  color: inherit;
+  text-decoration: none;
+  transition: background .2s;
+}
+.recent-row:hover, .recent-row:focus-visible { background: color-mix(in srgb, var(--accent) 8%, transparent); outline: none; }
+.recent-art { position: relative; width: 48px; height: 48px; border-radius: 6px; overflow: hidden; background: var(--line); }
+/* play badge over the cover: a triangle on hover, pause bars while that song plays */
+.recent-play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, .45);
+  opacity: 0;
+  transition: opacity .2s;
+}
+.recent-play::before {
+  content: "";
+  width: 0;
+  height: 0;
+  margin-left: 3px;
+  border-style: solid;
+  border-width: 8px 0 8px 13px;
+  border-color: transparent transparent transparent #fff;
+}
+.recent-row:hover .recent-play, .recent-row:focus-visible .recent-play, .recent-list li.selected .recent-play { opacity: 1; }
+.recent-list li.playing .recent-play::before {
+  width: 12px;
+  height: 14px;
+  margin: 0;
+  border: 0;
+  background: linear-gradient(90deg, #fff 0 4px, transparent 4px 8px, #fff 8px 12px);
+}
+.recent-list li.selected .recent-title { color: var(--accent); }
+.recent-art img { width: 100%; height: 100%; object-fit: cover; }
+.recent-text { display: grid; min-width: 0; }
+.recent-title, .recent-artist { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recent-title { font-weight: 500; }
+.recent-artist { font-size: 0.85rem; color: var(--muted); }
+.recent-when { display: inline-flex; align-items: center; gap: 7px; font-size: 0.8rem; color: var(--faint); white-space: nowrap; }
+.recent-list li.live .recent-when { color: var(--accent); font-weight: 500; }
+.recent-list li.live .recent-title { color: var(--accent); }
+/* equalizer bars (Recently Listened and the home strip) */
+.np-eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 11px; }
+.np-eq i { width: 2px; height: 100%; border-radius: 1px; background: currentColor; animation: np-eq 0.9s ease-in-out infinite alternate; }
+.np-eq i:nth-child(2) { animation-delay: -0.3s; }
+.np-eq i:nth-child(3) { animation-delay: -0.6s; }
+.np-eq i:nth-child(4) { animation-delay: -0.15s; }
+@keyframes np-eq { from { transform: scaleY(0.25); } to { transform: scaleY(1); } }
+.np-eq i { transform-origin: bottom; }
+@media (prefers-reduced-motion: reduce) { .np-eq i { animation: none; transform: scaleY(0.7); } }
+@media (max-width: 560px) {
+  .recent-row { grid-template-columns: 44px 1fr auto; gap: 12px; padding: 8px 4px; }
+  .recent-art { width: 44px; height: 44px; }
+}
 .playlist-group .group-head { margin-bottom: -24px; }
 .playlist .empty { margin-top: 12px; }
 

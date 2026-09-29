@@ -7,20 +7,23 @@
 //                On a group's first playlist, groupNote adds a line of text and groupStyle: "panel" gives it a raised box.
 window.PLAYLISTS = [
   {
-    // Paste the playlist's Spotify link into url (and set the title and description); until then it says "Playlist coming soon."
+    // The Lately panel also shows "Recently Listened" (live from Spotify, assets/js/recent.js) above this playlist
     group: "Lately",
     groupNote: "What I've been listening to",
     groupStyle: "panel",
-    title: "",
+    title: "Recently Liked",
     description: "",
-    url: "https://open.spotify.com/playlist/19F54mBzCryNrrLIOGFY5Q?si=4f607253cb434b81"
+    url: "hhttps://open.spotify.com/playlist/4GROnQ8g2SXcwtZoJ3fRcU?si=2d15099454b64fd1"
   },
   {
+    group: "Favorites",
+    groupStyle: "panel",
     title: "Best of the Best",
     description: "This playlist was both extremely easy and extremely difficult to make. I believe everyone should take the time to make their own. It's personal; It's a journey.",
     url: "https://open.spotify.com/playlist/0bVbAc35F1ojkJyAofCAZZ?si=3e0883bc67144326"
   },
   {
+    group: "Favorites",
     title: "Coding/Chores/Focus",
     description: "My latest obsession of 2026. Lyricless hype music. From the title you can tell this is nostalgic of 2000's Racing Game music. Apparently it's also called Atmospheric Drum & Bass. Although this can be easily found on some kind of 24/7 YouTube Live channel, this playlist is curated of favorites. And you know who's a difficult artist to search for? 'Thing'",
     url: "https://open.spotify.com/playlist/3CLltogSU1Z2uMWt0OJhU0?si=8aeeaef4423e42a0&pt=482f2081240249561c3c3f327fd95bcc"

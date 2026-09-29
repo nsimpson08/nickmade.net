@@ -17,6 +17,7 @@ OWNER_QUEUE_FALLBACK = "4"
 # Spotify developer app (developer.spotify.com/dashboard) for the home page's "listening to";
 # its Client Secret is a secret: npx wrangler secret put SPOTIFY_CLIENT_SECRET
 SPOTIFY_CLIENT_ID = "1c18f59367834eaf9edd982c5858fa9b"
+SPOTIFY_REDIRECT = "https://api.nickmade.net/spotify/callback"
 # Time zone for the nightly Xbox refresh and its "Last played" dates
 TIMEZONE = "America/Chicago"
 

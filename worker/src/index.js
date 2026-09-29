@@ -22,6 +22,7 @@
 //                               (or refreshes their Xbox stats if already there), poster from the Xbox store
 //   GET    /spotify/top?playlist=<id>  the first song on a public Spotify playlist (home page "Lately" strip)
 //   GET    /spotify/now         what Nick is playing on Spotify now, or his last played song (home "Lately" strip)
+//   GET    /spotify/recent      his last 10 songs (now playing first, marked live) for the Music page
 //   POST   /spotify/auth-url    (admin) a Spotify sign-in link for connecting his account (tools/spotify_connect.py)
 //   GET    /spotify/callback    where Spotify sends him back after he agrees; saves the refresh token
 //   GET    /img?u=url           image proxy for posters (allowlisted hosts only)
@@ -76,6 +77,7 @@ export default {
       if (url.pathname.startsWith("/lists/") && request.method === "DELETE") return await removeFromList(request, url, env, cors);
       if (url.pathname === "/img" && request.method === "GET") return await image(url, ctx);
       if (url.pathname === "/spotify/now" && request.method === "GET") return await spotifyNow(env, cors);
+      if (url.pathname === "/spotify/recent" && request.method === "GET") return await spotifyRecent(env, cors);
       if (url.pathname === "/spotify/auth-url" && request.method === "POST") return await spotifyAuthUrl(request, url, env, cors);
       if (url.pathname === "/spotify/callback" && request.method === "GET") return await spotifyCallback(url, env);
       if (url.pathname === "/spotify/top" && request.method === "GET") return await spotifyTop(url, cors);
@@ -752,8 +754,10 @@ async function spotifyTop(url, cors) {
 
 const SPOTIFY_SCOPES = "user-read-currently-playing user-read-recently-played";
 
-function spotifyRedirect(url) {
-  return url.origin + "/spotify/callback";
+// Must match a redirect URI in the Spotify app exactly. Set per environment (wrangler dev reports the live
+// hostname in request.url, so it can't be worked out from the request locally).
+function spotifyRedirect(url, env) {
+  return env.SPOTIFY_REDIRECT || url.origin + "/spotify/callback";
 }
 
 async function spotifyToken(env, params) {
@@ -778,11 +782,11 @@ async function spotifyAuthUrl(request, url, env, cors) {
   const auth = "https://accounts.spotify.com/authorize?" + new URLSearchParams({
     client_id: env.SPOTIFY_CLIENT_ID,
     response_type: "code",
-    redirect_uri: spotifyRedirect(url),
+    redirect_uri: spotifyRedirect(url, env),
     scope: SPOTIFY_SCOPES,
     state,
   });
-  return json({ url: auth, redirect: spotifyRedirect(url) }, 200, cors);
+  return json({ url: auth, redirect: spotifyRedirect(url, env) }, 200, cors);
 }
 
 function page(title, message) {
@@ -799,7 +803,7 @@ async function spotifyCallback(url, env) {
   await env.QUEUE.delete("spotify:state:" + state);
   if (url.searchParams.get("error")) return page("Not connected", "Spotify said: " + url.searchParams.get("error"));
   try {
-    const t = await spotifyToken(env, { grant_type: "authorization_code", code: url.searchParams.get("code") || "", redirect_uri: spotifyRedirect(url) });
+    const t = await spotifyToken(env, { grant_type: "authorization_code", code: url.searchParams.get("code") || "", redirect_uri: spotifyRedirect(url, env) });
     await env.QUEUE.put("spotify:refresh", t.refresh_token);
     await env.QUEUE.put("spotify:access", t.access_token, { expirationTtl: Math.max(60, (t.expires_in || 3600) - 120) });
     await env.QUEUE.delete("spotify:now");
@@ -821,17 +825,26 @@ async function spotifyAccess(env) {
 }
 
 function trackInfo(track) {
+  const images = (track.album && track.album.images) || [];
+  // Spotify lists album art largest first (640, 300, 64); take the ~300px one for cards
+  const art = images.find((i) => i.width && i.width <= 320) || images[images.length - 1] || images[0];
   return {
     title: track.name,
     artist: (track.artists || []).map((a) => a.name).join(", ") || null,
+    album: track.album ? track.album.name : null,
+    image: art ? art.url : null,
     url: track.external_urls ? track.external_urls.spotify : null,
+    durationMs: track.duration_ms || null,
   };
 }
 
-// Now playing if something is, else the last played song. Cached a minute so visitors don't each ask Spotify.
+// Now playing if something is, else the last played song. Cached a minute so visitors don't each ask Spotify,
+// but not past the end of the song that's playing. progressMs + fetchedAt let the page run the progress bar.
 async function spotifyNow(env, cors) {
   const cached = await env.QUEUE.get("spotify:now", "json");
-  if (cached) return json(cached, 200, cors);
+  const songOver = cached && cached.nowPlaying && cached.durationMs &&
+    Date.now() - Date.parse(cached.fetchedAt) > cached.durationMs - (cached.progressMs || 0);
+  if (cached && !songOver) return json(cached, 200, cors);
   let out = null;
   try {
     const token = await spotifyAccess(env);
@@ -840,7 +853,9 @@ async function spotifyNow(env, cors) {
     const cur = await fetch("https://api.spotify.com/v1/me/player/currently-playing", auth);
     if (cur.status === 200) {
       const d = await cur.json();
-      if (d.is_playing && d.item && d.currently_playing_type === "track") out = { ...trackInfo(d.item), nowPlaying: true, playedAt: new Date().toISOString() };
+      if (d.is_playing && d.item && d.currently_playing_type === "track") {
+        out = { ...trackInfo(d.item), nowPlaying: true, playedAt: new Date().toISOString(), progressMs: d.progress_ms || 0 };
+      }
     }
     if (!out) {
       const rec = await fetch("https://api.spotify.com/v1/me/player/recently-played?limit=1", auth);
@@ -853,6 +868,36 @@ async function spotifyNow(env, cors) {
     return json({ error: "Spotify didn't answer." }, 502, cors);
   }
   if (!out) return json({ error: "Nothing played yet." }, 404, cors);
+  out.fetchedAt = new Date().toISOString();
   await env.QUEUE.put("spotify:now", JSON.stringify(out), { expirationTtl: 60 });
+  return json(out, 200, cors);
+}
+
+// Up to 10 songs, newest first: what's playing now (live: true) and then recently played. Cached a minute.
+async function spotifyRecent(env, cors) {
+  const cached = await env.QUEUE.get("spotify:recent", "json");
+  if (cached) return json(cached, 200, cors);
+  const items = [];
+  try {
+    const token = await spotifyAccess(env);
+    if (!token) return json({ error: "Spotify isn't connected." }, 404, cors);
+    const auth = { headers: { Authorization: "Bearer " + token } };
+    const cur = await fetch("https://api.spotify.com/v1/me/player/currently-playing", auth);
+    if (cur.status === 200) {
+      const d = await cur.json();
+      if (d.is_playing && d.item && d.currently_playing_type === "track") items.push({ ...trackInfo(d.item), live: true, playedAt: new Date().toISOString() });
+    }
+    const rec = await fetch("https://api.spotify.com/v1/me/player/recently-played?limit=10", auth);
+    if (rec.ok) {
+      for (const it of (await rec.json()).items || []) {
+        if (items.length >= 10) break;
+        items.push({ ...trackInfo(it.track), live: false, playedAt: it.played_at });
+      }
+    }
+  } catch (e) {
+    return json({ error: "Spotify didn't answer." }, 502, cors);
+  }
+  const out = { items, fetchedAt: new Date().toISOString() };
+  await env.QUEUE.put("spotify:recent", JSON.stringify(out), { expirationTtl: 60 });
   return json(out, 200, cors);
 }

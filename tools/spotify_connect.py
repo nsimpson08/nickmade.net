@@ -21,7 +21,11 @@ local = "--local" in sys.argv
 api = "http://127.0.0.1:8787" if local else "https://api.nickmade.net"
 token = "local-test-token" if local else (os.environ.get("NICKMADE_ADMIN_TOKEN") or getpass.getpass("Admin password: "))
 
-req = urllib.request.Request(api + "/spotify/auth-url", method="POST", headers={"Authorization": "Bearer " + token})
+# A browser-style User-Agent: Cloudflare blocks Python's default one (error 1010)
+req = urllib.request.Request(api + "/spotify/auth-url", method="POST", headers={
+    "Authorization": "Bearer " + token,
+    "User-Agent": "Mozilla/5.0 (nickmade.net spotify_connect)",
+})
 try:
     with urllib.request.urlopen(req, timeout=30) as res:
         data = json.load(res)

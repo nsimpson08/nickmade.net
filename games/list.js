@@ -58,6 +58,7 @@ window.SECTIONS = [
   {
     group: "Favorites",
     groupNote: "",
+    groupStyle: "panel",
     title: "All Time Favorites",
     layout: "reviews",
     items: [

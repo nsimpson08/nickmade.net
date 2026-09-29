@@ -54,9 +54,10 @@
       .catch(function () { return null; });
   }
 
-  function part(kind, href, verb, title, extra, when) {
+  function part(kind, href, verb, title, extra, when, image) {
     return '<a class="now-item now-' + kind + '" href="' + href + '">' +
       '<span class="now-verb">' + verb + "</span> " +
+      (image ? '<img class="now-art" src="' + esc(image) + '" alt="" width="20" height="20">' : "") +
       '<span class="now-title">' + esc(title) + "</span>" +
       (extra ? ' <span class="now-extra">' + esc(extra) + "</span>" : "") +
       (when ? ' <span class="now-when">' + esc(when) + "</span>" : "") +
@@ -84,7 +85,7 @@
   function listening() {
     return getJson("/spotify/now").then(function (s) {
       if (s && s.title) {
-        return { title: s.title, extra: s.artist ? "by " + s.artist : "", when: s.nowPlaying ? "now" : agoTime(s.playedAt), live: s.nowPlaying };
+        return { title: s.title, extra: s.artist ? "by " + s.artist : "", when: s.nowPlaying ? "" : agoTime(s.playedAt), live: s.nowPlaying, image: s.image };
       }
       var m = playlist && /playlist\/([A-Za-z0-9]+)/.exec(playlist.url);
       return (m ? getJson("/spotify/top?playlist=" + m[1]) : Promise.resolve(null)).then(function (t) {
@@ -98,7 +99,12 @@
     var parts = [];
     if (res[0]) parts.push(part("games", "/games/#recently-played", "playing", res[0].title, stars(res[0].rating), ago(res[0].date)));
     if (res[1]) parts.push(part("movies", "/movies/#recently-watched", "watched", res[1].title, stars(res[1].rating), ago(res[1].date)));
-    if (res[2]) parts.push(part("music" + (res[2].live ? " now-live" : ""), "/music/", "listening to", res[2].title, res[2].extra, res[2].when));
+    if (res[2]) {
+      var m = part("music" + (res[2].live ? " now-live" : ""), "/music/", "listening to", res[2].title, res[2].extra, res[2].when, res[2].image);
+      // playing right now: little bouncing equalizer bars instead of a time
+      if (res[2].live) m = m.replace(/<\/a>$/, ' <span class="np-eq now-eq" aria-label="playing now"><i></i><i></i><i></i><i></i></span></a>');
+      parts.push(m);
+    }
     if (!parts.length) return;
     root.innerHTML = '<span class="now-label"><i aria-hidden="true"></i>Lately</span>' + parts.join('<span class="now-sep" aria-hidden="true">·</span>');
     root.hidden = false;

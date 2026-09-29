@@ -57,6 +57,7 @@ window.SECTIONS = [
   {
     group: "Favorites",
     groupNote: "",
+    groupStyle: "panel",
     title: "All Time Favorites",
     layout: "reviews",
     items: [
@@ -67,7 +68,7 @@ window.SECTIONS = [
         starring: ["Daniel Day-Lewis", "Paul Dano"],
         image: "posters/there-will-be-blood.jpg",
         credit: { artist: "Jamie Stark", url: "https://instagram.com/starkdesignsllc" },
-        review: "What can be said that hasn't already been said? Daniel Day-Lewis literally is Daniel Plainview. There is no separation between where one begins and one ends, a complete and total immersion into character. Personally, Plainview reminds me of my uncle. A rough and tumbled farmer from West Texas, a lone wolf, very little family connection. He worked very hard, made the most of his business, and now lives in a log cabin away from all of society. "
+        review: "What can be said that hasn't already been said? Daniel Day-Lewis literally is Daniel Plainview. There is no separation between where one begins and one ends, a complete and total immersion into character. Personally, Plainview reminds me of my uncle. A rough and tumbled farmer from West Texas, a lone wolf, very little family connection. He worked very hard, made the most of his business, and now lives in a log cabin away from all of society. I don't know him, yet I love him."
       },
       {
         title: "The Big Lebowski",
@@ -76,7 +77,7 @@ window.SECTIONS = [
         starring: ["Jeff Bridges", "John Goodman"],
         image: "posters/the-big-lebowski.jpg",
         credit: { artist: "Doaly", url: "http://www.doaly.co.uk/" },
-        review: "There is an unspeakable vibe that arises straight from the essence of this movie. Each character and actor that portrays them is the definition of 'perfect'. No one could play anyone else. There are no jokes in this movie written like Anchorman, yet they are endlessly quotable. I watch this 3 times a year minimum. Own the VHS, DVD, BluRay, and 4k. Sountrack, perfect. Story script, perfect. The Dude, perfect. Philip Seymour Hoffman, perfect."
+        review: "There is an unspeakable vibe that arises straight from the essence of this movie. Each character and actor that portrays them is the definition of 'perfect'. No one could play anyone else. There are no jokes in this movie written like Anchorman, yet they are endlessly quotable. I watch this 3 times a year minimum. Own the VHS, DVD, BluRay, and 4k. Sountrack, perfect. Story script, perfect. Philip Seymour Hoffman, perfect. The Dude, perfect."
       },
       {
         title: "Donnie Darko",
