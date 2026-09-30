@@ -68,7 +68,7 @@ window.SECTIONS = [
         starring: ["Daniel Day-Lewis", "Paul Dano"],
         image: "posters/there-will-be-blood.jpg",
         credit: { artist: "Jamie Stark", url: "https://instagram.com/starkdesignsllc" },
-        review: "What can be said that hasn't already been said? Daniel Day-Lewis literally is Daniel Plainview. There is no separation between where one begins and one ends, a complete and total immersion into character. Personally, Plainview reminds me of my uncle. A rough and tumbled farmer from West Texas, a lone wolf, very little family connection. He worked very hard, made the most of his business, and now lives in a log cabin away from all of society. I don't know him, yet I love him."
+        review: "What can be said that hasn't already been said? Daniel Day-Lewis literally is Daniel Plainview. There is no separation between where one begins and one ends, a complete and total immersion into character. Personally, Plainview reminds me of my uncle. A rough and tumbled farmer from West Texas, a lone wolf, very little family connection. He worked very hard, made the most of his business, and now lives in a log cabin away from all of society. I don't know him, yet I love him. I love them both and all of their flaws."
       },
       {
         title: "The Big Lebowski",

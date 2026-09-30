@@ -17,6 +17,9 @@ Personal site, served by GitHub Pages from the root of `main`. Plain HTML, no bu
   Every night at midnight Central the Worker refreshes those games' last played date, achievements, and playtime. These are stored by the Worker, not in this repo.
 - `extras/rapture/`: the built Rapture: ADAM & Dice game (one self-contained file). Its source is a separate project;
   don't edit this copy, publish a new build from the game's folder with `npm run publish:site`
+- `extras/golf-game/`: the built Nick's Nine golf game (one self-contained file). Its source is a separate project
+  (`../Golf Game`); don't edit this copy, publish a new build from the game's folder with `npm run publish:site`.
+  It reads `extras/golf/scores.js` and `trackman.js` at runtime, so new rounds and stats change the game with no rebuild
 - `extras/golf/`: the Golf page (Extras). Rounds and bag in `scores.js`; Trackman rounds are imported into `trackman.js`
   (and course photos into `courses/`) by `python3 tools/import_trackman.py`, from the round cards' HTML copied off Trackman's site
 - `tools/pull_live.py`: copies site additions into list.js and posters/ (then commit and push); run it again
