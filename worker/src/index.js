@@ -331,6 +331,10 @@ async function findAlternativeArt(title, year) {
       if (got !== want && /^\d/.test(got.slice(want.length + 1))) continue;
       const page = await (await fetch(link, { headers: { "User-Agent": "Mozilla/5.0 (nickmade.net queue)" } })).text();
       const img = (page.match(/<meta property="og:image" content="([^"]+)"/) || [])[1];
+      // some pages' image is a landscape banner, not the poster; keep portrait (about 2:3) only
+      const w = +(page.match(/<meta property="og:image:width" content="(\d+)"/) || [])[1];
+      const h = +(page.match(/<meta property="og:image:height" content="(\d+)"/) || [])[1];
+      if (w && h && (h / w < 1.25 || h / w > 1.75)) continue;
       if (img && /\.(jpe?g|png)$/i.test(img)) return { image: img, artist: decode(artist).trim(), url: link };
     }
   } catch (e) {}

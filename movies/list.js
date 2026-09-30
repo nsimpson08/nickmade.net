@@ -99,7 +99,9 @@ window.SECTIONS = [
       { title: "Anchorman", year: 2004, image: "posters/anchorman.jpg", credit: { artist: "Oregon Pizza", url: "https://www.behance.net/oregonpizza" } },
       { title: "Superbad", year: 2007, image: "posters/superbad.jpg", credit: { artist: "Star Pendergrass", url: "https://www.instagram.com/star.pendergrass/" } },
       { title: "Horrible Bosses", year: 2011, image: "posters/horrible-bosses.jpg", credit: { artist: "Chungkong", url: "https://displate.com/artist/chungkong" } },
-      { title: "The Art of Self-Defense", year: 2019, image: "posters/the-art-of-self-defense.jpg", credit: { artist: "salny", url: "https://posterspy.com/profile/salny/" } }
+      { title: "The Art of Self-Defense", year: 2019, image: "posters/the-art-of-self-defense.jpg", credit: { artist: "salny", url: "https://posterspy.com/profile/salny/" } },
+      { title: "Forgetting Sarah Marshall", year: 2008, image: "posters/forgetting-sarah-marshall.jpg", credit: { artist: "Chungkong", url: "https://displate.com/artist/chungkong" } },
+      { title: "Pineapple Express", year: 2008, image: "posters/pineapple-express.jpg", credit: { artist: "Rough Deontas", url: "https://alternativemovieposters.com/amp/pineapple-express-by-rough-deontas/" } }
     ]
   },
   {
@@ -109,7 +111,9 @@ window.SECTIONS = [
     layout: "grid",
     items: [
       { title: "Phantom Thread", year: 2017, image: "posters/phantom-thread.jpg", credit: { artist: "Chris Ayers", url: "https://www.instagram.com/filmprintposters/" } },
-      { title: "Call Me by Your Name", year: 2017, image: "posters/call-me-by-your-name.jpg", credit: { artist: "Cinzia Cacioppo", url: "https://www.instagram.com/the_cinziettis/" } }
+      { title: "Call Me by Your Name", year: 2017, image: "posters/call-me-by-your-name.jpg", credit: { artist: "Cinzia Cacioppo", url: "https://www.instagram.com/the_cinziettis/" } },
+      { title: "Blue Valentine", year: 2010, image: "posters/blue-valentine.jpg", credit: { artist: "sampath", url: "https://posterspy.com/profile/sampath/" } },
+      { title: "Romeo + Juliet", year: 1996, image: "posters/romeo-juliet.jpg", credit: { artist: "Ise Ananphada", url: "https://alternativemovieposters.com/amp/romeo-juliet-by-ise-ananphada/" } }
     ]
   },
   {
@@ -119,7 +123,9 @@ window.SECTIONS = [
     layout: "grid",
     items: [
       { title: "Southland Tales", year: 2006, image: "posters/southland-tales.jpg", credit: { artist: "Gregory Sacre", url: "https://alternativemovieposters.com/portfolio_tags/gregory-sacre/" } },
-      { title: "Night Watch", year: 2004, image: "posters/night-watch.jpg", credit: { official: true } }
+      { title: "Night Watch", year: 2004, image: "posters/night-watch.jpg", credit: { official: true } },
+      { title: "The Fountain", year: 2006, image: "posters/the-fountain.jpg", credit: { artist: "Ise Ananphada", url: "https://alternativemovieposters.com/amp/fountain-ise-ananphada/" } },
+      { title: "Layer Cake", year: 2004, image: "posters/layer-cake.jpg", credit: { artist: "Rémi Germain", url: "https://posterspy.com/profile/remigermain/" } }
     ]
   }
 ];

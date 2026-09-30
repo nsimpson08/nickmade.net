@@ -87,6 +87,7 @@ img { display: block; max-width: 100%; }
   transition: opacity .6s ease, transform .6s ease;
 }
 .banner p.now.in { opacity: 1; transform: none; }
+.banner p.now[hidden] { display: none; }
 .now-label {
   display: inline-flex;
   align-items: center;
@@ -122,6 +123,17 @@ img { display: block; max-width: 100%; }
 .now-eq { margin-left: 3px; vertical-align: -1px; color: var(--pink); }
 .now-when { color: var(--faint); font-size: 0.8rem; }
 .now-sep { color: var(--faint); }
+/* shown while the parts are still loading: a ring in the three section colours, spinning */
+.now-loading { display: inline-flex; align-items: center; gap: 8px; align-self: center; color: var(--faint); font-size: 0.8rem; }
+.now-spin {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: conic-gradient(var(--violet), var(--amber), var(--pink), transparent 85%);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
+  animation: spin .9s linear infinite;
+}
 @media (max-width: 560px) {
   .banner p.now { flex-direction: column; align-items: center; gap: 6px; }
   .now-sep { display: none; }
@@ -129,6 +141,7 @@ img { display: block; max-width: 100%; }
 @media (prefers-reduced-motion: reduce) {
   .now-label i { animation: none; }
   .banner p.now { transition: none; }
+  .now-spin { animation-duration: 2.4s; }
 }
 
 .tiles {

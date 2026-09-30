@@ -2,7 +2,7 @@
 // Recently Watched (with its rating), and what's playing on Nick's Spotify (or his last played song). Without
 // Spotify it falls back to the top song on Music's Lately playlist, then that playlist's name.
 // Updates itself as those lists change.
-// Parts that can't load are left out; if none load, the strip stays hidden.
+// A spinner shows while they load; parts that can't load are left out, and if none load, the strip hides.
 (function () {
   var script = document.currentScript;
   var local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
@@ -95,19 +95,39 @@
     });
   }
 
-  Promise.all([API ? newest("games") : null, API ? newest("movies") : null, listening()]).then(function (res) {
-    var parts = [];
-    if (res[0]) parts.push(part("games", "/games/#recently-played", "playing", res[0].title, stars(res[0].rating), ago(res[0].date)));
-    if (res[1]) parts.push(part("movies", "/movies/#recently-watched", "watched", res[1].title, stars(res[1].rating), ago(res[1].date)));
-    if (res[2]) {
-      var m = part("music" + (res[2].live ? " now-live" : ""), "/music/", "listening to", res[2].title, res[2].extra, res[2].when, res[2].image);
-      // playing right now: little bouncing equalizer bars instead of a time
-      if (res[2].live) m = m.replace(/<\/a>$/, ' <span class="np-eq now-eq" aria-label="playing now"><i></i><i></i><i></i><i></i></span></a>');
-      parts.push(m);
-    }
-    if (!parts.length) return;
-    root.innerHTML = '<span class="now-label"><i aria-hidden="true"></i>Lately</span>' + parts.join('<span class="now-sep" aria-hidden="true">·</span>');
-    root.hidden = false;
-    requestAnimationFrame(function () { root.classList.add("in"); });
+  function music(s) {
+    var m = part("music" + (s.live ? " now-live" : ""), "/music/", "listening to", s.title, s.extra, s.when, s.image);
+    // playing right now: little bouncing equalizer bars instead of a time
+    if (s.live) m = m.replace(/<\/a>$/, ' <span class="np-eq now-eq" aria-label="playing now"><i></i><i></i><i></i><i></i></span></a>');
+    return m;
+  }
+
+  // Each part shows up as soon as it loads (in its fixed order), with a spinner after them until the last one is in
+  var sources = [
+    [API ? newest("games") : null, function (g) { return part("games", "/games/#recently-played", "playing", g.title, stars(g.rating), ago(g.date)); }],
+    [API ? newest("movies") : null, function (mv) { return part("movies", "/movies/#recently-watched", "watched", mv.title, stars(mv.rating), ago(mv.date)); }],
+    [listening(), music],
+  ];
+  var slots = sources.map(function () { return ""; });
+  var pending = sources.length;
+
+  function render() {
+    var parts = slots.filter(Boolean);
+    if (!pending && !parts.length) { root.hidden = true; root.textContent = ""; return; } // nothing loaded: hide the strip
+    root.setAttribute("aria-busy", String(pending > 0));
+    root.innerHTML = '<span class="now-label"><i aria-hidden="true"></i>Lately</span>' +
+      parts.join('<span class="now-sep" aria-hidden="true">·</span>') +
+      (pending ? '<span class="now-loading" role="status"><i class="now-spin" aria-hidden="true"></i>' + (parts.length ? "" : "Loading…") + "</span>" : "");
+  }
+
+  render();
+  root.hidden = false;
+  requestAnimationFrame(function () { root.classList.add("in"); });
+  sources.forEach(function (src, i) {
+    Promise.resolve(src[0]).then(function (v) { return v ? src[1](v) : ""; }, function () { return ""; }).then(function (html) {
+      slots[i] = html;
+      pending--;
+      render();
+    });
   });
 })();
