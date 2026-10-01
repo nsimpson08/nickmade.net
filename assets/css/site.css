@@ -1227,7 +1227,117 @@ button.queue-slot:hover .plus { transform: rotate(90deg); }
 .photo img { width: 100%; height: auto; }
 .photos[data-cols="1"] .photo { margin-bottom: 24px; background: transparent; }
 .photos[data-cols="1"] .photo img { max-height: 95vh; object-fit: contain; }
-.photos .empty { padding: 0 16px; }
+.photo-sections .empty { padding: 0 16px; }
+/* Film / Pixel / Cats: jump links and a header per section, lined up with the photos' 16px edge */
+.photo-bar { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 12px 14px; margin: 0 16px 56px; }
+.photo-bar .photo-jump { margin: 0; }
+.photo-bar .photo-jump + .layout-toggle { position: relative; margin-left: 15px; } /* thin divider before the columns */
+.photo-bar .photo-jump + .layout-toggle::before { content: ""; position: absolute; left: -15px; top: 8px; bottom: 8px; width: 1px; background: var(--line); }
+.photo-section { scroll-margin-top: 24px; }
+.photo-section .subhead { margin: 0 16px 28px; justify-content: center; }
+/* Pinned control bar (assets/js/photos.js): section links, the column toggle, and "Top of Film" / "Jump to top".
+   Bottom right once you've scrolled down. Rests collapsed to just the arrow; .open (hover, focus, or a tap)
+   slides the rest out to the left. */
+.photo-dock {
+  position: fixed;
+  right: max(20px, env(safe-area-inset-right));
+  bottom: max(20px, env(safe-area-inset-bottom));
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  max-width: calc(100vw - 16px);
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .45);
+  font-size: 0.85rem;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(12px);
+  transition: opacity .25s, transform .25s, border-color .2s;
+}
+.photo-dock.show { opacity: 1; pointer-events: auto; transform: none; }
+.photo-dock.open { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+
+/* the drawer: sections + columns, folded to nothing until .open */
+.dock-more {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  max-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  visibility: hidden;
+  transition: max-width .35s ease, opacity .2s, margin .35s ease, visibility 0s .35s;
+}
+.photo-dock.open .dock-more {
+  max-width: 560px;
+  margin-right: 13px;
+  opacity: 1;
+  visibility: visible;
+  transition: max-width .35s ease, opacity .25s .08s, margin .35s ease, visibility 0s;
+}
+.dock-sections { display: flex; gap: 2px; }
+.dock-sections a, .photo-dock .to-top {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background .2s, color .2s;
+}
+.dock-sections a:hover, .dock-sections a:focus-visible,
+.photo-dock .to-top:hover, .photo-dock .to-top:focus-visible { color: var(--accent); outline: none; }
+.dock-sections a[aria-current] { color: var(--fg); background: color-mix(in srgb, var(--fg) 10%, transparent); }
+/* thin dividers: between sections and columns, and before the jump button when open */
+.dock-more > * + *, .photo-dock.open .to-top { position: relative; }
+.dock-more > * + *::before, .photo-dock.open .to-top::before {
+  content: "";
+  position: absolute;
+  left: -7px;
+  top: 7px;
+  bottom: 7px;
+  width: 1px;
+  background: var(--line);
+}
+.photo-dock .layout-toggle { flex: none; border: 0; padding: 0; }
+.photo-dock .layout-toggle button { width: 36px; height: 32px; }
+
+/* collapsed it's a round arrow; open, the arrow gets its label */
+.photo-dock .to-top { flex: none; justify-content: center; min-width: 32px; padding: 0 8px; color: var(--fg); }
+.photo-dock .to-top span { font-size: 1rem; line-height: 1; }
+.photo-dock .to-top b {
+  font-weight: inherit;
+  max-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-width .35s ease, opacity .2s, margin .35s ease;
+}
+.photo-dock.open .to-top { padding: 0 12px; }
+.photo-dock.open .to-top b { max-width: 140px; margin-left: 7px; opacity: 1; }
+@media (max-width: 640px) {
+  .photo-dock { right: max(10px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); }
+  .dock-sections a { padding: 0 9px; }
+  .photo-dock .layout-toggle button { width: 30px; }
+  .photo-dock.open .to-top b { display: none; } /* just the arrow on phones; it still goes section top, then page top */
+  .photo-dock.open .to-top { padding: 0 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .photo-dock, .dock-more, .photo-dock.open .dock-more, .photo-dock .to-top b { transition: opacity .2s, visibility 0s; transform: none; }
+}
+.photo-section .photos { padding-bottom: 72px; }
+.photo-section:last-child .photos { padding-bottom: 96px; }
+.photo-only-featured { margin: -12px 16px 72px; color: var(--muted); font-size: 0.9rem; }
 
 /* Featured photo: gilded moulding, a recessed charcoal mat with a fine gold fillet, and a brass plaque */
 .featured {
@@ -1361,6 +1471,9 @@ button.queue-slot:hover .plus { transform: rotate(90deg); }
   .photos[data-cols="2"] { columns: 1; }
   .photos { padding: 0 8px 64px; column-gap: 8px; }
   .photo { margin-bottom: 8px; }
+  .photo-section .subhead { margin: 0 8px 20px; }
+  .photo-section .photos { padding-bottom: 56px; }
+  .photo-bar { margin: 0 8px 40px; }
 }
 
 @media (max-width: 760px) {

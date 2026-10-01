@@ -5,3 +5,5 @@ photography/.manifest.json
 NOTES.md
 __pycache__/
 backups/
+photography/full/
+photography/.uploaded.json

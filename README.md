@@ -24,9 +24,14 @@ Personal site, served by GitHub Pages from the root of `main`. Plain HTML, no bu
   (and course photos into `courses/`) by `python3 tools/import_trackman.py`, from the round cards' HTML copied off Trackman's site
 - `tools/pull_live.py`: copies site additions into list.js and posters/ (then commit and push); run it again
   after pushing to clear the now-duplicate live copies. Also saves a snapshot to `backups/`.
-- `photography/`: the Photography page. Drop photos into `photography/originals/` (not published),
-  then run `python3 tools/photos.py` to make metadata-free full-resolution copies, smaller versions,
-  and `photography/photos.js`. Set your Instagram username in `photography/config.js`.
+- `photography/`: the Photography page, in sections (Film, Pixel, Cats). Drop photos into the section's folder,
+  `photography/originals/<film|pixel|cats>/` (not published), then run `python3 tools/photos.py`. It makes
+  metadata-free copies (location, camera data and phones' hidden extra images removed; only an artist and
+  copyright tag added), smaller versions in `photography/sizes/`, and `photography/photos.js`. The full-resolution
+  copies are too big for GitHub Pages, so the script uploads them to Cloudflare R2 (bucket `nickmade-photos`,
+  served at photos.nickmade.net) with wrangler instead of committing them. Sections, the featured photo, the
+  Instagram username and the R2 address are set in `photography/config.js`
+- `robots.txt`: asks AI crawlers (GPTBot, CCBot, Google-Extended...) to stay out; search engines are still allowed
 - `assets/gifs/`: home tile GIFs. `python3 assets/gifs/make_gifs.py assets/gifs [name...]` regenerates them (needs Pillow); e.g. `... assets/gifs extras` redoes just the Extras one
 
 Preview locally with `python3 -m http.server` and open http://localhost:8000.

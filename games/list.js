@@ -154,7 +154,11 @@ window.SECTIONS = [
       { title: "ROUTINE", year: 2025, image: "posters/routine.jpg", credit: { official: true } },
       { title: "The Evil Within", year: 2014, image: "posters/the-evil-within.jpg", credit: { official: true } },
       { title: "Resident Evil 7: Biohazard", year: 2017, image: "posters/resident-evil-7.jpg", credit: { artist: "DComp", url: "https://posterspy.com/profile/dcomp" } },
-      { title: "F.E.A.R. 2: Project Origin", year: 2009, image: "posters/fear-2.jpg", credit: { official: true } }
+      { title: "F.E.A.R. 2: Project Origin", year: 2009, image: "posters/fear-2.jpg", credit: { official: true } },
+      { title: "Signalis", year: 2022, image: "posters/signalis.jpg", credit: { artist: "Ray-Ana", url: "https://www.deviantart.com/ray-ana/art/Signalis-Poster-941068347" } },
+      { title: "SOMA", year: 2015, image: "posters/soma.jpg", credit: { official: true } },
+      { title: "Alien: Isolation", year: 2014, image: "posters/alien-isolation.jpg", credit: { artist: "edwardjmoran", url: "https://posterspy.com/profile/edwardjmoran" } },
+      { title: "Arizona Sunshine 2", year: 2023, image: "posters/arizona-sunshine-2.jpg", credit: { official: true } }
     ]
   },
   {
@@ -163,7 +167,13 @@ window.SECTIONS = [
     title: "Best Indie",
     layout: "grid",
     items: [
-      { title: "Void Bastards", year: 2019, image: "posters/void-bastards.jpg", credit: { official: true } }
+      { title: "Void Bastards", year: 2019, image: "posters/void-bastards.jpg", credit: { official: true } },
+      { title: "Cocoon", year: 2023, image: "posters/cocoon.jpg", credit: { official: true } },
+      { title: "Raft", year: 2022, image: "posters/raft.jpg", credit: { official: true } },
+      { title: "Firewatch", year: 2016, image: "posters/firewatch.jpg", credit: { official: true } },
+      { title: "Superliminal", year: 2019, image: "posters/superliminal.jpg", credit: { official: true } },
+      { title: "Inscryption", year: 2021, image: "posters/inscryption.jpg", credit: { official: true } },
+      { title: "Quern - Undying Thoughts", year: 2016, image: "posters/quern.jpg", credit: { official: true } }
     ]
   }
 ];
