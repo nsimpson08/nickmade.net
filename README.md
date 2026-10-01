@@ -31,6 +31,9 @@ Personal site, served by GitHub Pages from the root of `main`. Plain HTML, no bu
   copies are too big for GitHub Pages, so the script uploads them to Cloudflare R2 (bucket `nickmade-photos`,
   served at photos.nickmade.net) with wrangler instead of committing them. Sections, the featured photo, the
   Instagram username and the R2 address are set in `photography/config.js`
+- `changelog/log.js`: the site's version history (newest first). The footer on every page (`assets/js/footer.js`)
+  shows the newest version, linking to `/changelog/`; returning visitors see a dot when there's a version they
+  haven't seen. Add an entry at the top for each new feature (1.1, 1.2...); new movies/games/photos don't need one
 - `robots.txt`: asks AI crawlers (GPTBot, CCBot, Google-Extended...) to stay out; search engines are still allowed
 - `assets/gifs/`: home tile GIFs. `python3 assets/gifs/make_gifs.py assets/gifs [name...]` regenerates them (needs Pillow); e.g. `... assets/gifs extras` redoes just the Extras one
 

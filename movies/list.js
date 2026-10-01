@@ -80,13 +80,13 @@ window.SECTIONS = [
         review: "There is an unspeakable vibe that arises straight from the essence of this movie. Each character and actor that portrays them is the definition of 'perfect'. No one could play anyone else. There are no jokes in this movie written like Anchorman, yet they are endlessly quotable. I watch this 3 times a year minimum. Own the VHS, DVD, BluRay, and 4k. Sountrack, perfect. Story script, perfect. Philip Seymour Hoffman, perfect. The Dude, perfect."
       },
       {
-        title: "Donnie Darko",
-        year: 2001,
-        details: "Dir. Richard Kelly",
-        starring: ["Jake Gyllenhaal", "Jena Malone"],
-        image: "posters/donnie-darko.jpg",
-        credit: { artist: "John Dunn", url: "https://www.instagram.com/johndunn_art/" },
-        review: ""
+        title: "Everything Everywhere All at Once",
+        year: 2022,
+        details: "Dir. Daniel Kwan & Daniel Scheinert",
+        starring: ["Michelle Yeoh", "Ke Huy Quan"],
+        image: "posters/everything-everywhere-all-at-once.jpg",
+        credit: { artist: "Jason Ragosta", url: "https://posterspy.com/profile/jragosta" },
+        review: "The Multiverse Matrix. Zoom out and it's dripping with existentialism. Zoom in and it's a distilled love story for bloodlines and soulmates. It helps me have less anxiety about reality, what the purpose of anything and everything is. An absolute masterpiece from the Daniels. A performance from David Bryne sure doesn't hurt it either."
       }
     ]
   },
@@ -113,7 +113,8 @@ window.SECTIONS = [
       { title: "Phantom Thread", year: 2017, image: "posters/phantom-thread.jpg", credit: { artist: "Chris Ayers", url: "https://www.instagram.com/filmprintposters/" } },
       { title: "Call Me by Your Name", year: 2017, image: "posters/call-me-by-your-name.jpg", credit: { artist: "Cinzia Cacioppo", url: "https://www.instagram.com/the_cinziettis/" } },
       { title: "Blue Valentine", year: 2010, image: "posters/blue-valentine.jpg", credit: { artist: "sampath", url: "https://posterspy.com/profile/sampath/" } },
-      { title: "Romeo + Juliet", year: 1996, image: "posters/romeo-juliet.jpg", credit: { artist: "Ise Ananphada", url: "https://alternativemovieposters.com/amp/romeo-juliet-by-ise-ananphada/" } }
+      { title: "Romeo + Juliet", year: 1996, image: "posters/romeo-juliet.jpg", credit: { artist: "Ise Ananphada", url: "https://alternativemovieposters.com/amp/romeo-juliet-by-ise-ananphada/" } },
+      { title: "Lawless", year: 2012, image: "posters/lawless.jpg", credit: { artist: "Lucas Peverill", url: "https://posterspy.com/profile/lucaspeverill/" } }
     ]
   },
   {
@@ -122,10 +123,13 @@ window.SECTIONS = [
     title: "Hidden Gems",
     layout: "grid",
     items: [
-      { title: "Southland Tales", year: 2006, image: "posters/southland-tales.jpg", credit: { artist: "Gregory Sacre", url: "https://alternativemovieposters.com/portfolio_tags/gregory-sacre/" } },
+      { title: "Southland Tales", year: 2006, image: "posters/southland-tales.jpg", credit: { artist: "CmdrRiker", url: "https://theposterdb.com/user/CmdrRiker" } },
       { title: "Night Watch", year: 2004, image: "posters/night-watch.jpg", credit: { official: true } },
       { title: "The Fountain", year: 2006, image: "posters/the-fountain.jpg", credit: { artist: "Ise Ananphada", url: "https://alternativemovieposters.com/amp/fountain-ise-ananphada/" } },
-      { title: "Layer Cake", year: 2004, image: "posters/layer-cake.jpg", credit: { artist: "Rémi Germain", url: "https://posterspy.com/profile/remigermain/" } }
+      { title: "Layer Cake", year: 2004, image: "posters/layer-cake.jpg", credit: { artist: "Rémi Germain", url: "https://posterspy.com/profile/remigermain/" } },
+      { title: "Primer", year: 2004, image: "posters/primer.jpg", credit: { artist: "sampath", url: "https://posterspy.com/profile/sampath/" } },
+      { title: "Garden State", year: 2004, image: "posters/garden-state.jpg", credit: { artist: "Daniel Norris", url: "https://posterspy.com/profile/danknorris/" } },
+      { title: "Visioneers", year: 2008, image: "posters/visioneers.jpg", credit: { official: true } }
     ]
   }
 ];

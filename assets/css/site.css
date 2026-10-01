@@ -209,11 +209,74 @@ img { display: block; max-width: 100%; }
 .tile:hover .sub, .tile:focus-visible .sub { color: var(--muted); }
 .tile:focus-visible { outline: none; }
 
-.home footer {
-  margin-top: 96px;
+/* Footer on every page (assets/js/footer.js): copyright and the site version, linking to /changelog/ */
+.site-footer {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 16px 40px;
   text-align: center;
   color: var(--faint);
   font-size: 0.8rem;
+}
+.home .site-footer { margin-top: 96px; padding: 0; }
+.site-footer .footer-sep { margin: 0 4px; }
+.site-footer .version { color: var(--muted); text-decoration: none; transition: color .2s; }
+.site-footer .version:hover, .site-footer .version:focus-visible { color: var(--fg); text-decoration: underline; text-underline-offset: 3px; outline: none; }
+/* returning visitor, newer version than they've seen: a pulsing mint dot (like the home Lately strip) */
+.version-new {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  vertical-align: 2px;
+  border-radius: 50%;
+  background: var(--mint);
+  animation: now-pulse 2.4s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) { .version-new { animation: none; } }
+
+/* ---------- Changelog ---------- */
+
+.release + .release { margin-top: 64px; }
+.release-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 14px;
+  margin: 0 0 22px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+  font-weight: 400;
+}
+.release-version { font-family: var(--display); font-weight: 700; font-size: 1.5rem; letter-spacing: -0.01em; color: var(--fg); }
+.release.latest .release-version { color: var(--mint); }
+.release-title { font-size: 1rem; color: var(--muted); }
+.release-head time { margin-left: auto; font-size: 0.85rem; color: var(--faint); }
+.release-changes { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.release-changes li { display: grid; grid-template-columns: 112px 1fr; gap: 16px; align-items: baseline; line-height: 1.55; color: var(--muted); }
+.release-changes .tag {
+  justify-self: start;
+  padding: 3px 10px;
+  border: 1px solid color-mix(in srgb, var(--tag) 45%, transparent);
+  border-radius: 999px;
+  color: var(--tag);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  white-space: nowrap;
+}
+a.tag:hover, a.tag:focus-visible { background: color-mix(in srgb, var(--tag) 14%, transparent); outline: none; }
+.tag-site { --tag: var(--muted); }
+.tag-home { --tag: var(--fg); }
+.tag-games { --tag: var(--violet); }
+.tag-movies { --tag: var(--amber); }
+.tag-music { --tag: var(--pink); }
+.tag-photography { --tag: var(--sky); }
+.tag-extras { --tag: var(--mint); }
+@media (max-width: 560px) {
+  .release-changes li { grid-template-columns: 1fr; gap: 6px; }
+  .release-head time { margin-left: 0; width: 100%; }
 }
 
 /* ---------- Inner pages ---------- */

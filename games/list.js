@@ -60,56 +60,16 @@ window.SECTIONS = [
     groupNote: "",
     groupStyle: "panel",
     title: "All Time Favorites",
-    layout: "reviews",
+    layout: "grid",
     items: [
-      {
-        title: "BioShock",
-        year: 2007,
-        details: "Irrational Games",
-        image: "posters/bioshock.jpg",
-        credit: { artist: "Felix Tindall", url: "https://posterspy.com/profile/felixtindall" },
-        review: ""
-      },
-      {
-        title: "Outer Wilds",
-        year: 2019,
-        details: "Mobius Digital",
-        image: "posters/outer-wilds.jpg",
-        credit: { artist: "Jeff Langevin", url: "https://www.jefflangevin.com/" },
-        review: ""
-      },
-      {
-        title: "Kingdom Hearts",
-        year: 2002,
-        details: "Square",
-        image: "posters/kingdom-hearts.jpg",
-        credit: { artist: "TheKHRP", url: "https://www.deviantart.com/thekhrp/art/Nomura-Tribute-793571299" },
-        review: ""
-      },
-      {
-        title: "Subnautica",
-        year: 2018,
-        details: "Unknown Worlds",
-        image: "posters/subnautica.jpg",
-        credit: { official: true },
-        review: ""
-      },
-      {
-        title: "Rocket League",
-        year: 2015,
-        details: "Psyonix",
-        image: "posters/rocket-league.jpg",
-        credit: { official: true },
-        review: ""
-      },
-      {
-        title: "The Witcher 3: Wild Hunt",
-        year: 2015,
-        details: "CD Projekt Red",
-        image: "posters/the-witcher-3.jpg",
-        credit: { artist: "Joe Cosentino", url: "https://posterspy.com/profile/joecosentinodesign/" },
-        review: ""
-      }
+      { title: "BioShock", year: 2007, image: "posters/bioshock.jpg", credit: { artist: "Felix Tindall", url: "https://posterspy.com/profile/felixtindall" } },
+      { title: "Outer Wilds", year: 2019, image: "posters/outer-wilds.jpg", credit: { artist: "Jeff Langevin", url: "https://www.jefflangevin.com/" } },
+      { title: "Kingdom Hearts", year: 2002, image: "posters/kingdom-hearts.jpg", credit: { artist: "TheKHRP", url: "https://www.deviantart.com/thekhrp/art/Nomura-Tribute-793571299" } },
+      { title: "Subnautica", year: 2018, image: "posters/subnautica.jpg", credit: { official: true } },
+      { title: "Rocket League", year: 2015, image: "posters/rocket-league.jpg", credit: { official: true } },
+      { title: "The Witcher 3: Wild Hunt", year: 2015, image: "posters/the-witcher-3.jpg", credit: { artist: "Joe Cosentino", url: "https://posterspy.com/profile/joecosentinodesign/" } },
+      { title: "Red Dead Redemption 2", year: 2018, image: "posters/red-dead-redemption-2.jpg", credit: { artist: "edwardjmoran", url: "https://posterspy.com/profile/edwardjmoran" } },
+      { title: "Super Mario World 2: Yoshi's Island", year: 1995, image: "posters/yoshis-island.jpg", credit: { official: true } }
     ]
   },
   {
