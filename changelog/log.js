@@ -8,6 +8,7 @@
 //
 // page    which part of the site it's about (gives the line its colored tag):
 //         "site", "home", "games", "movies", "music", "photography", or "extras"
+//         The changelog page groups a version's lines by page in that order, whatever order they're written in.
 // When to bump: 1.1, 1.2... for new features or sections; 2.0 for a big redesign.
 // New movies, games, or photos don't need a version (that's content; the home Lately strip covers it).
 window.CHANGELOG = [
