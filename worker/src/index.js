@@ -1,14 +1,19 @@
+import { golfRoute } from "./golf.js";
+
 // nickmade-queue: the live sections of the Movies and Games pages: visitor suggestions for "In the Queue",
 // Nick's "Recently Watched"/"Recently Played" lists, and Nick's site-added picks for other sections.
 // The queue and watched routes take a page (?page= or "page" in the body): movies (default) or games.
 //
 //   GET    /search?q=title      title autocomplete (IMDb suggestions); &kind=game searches video games instead of movies
 //   GET    /queue               visitor submissions + whether the queue is open + this visitor's remaining count
-//   POST   /queue               { imdbId, name, visitorId } -> adds a movie
+//   POST   /queue               { imdbId, name, visitorId, comment?, commentPrivate? } -> adds a movie (comment: optional note,
+//                               up to 200 chars, no links; commentPrivate: only Nick sees it, in owner mode)
 //                               with Authorization: Bearer ADMIN_TOKEN it's Nick's own pick:
 //                               no name, no per-visitor limit, allowed past the cap
 //   GET    /admin/check         200 if the Authorization token is the admin token
-//   DELETE /queue/:imdbId       remove a submission (needs Authorization: Bearer ADMIN_TOKEN)
+//   PATCH  /queue/:imdbId       { page, visitorId, name, comment, commentPrivate } -> a visitor edits their own suggestion
+//   DELETE /queue/:imdbId       remove a submission: Nick (Authorization: Bearer ADMIN_TOKEN), or the visitor who suggested
+//                               it (?visitorId=), which also gives them that suggestion back
 //   GET    /watched             Recently Watched, newest first
 //   POST   /watched             { imdbId, date: "YYYY-MM-DD", rating: 0.5-5 in halves, optional } (admin) -> adds a movie; also drops it from the queue
 //   PATCH  /watched/:id         { rating, date } (admin) -> change the rating and/or date watched
@@ -25,7 +30,10 @@
 //   GET    /spotify/recent      his last 10 songs (now playing first, marked live) for the Music page
 //   POST   /spotify/auth-url    (admin) a Spotify sign-in link for connecting his account (tools/spotify_connect.py)
 //   GET    /spotify/callback    where Spotify sends him back after he agrees; saves the refresh token
+//   GET    /poster?imdbId=&page= (admin) poster choices for an add: up to 3 fan-art posters + the official one
+//                               (POST /queue as owner, POST /watched and POST /lists take the picked one as body.poster)
 //   GET    /img?u=url           image proxy for posters (allowlisted hosts only)
+//   /golf/leaderboard           Nick's Nine leaderboard (GET, POST; DELETE /golf/leaderboard/:id as admin), see golf.js
 //
 // Storage: one KV namespace (QUEUE). Keys (Movies keeps the original unprefixed names):
 //   queue / queue:games            JSON array of queue submissions
@@ -36,6 +44,13 @@
 //   xbox:recent                    10-minute cache of /xbox/recent (OpenXBL allows 150 requests/hour, shared with the Montage app)
 
 const PER_VISITOR = 3;
+// Words in a comment that start with a BLOCKED term but are fine ("hit me" with the space removed would read "shit",
+// so comments are checked word by word, unlike names)
+const ALLOWED_WORDS = new Set(["cocktail", "cocktails", "cockpit", "cockroach", "cockroaches", "cockatoo", "cocky", "dickens", "dickinson", "dickie", "shitake"]);
+function blockedWords(text) {
+  return normalize(text).split(" ").some((word) => !ALLOWED_WORDS.has(word) && BLOCKED.some((w) => word.startsWith(w)));
+}
+const COMMENT_MAX = 200; // visitors' optional "Why should Nick watch it?" note
 const MOVIE_TYPES = new Set(["movie", "tvMovie", "video"]);
 const GAME_TYPES = new Set(["videoGame"]);
 const PAGES = { movies: "movie", games: "game" }; // page -> kind of title it lists
@@ -87,12 +102,18 @@ export default {
         return isAdmin(request, env) ? json({ ok: true }, 200, cors) : json({ error: "Wrong password." }, 401, cors);
       }
       if (url.pathname.startsWith("/queue/") && request.method === "DELETE") return await removeFromQueue(request, url, env, cors);
+      if (url.pathname.startsWith("/queue/") && request.method === "PATCH") return await editSuggestion(request, url, env, cors);
+      if (url.pathname === "/poster" && request.method === "GET") return await previewPoster(request, url, env, cors);
       if (url.pathname === "/watched" && request.method === "GET") {
         return json({ items: sortWatched(await getList(env, watchedKey(pageOf(url.searchParams.get("page"))))) }, 200, cors);
       }
       if (url.pathname === "/watched" && request.method === "POST") return await addWatched(request, env, cors);
       if (url.pathname.startsWith("/watched/") && request.method === "PATCH") return await editWatched(request, url, env, cors);
       if (url.pathname.startsWith("/watched/") && request.method === "DELETE") return await removeWatched(request, url, env, cors);
+      if (url.pathname.startsWith("/golf/")) {
+        const res = await golfRoute(request, url, env, cors, { json, isAdmin, sha256, normalize, BLOCKED });
+        if (res) return res;
+      }
       return json({ error: "Not found" }, 404, cors);
     } catch (err) {
       return json({ error: "Something went wrong. Try again in a bit." }, 500, cors);
@@ -189,7 +210,13 @@ async function ownerQueueTitles(env, page) {
 
 async function queueState(env, page) {
   const limit = parseInt(env.QUEUE_LIMIT, 10) || 10;
-  const owner = await ownerQueueTitles(env, page);
+  let owner = await ownerQueueTitles(env, page);
+  // Games: a list.js queue game already in Recently Played (exact title, ignoring case and symbols like ™) is done;
+  // the page hides it and it stops counting toward the cap (tools/pull_live.py deletes it from list.js)
+  if (owner && page === "games") {
+    const played = new Set((await getList(env, watchedKey("games"))).map((it) => normalize(it.title)));
+    owner = owner.filter((t) => !played.has(normalize(t)));
+  }
   const ownerCount = owner ? owner.length : page === "movies" ? parseInt(env.OWNER_QUEUE_FALLBACK, 10) || 0 : 0;
   const items = await getQueue(env, page);
   return { limit, owner: owner || [], items, open: ownerCount + items.length < limit, remaining: Math.max(0, limit - ownerCount - items.length) };
@@ -236,8 +263,9 @@ async function listQueue(request, url, env, cors) {
   const state = await queueState(env, page);
   const keys = await visitorKeys(request, url.searchParams.get("visitorId"), env, page);
   const used = await usedBy(keys, env);
+  const mine = await suggesterId(url.searchParams.get("visitorId"), env);
   return json({
-    items: state.items.map(publicItem),
+    items: state.items.map((it) => publicItem(it, isAdmin(request, env), mine)),
     open: state.open,
     remaining: state.remaining,
     yourRemaining: Math.max(0, PER_VISITOR - used),
@@ -245,8 +273,34 @@ async function listQueue(request, url, env, cors) {
   }, 200, cors);
 }
 
-function publicItem(it) {
-  return { imdbId: it.imdbId, title: it.title, year: it.year, image: it.image, credit: it.credit, suggestedBy: it.suggestedBy || null, owner: !!it.owner };
+// Who suggested an item: a hash of the random id their browser keeps (item.by). Only that browser can edit or remove
+// it; the hash never leaves the Worker (items just say mine: true to the browser that matches).
+async function suggesterId(visitorId, env) {
+  if (!visitorId || !/^[a-z0-9-]{8,64}$/i.test(visitorId)) return null;
+  return sha256((env.SALT || "nickmade") + "by:" + visitorId);
+}
+
+// A private comment ("Just Nick") is only sent back to Nick (admin token) and to the visitor who wrote it
+function publicItem(it, admin, mine) {
+  const out = { imdbId: it.imdbId, title: it.title, year: it.year, image: it.image, credit: it.credit, suggestedBy: it.suggestedBy || null, owner: !!it.owner };
+  const isMine = !!(mine && it.by && it.by === mine);
+  out.comment = it.comment && (!it.commentPrivate || admin || isMine) ? it.comment : null;
+  if ((admin || isMine) && it.comment && it.commentPrivate) out.commentPrivate = true;
+  if (isMine) out.mine = true;
+  return out;
+}
+
+// A visitor's name and comment: the rules for adding and for editing. Returns an error message, or null if fine.
+function checkSuggestion(name, comment) {
+  if (name.length < 1 || name.length > 40) return "Add your name (up to 40 characters).";
+  if (BLOCKED.some((w) => normalize(name).replace(/ /g, "").includes(w))) return "Please use a different name.";
+  if (comment.length > COMMENT_MAX) return "Keep the comment to " + COMMENT_MAX + " characters.";
+  if (comment && blockedWords(comment)) return "Please reword the comment.";
+  // no links, so the box can't be used for spam
+  if (comment && /https?:|www\.|\b[a-z0-9-]+\.(com|net|org|io|co|ru|xyz|ly|gg|me|info|biz|link|site|online|app)\b/i.test(comment)) {
+    return "Comments can't include links.";
+  }
+  return null;
 }
 
 async function addToQueue(request, env, cors) {
@@ -254,6 +308,7 @@ async function addToQueue(request, env, cors) {
   try { body = await request.json(); } catch (e) { return json({ error: "Bad request." }, 400, cors); }
   const imdbId = String(body.imdbId || "");
   const name = String(body.name || "").replace(/\s+/g, " ").trim();
+  const comment = String(body.comment || "").replace(/\s+/g, " ").trim();
   const owner = isAdmin(request, env);
   const page = pageOf(body.page);
   const noun = PAGES[page];
@@ -262,9 +317,8 @@ async function addToQueue(request, env, cors) {
   let keys = [];
   let used = 0;
   if (!owner) {
-    if (name.length < 1 || name.length > 40) return json({ error: "Add your name (up to 40 characters)." }, 400, cors);
-    const lowered = normalize(name).replace(/ /g, "");
-    if (BLOCKED.some((w) => lowered.includes(w))) return json({ error: "Please use a different name." }, 400, cors);
+    const problem = checkSuggestion(name, comment);
+    if (problem) return json({ error: problem }, 400, cors);
     keys = await visitorKeys(request, body.visitorId, env, page);
     used = await usedBy(keys, env);
     if (used >= PER_VISITOR) return json({ error: "You've already added " + PER_VISITOR + " " + noun + "s. Thanks!" }, 429, cors);
@@ -274,11 +328,18 @@ async function addToQueue(request, env, cors) {
   if (!state.open && !owner) return json({ error: "Not taking submissions at this time." }, 409, cors);
   if (state.items.some((it) => it.imdbId === imdbId)) return json({ error: "That one's already in the queue." }, 409, cors);
 
-  const movie = await lookupMovie(imdbId, noun);
+  // visitors' suggestions get the official poster; fan art is only looked up for Nick's own picks
+  const movie = await lookupMovie(imdbId, noun, { fanArt: owner, poster: owner ? cleanPoster(body.poster) : null });
   if (!movie) return json({ error: "Couldn't find that " + noun + "." }, 404, cors);
   if (state.owner.some((t) => normalize(t) === normalize(movie.title))) return json({ error: "That one's already in the queue." }, 409, cors);
 
   const item = { ...movie, suggestedBy: owner ? null : name, owner, createdAt: new Date().toISOString() };
+  const by = owner ? null : await suggesterId(body.visitorId, env);
+  if (by) item.by = by;
+  if (!owner && comment) {
+    item.comment = comment;
+    if (body.commentPrivate === true) item.commentPrivate = true;
+  }
 
   // Re-read right before writing to keep the cap honest if two people submit at once
   const latest = await queueState(env, page);
@@ -288,7 +349,7 @@ async function addToQueue(request, env, cors) {
   for (const k of keys) await env.QUEUE.put(k, String(used + 1));
 
   return json({
-    item: publicItem(item),
+    item: publicItem(item, owner, by),
     open: latest.remaining - 1 > 0,
     remaining: Math.max(0, latest.remaining - 1),
     yourRemaining: owner ? PER_VISITOR : Math.max(0, PER_VISITOR - used - 1),
@@ -297,12 +358,15 @@ async function addToQueue(request, env, cors) {
 
 // Look the title up by id so the title/year/poster come from IMDb, not the browser.
 // Poster: alternative art if AMP (movies only) or PosterSpy has it; otherwise the official IMDb poster/box art.
-async function lookupMovie(imdbId, kind) {
+// fanArt: false skips that search and always uses the official poster (visitors' queue suggestions).
+// poster: one Nick picked in the dialog ({ image, credit }, checked by cleanPoster), used instead of searching.
+async function lookupMovie(imdbId, kind, { fanArt = true, poster = null } = {}) {
   const res = await fetch("https://v3.sg.media-imdb.com/suggestion/x/" + imdbId + ".json");
   const data = await res.json();
   const movie = (data.d || []).find((r) => r.id === imdbId);
   if (!movie || !(kind === "game" ? GAME_TYPES : MOVIE_TYPES).has(movie.qid)) return null;
-  const art = (kind === "game" ? null : await findAlternativeArt(movie.l, movie.y)) || await findPosterSpyArt(movie.l);
+  if (poster) return { imdbId, title: movie.l, year: movie.y || null, image: poster.image, credit: poster.credit };
+  const art = !fanArt ? null : (kind === "game" ? null : await findAlternativeArt(movie.l, movie.y)) || await findPosterSpyArt(movie.l);
   return {
     imdbId,
     title: movie.l,
@@ -314,6 +378,11 @@ async function lookupMovie(imdbId, kind) {
 
 // Search alternativemovieposters.com for "<Title> by <Artist>" and use the first exact title match.
 async function findAlternativeArt(title, year) {
+  return (await findAlternativeArts(title, 1))[0] || null;
+}
+// ...or up to max of them (the dialog's poster choices)
+async function findAlternativeArts(title, max) {
+  const found = [];
   try {
     const res = await fetch("https://alternativemovieposters.com/?s=" + encodeURIComponent(title), {
       headers: { "User-Agent": "Mozilla/5.0 (nickmade.net queue)" },
@@ -335,10 +404,13 @@ async function findAlternativeArt(title, year) {
       const w = +(page.match(/<meta property="og:image:width" content="(\d+)"/) || [])[1];
       const h = +(page.match(/<meta property="og:image:height" content="(\d+)"/) || [])[1];
       if (w && h && (h / w < 1.25 || h / w > 1.75)) continue;
-      if (img && /\.(jpe?g|png)$/i.test(img)) return { image: img, artist: decode(artist).trim(), url: link };
+      if (img && /\.(jpe?g|png)$/i.test(img)) {
+        found.push({ image: img, artist: decode(artist).trim(), url: link });
+        if (found.length >= max) break;
+      }
     }
   } catch (e) {}
-  return null;
+  return found;
 }
 
 // Search PosterSpy (fan posters for movies and games) and use the first portrait poster whose title is exactly this one.
@@ -362,13 +434,17 @@ function posterTitles(s) {
 }
 
 async function findPosterSpyArt(title) {
+  return (await findPosterSpyArts(title, 1))[0] || null;
+}
+async function findPosterSpyArts(title, max) {
+  const found = [];
   try {
     const res = await fetch("https://posterspy.com/?s=" + encodeURIComponent(title), {
       headers: { "User-Agent": "Mozilla/5.0 (nickmade.net queue)" },
     });
     const html = await res.text();
     const want = plainTitle(title);
-    if (!want) return null;
+    if (!want) return found;
     for (const card of html.split('class="wpps-poster-card').slice(1)) {
       const link = (card.match(/href="(https:\/\/posterspy\.com\/posters\/[^"]+)"/) || [])[1];
       const thumb = card.match(/<img src="(https:\/\/media\.posterspy\.com\/[^"]+)" width="(\d+)" height="(\d+)"/);
@@ -380,10 +456,11 @@ async function findPosterSpyArt(title) {
       if (ratio < 1.25 || ratio > 1.75) continue; // portrait (about 2:3) only
       const image = thumb[1].replace(/-\d+x\d+(\.\w+)$/, "$1"); // full size instead of the 480px thumbnail
       if (!/\.(jpe?g|png)$/i.test(image)) continue;
-      return { image, artist: decode(artist).trim(), url: link };
+      found.push({ image, artist: decode(artist).trim(), url: link });
+      if (found.length >= max) break;
     }
   } catch (e) {}
-  return null;
+  return found;
 }
 
 function decode(s) {
@@ -394,13 +471,88 @@ function decode(s) {
 }
 
 async function removeFromQueue(request, url, env, cors) {
-  if (!isAdmin(request, env)) return json({ error: "Unauthorized" }, 401, cors);
   const id = decodeURIComponent(url.pathname.split("/")[2] || "");
   const page = pageOf(url.searchParams.get("page"));
   const items = await getQueue(env, page);
-  const kept = items.filter((it) => it.imdbId !== id);
-  await env.QUEUE.put(queueKey(page), JSON.stringify(kept));
-  return json({ removed: items.length - kept.length }, 200, cors);
+  if (isAdmin(request, env)) {
+    const kept = items.filter((it) => it.imdbId !== id);
+    await env.QUEUE.put(queueKey(page), JSON.stringify(kept));
+    return json({ removed: items.length - kept.length }, 200, cors);
+  }
+  // a visitor removing their own suggestion
+  const visitorId = url.searchParams.get("visitorId");
+  const by = await suggesterId(visitorId, env);
+  const it = items.find((x) => x.imdbId === id);
+  if (!it) return json({ removed: 0 }, 200, cors);
+  if (!by || it.by !== by) return json({ error: "You can only remove your own suggestions." }, 403, cors);
+  await env.QUEUE.put(queueKey(page), JSON.stringify(items.filter((x) => x !== it)));
+  // give the suggestion back: one less on each of their counters
+  const keys = await visitorKeys(request, visitorId, env, page);
+  for (const k of keys) {
+    const n = parseInt(await env.QUEUE.get(k), 10) || 0;
+    if (n > 1) await env.QUEUE.put(k, String(n - 1));
+    else await env.QUEUE.delete(k);
+  }
+  const state = await queueState(env, page);
+  return json({ removed: 1, open: state.open, remaining: state.remaining, yourRemaining: Math.max(0, PER_VISITOR - await usedBy(keys, env)) }, 200, cors);
+}
+
+// Poster choices for Nick's add: up to 3 fan-art posters (movies: alternativemovieposters.com first, then PosterSpy;
+// games: PosterSpy), then the official one. The first is what adding would pick on its own; the dialog shows them all
+// and sends back the one he picks. Owner only: visitors' suggestions always use the official poster.
+const ART_CHOICES = 3;
+async function previewPoster(request, url, env, cors) {
+  if (!isAdmin(request, env)) return json({ error: "Unauthorized" }, 401, cors);
+  const imdbId = String(url.searchParams.get("imdbId") || "");
+  if (!/^tt\d{5,10}$/.test(imdbId)) return json({ error: "Bad id." }, 400, cors);
+  const kind = PAGES[pageOf(url.searchParams.get("page"))];
+  const official = await lookupMovie(imdbId, kind, { fanArt: false });
+  if (!official) return json({ error: "Not found." }, 404, cors);
+  let art = kind === "game" ? [] : await findAlternativeArts(official.title, ART_CHOICES);
+  if (art.length < ART_CHOICES) art = art.concat(await findPosterSpyArts(official.title, ART_CHOICES));
+  const seen = new Set();
+  const options = art.filter((a) => !seen.has(a.image) && seen.add(a.image)).slice(0, ART_CHOICES)
+    .map((a) => ({ image: a.image, credit: { artist: a.artist, url: a.url } }));
+  if (official.image) options.push({ image: official.image, credit: official.credit });
+  return json({ options }, 200, cors);
+}
+
+// A poster Nick picked in the dialog, from the request body: only images on the hosts /img already allows, and a
+// plain artist credit (or "Official poster"). Anything else is ignored and the usual lookup runs.
+function cleanPoster(p) {
+  if (!p || typeof p.image !== "string" || p.image.length > 600) return null;
+  let u;
+  try { u = new URL(p.image); } catch (e) { return null; }
+  if (u.protocol !== "https:" || !IMG_HOSTS.includes(u.hostname)) return null;
+  const c = p.credit || {};
+  if (typeof c.artist === "string" && c.artist.trim() && c.artist.length <= 80) {
+    const link = typeof c.url === "string" && /^https:\/\/[^\s"<>]{1,400}$/.test(c.url) ? c.url : "";
+    return { image: p.image, credit: { artist: c.artist.trim(), url: link } };
+  }
+  return { image: p.image, credit: { label: "Official poster", artist: "" } };
+}
+
+// A visitor fixing their own suggestion: name, comment, and who can see the comment (the title stays; remove it instead)
+async function editSuggestion(request, url, env, cors) {
+  let body;
+  try { body = await request.json(); } catch (e) { return json({ error: "Bad request." }, 400, cors); }
+  const id = decodeURIComponent(url.pathname.split("/")[2] || "");
+  const page = pageOf(body.page);
+  const by = await suggesterId(body.visitorId, env);
+  const items = await getQueue(env, page);
+  const it = items.find((x) => x.imdbId === id);
+  if (!it) return json({ error: "That one isn't in the queue anymore." }, 404, cors);
+  if (!by || it.by !== by) return json({ error: "You can only change your own suggestions." }, 403, cors);
+  const name = String(body.name || "").replace(/\s+/g, " ").trim();
+  const comment = String(body.comment || "").replace(/\s+/g, " ").trim();
+  const problem = checkSuggestion(name, comment);
+  if (problem) return json({ error: problem }, 400, cors);
+  it.suggestedBy = name;
+  if (comment) it.comment = comment; else delete it.comment;
+  if (comment && body.commentPrivate === true) it.commentPrivate = true; else delete it.commentPrivate;
+  it.editedAt = new Date().toISOString();
+  await env.QUEUE.put(queueKey(page), JSON.stringify(items));
+  return json({ item: publicItem(it, false, by) }, 200, cors);
 }
 
 // ---------- Recently Watched (owner only) ----------
@@ -422,7 +574,7 @@ async function addWatched(request, env, cors) {
   if (bad) return json({ error: bad }, 400, cors);
   const rating = toRating(body.rating);
 
-  const movie = await lookupMovie(imdbId, noun);
+  const movie = await lookupMovie(imdbId, noun, { poster: cleanPoster(body.poster) });
   if (!movie) return json({ error: "Couldn't find that " + noun + "." }, 404, cors);
   const item = { ...movie, id: imdbId + "-" + date, date, rating, createdAt: new Date().toISOString() };
 
@@ -505,7 +657,7 @@ async function addToList(request, env, cors) {
 
   const lists = await readLists(env, page);
   if ((lists[key] || []).some((it) => it.imdbId === imdbId)) return json({ error: "That one's already in this section." }, 409, cors);
-  const found = await lookupMovie(imdbId, PAGES[page]);
+  const found = await lookupMovie(imdbId, PAGES[page], { poster: cleanPoster(body.poster) });
   if (!found) return json({ error: "Couldn't find that one." }, 404, cors);
   const item = { ...found, createdAt: new Date().toISOString() };
 
@@ -691,7 +843,8 @@ async function xboxImport(request, env, cors) {
   }
   await env.QUEUE.put(watchedKey("games"), JSON.stringify(items));
 
-  // Playing something from the queue takes it out of the queue (matched by title, since queue games come from IMDb)
+  // Playing something from the queue takes it out of the queue. Matched by exact title (ignoring only case and symbols
+  // like ™, so "Gears of War" never removes "Gears of War: E-Day"), since queue games come from IMDb, not Xbox
   const queue = await getQueue(env, "games");
   const kept = queue.filter((it) => !importedTitles.some((t) => normalize(t) === normalize(it.title)));
   if (kept.length !== queue.length) await env.QUEUE.put(queueKey("games"), JSON.stringify(kept));

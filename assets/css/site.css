@@ -745,6 +745,28 @@ a.tag:hover, a.tag:focus-visible { background: color-mix(in srgb, var(--tag) 14%
   font-size: 0.78rem;
   color: var(--accent);
 }
+/* a visitor's "Why should Nick watch it?" note, under "Suggested by"; long ones clamp to 4 lines (full text on hover) */
+.poster.suggested .suggest-comment {
+  margin: 6px 0 0;
+  padding-left: 9px;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  font-size: 0.78rem;
+  font-style: italic;
+  line-height: 1.45;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  overflow: hidden;
+}
+.poster.suggested .suggest-comment.private { border-left-style: dashed; }
+/* owner mode: a "Just Nick" comment; or the visitor's own card right after sending one */
+.poster.suggested .comment-private { display: flex; align-items: center; gap: 5px; margin-top: 5px; font-size: 0.72rem; color: var(--faint); }
+.poster.suggested .comment-private svg { width: 11px; height: 11px; flex: none; }
+.poster.suggested .suggest-comment::before { content: "\201C"; }
+.poster.suggested .suggest-comment::after { content: "\201D"; }
 .queue-slot {
   display: flex;
   flex-direction: column;
@@ -795,6 +817,9 @@ button.queue-slot:hover, button.queue-slot:focus-visible {
 .queue-slot .plus::after { transform: translate(-50%, -50%) rotate(90deg); }
 button.queue-slot:hover .plus { transform: rotate(90deg); }
 .queue-slot .label { font-size: 0.9rem; font-weight: 500; }
+/* a visitor's own allowance under the label: "2 of 3 left" */
+.queue-slot .left { margin-top: -8px; font-size: 0.75rem; letter-spacing: 0; color: var(--muted); }
+.queue-slot.closed .left { margin-top: 6px; color: inherit; }
 .queue-slot.closed {
   border-color: var(--line);
   background: transparent;
@@ -803,6 +828,7 @@ button.queue-slot:hover .plus { transform: rotate(90deg); }
   line-height: 1.4;
 }
 
+.poster[hidden] { display: none; } /* e.g. a queue game that's now in Recently Played (live.js hidePlayedQueueGames) */
 .poster.suggested .owner-actions { display: flex; gap: 6px; margin-top: 8px; }
 .poster.suggested .owner-actions button {
   padding: 3px 10px;
@@ -816,7 +842,52 @@ button.queue-slot:hover .plus { transform: rotate(90deg); }
 }
 .poster.suggested .edit:hover { border-color: var(--accent); color: var(--accent); }
 .poster.suggested .remove:hover { border-color: #ff8a8a; color: #ff8a8a; }
+/* a visitor's own suggestion: "Your suggestion · Edit · Remove" */
+.poster.suggested .mine-actions { flex-wrap: wrap; align-items: center; }
+.poster.suggested .mine-actions span { margin-right: 2px; font-size: 0.72rem; color: var(--faint); }
 .queue-dialog input[readonly] { color: var(--muted); }
+/* the poster an add will use, at the top of the dialog above the title search (assets/js/live.js previewFor) */
+.queue-dialog .pick-preview { display: flex; align-items: center; gap: 18px; margin: 4px 0 6px; }
+.queue-dialog .pick-preview[hidden] { display: none; }
+.queue-dialog .pp-art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 140px;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--line);
+}
+.queue-dialog .pp-art img { width: 100%; height: 100%; object-fit: cover; }
+/* Nick's poster choices beside the big preview: up to 3 fan-art posters + the official one, 2 per row */
+.queue-dialog .pp-choices { display: grid; grid-template-columns: repeat(2, 62px); gap: 8px; align-content: center; }
+.queue-dialog .pp-choices[hidden] { display: none; }
+.queue-dialog .pp-choices button {
+  padding: 0;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  background: var(--line);
+  cursor: pointer;
+  opacity: .65;
+  transition: opacity .15s, border-color .15s;
+}
+.queue-dialog .pp-choices button img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.queue-dialog .pp-choices button:hover, .queue-dialog .pp-choices button:focus-visible { opacity: 1; outline: none; }
+.queue-dialog .pp-choices button[aria-checked="true"] { opacity: 1; border-color: var(--accent); }
+.queue-dialog .pp-none { padding: 4px; font-size: 0.65rem; text-align: center; color: var(--faint); }
+.queue-dialog .pp-spin {
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--muted);
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+
 .poster.suggested .watched-on {
   margin-top: 4px;
   font-size: 0.78rem;
@@ -932,7 +1003,46 @@ button.queue-slot:hover .plus { transform: rotate(90deg); }
   font: inherit;
   font-size: 0.95rem;
 }
-.queue-dialog input:focus { outline: none; border-color: var(--accent); }
+.queue-dialog input:focus, .queue-dialog textarea:focus { outline: none; border-color: var(--accent); }
+.queue-dialog textarea {
+  display: block;
+  width: 100%;
+  min-height: 76px;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #000;
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  resize: vertical;
+}
+.queue-dialog label .optional { color: var(--faint); }
+.queue-dialog .count { margin: 6px 0 0; min-height: 1em; font-size: 0.75rem; color: var(--faint); text-align: right; }
+.queue-dialog [hidden] { display: none; }
+/* "Who can see your note?": Everyone / Just Nick, as two pills (only the comment; the suggestion itself is always public) */
+.queue-dialog .who { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0 0; padding: 0; border: 0; }
+.queue-dialog .who legend { float: left; margin-right: 6px; padding: 0; font-size: 0.8rem; color: var(--muted); }
+.queue-dialog .who label {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  padding: 6px 13px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  cursor: pointer;
+  transition: border-color .2s, color .2s, background .2s;
+}
+.queue-dialog .who[hidden] { display: none; } /* .who's display: flex would otherwise beat [hidden] (owner mode, logging) */
+.queue-dialog .who label { position: relative; }
+/* the real radios, invisible under each pill; sized here because .queue-dialog input sets width: 100%,
+   which on an absolutely placed input stretched the dialog sideways */
+.queue-dialog .who input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; border: 0; opacity: 0; pointer-events: none; }
+.queue-dialog .who label:has(input:checked) { border-color: var(--accent); color: var(--fg); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.queue-dialog .who label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 .queue-dialog input[type="date"] { color-scheme: dark; }
 .queue-dialog .close {
   position: absolute;

@@ -12,6 +12,8 @@
   var PAGE = script.dataset.page || "movies";
   var KIND = PAGE === "games" ? "game" : "movie";
   var DID = PAGE === "games" ? "Played" : "Watched"; // "Watched Sep 4, 2026" / "Played Sep 4, 2026"
+  var LOCK = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5" fill="currentColor"/><path d="M5 7V5a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
+  var COMMENT_MAX = 200; // visitors' "Why should Nick watch it?" note (the Worker enforces the same limit)
   var PQ = "page=" + PAGE;
   if (!API) return;
 
@@ -160,6 +162,8 @@
   // kind: "queue" (default), "watched", or "list" (then l is the live section it belongs to)
   function card(it, kind, l) {
     var watched = kind === "watched";
+    // a visitor's own queue suggestion (the Worker marks it mine for their browser): they can edit or remove it
+    var yours = !ADMIN && !watched && !l && it.mine;
     var fig = document.createElement("figure");
     fig.className = "poster suggested";
     fig.dataset.imdb = it.imdbId;
@@ -185,6 +189,10 @@
       (watched && it.rating ? '<div class="rating" aria-label="' + ratingText(it.rating) + '">' + stars(it.rating) + "</div>" : "") +
       credit +
       (it.suggestedBy ? '<div class="suggested-by">Suggested by ' + esc(it.suggestedBy) + "</div>" : "") +
+      (it.comment
+        ? '<blockquote class="suggest-comment' + (it.commentPrivate ? " private" : "") + '" title="' + esc(it.comment) + '">' + esc(it.comment) + "</blockquote>" +
+          (it.commentPrivate ? '<div class="comment-private">' + LOCK + (ADMIN ? "Only you can see this" : "Only you and Nick can see this") + "</div>" : "")
+        : "") +
       (watched && it.xbox
         ? '<div class="xbox-stats">' +
             (it.xbox.minutes != null ? "<span>" + esc(playtime(it.xbox.minutes)) + " played</span>" : "") +
@@ -193,7 +201,9 @@
         : "") +
       (watched && it.date ? '<div class="watched-on">' + (it.xbox ? "Last played" : DID) + " " + esc(watchedOn(it.date)) + "</div>" : "") +
       (ADMIN ? '<div class="owner-actions">' + (watched ? '<button class="edit" type="button">Edit</button>' : "") +
-        '<button class="remove" type="button">Remove</button></div>' : "");
+        '<button class="remove" type="button">Remove</button></div>'
+        : yours ? '<div class="owner-actions mine-actions"><span>Your suggestion</span><button class="edit" type="button">Edit</button>' +
+          '<button class="remove" type="button">Remove</button></div>' : "");
     if (ADMIN && watched) {
       fig.querySelector(".edit").addEventListener("click", function () { openDialog(state, "edit", it); });
     }
@@ -211,6 +221,25 @@
             state.open = state.remaining > 0;
           })
           .catch(function () { alert("Couldn't remove it. Try logging in again."); });
+      });
+    }
+    if (yours) {
+      fig.querySelector(".edit").addEventListener("click", function () { openDialog(state, "mine", it); });
+      fig.querySelector(".remove").addEventListener("click", function () {
+        if (!confirm("Remove your suggestion of " + it.title + "? You'll get the spot back.")) return;
+        fetch(API + "/queue/" + encodeURIComponent(it.imdbId) + "?" + PQ + "&visitorId=" + encodeURIComponent(VID), { method: "DELETE" })
+          .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+          .then(function (res) {
+            if (!res.ok) throw new Error(res.d.error);
+            fig.remove();
+            if (res.d.remaining != null) {
+              state.remaining = res.d.remaining;
+              state.open = res.d.open;
+              state.yourRemaining = res.d.yourRemaining;
+              renderSlot(state);
+            }
+          })
+          .catch(function (e) { alert((e && e.message) || "Couldn't remove it. Try again in a bit."); });
       });
     }
     return fig;
@@ -232,12 +261,16 @@
       slot.innerHTML = "<span>Not taking submissions at this time</span>";
     } else if (state.yourRemaining <= 0) {
       slot.className = "queue-slot closed";
-      slot.innerHTML = "<span>Thanks for your " + state.perVisitor + " picks!</span>";
+      // removing one of theirs gives the spot back, so say so
+      slot.innerHTML = "<span>Thanks for your " + state.perVisitor + " picks!</span>" +
+        '<span class="left">Remove one of yours to suggest another</span>';
     } else {
       slot.type = "button";
       slot.className = "queue-slot add";
-      slot.setAttribute("aria-label", "Suggest a " + KIND + " for the queue");
-      slot.innerHTML = '<span class="plus" aria-hidden="true"></span><span class="label">Suggest a ' + KIND + "</span>";
+      var left = state.yourRemaining + " of " + state.perVisitor + " left";
+      slot.setAttribute("aria-label", "Suggest a " + KIND + " for the queue (" + left + ")");
+      slot.innerHTML = '<span class="plus" aria-hidden="true"></span><span class="label">Suggest a ' + KIND + "</span>" +
+        '<span class="left">' + left + "</span>";
       slot.addEventListener("click", function () { openDialog(state, "queue"); });
     }
     grid().appendChild(slot);
@@ -248,7 +281,7 @@
   ready.then(function () { if (ADMIN) ownerBar(); });
   if (section) {
     ready
-      .then(function () { return fetch(API + "/queue?" + PQ + "&visitorId=" + encodeURIComponent(VID)); })
+      .then(function () { return fetch(API + "/queue?" + PQ + "&visitorId=" + encodeURIComponent(VID), { headers: authHeaders() }); })
       .then(function (r) { return r.json(); })
       .then(function (data) {
         state = data;
@@ -406,7 +439,7 @@
         return reloadWatched().then(function () {
           if (!section) return;
           // importing can take games out of the queue, so refresh it too
-          return fetch(API + "/queue?" + PQ + "&visitorId=" + encodeURIComponent(VID)).then(function (r) { return r.json(); }).then(function (data) {
+          return fetch(API + "/queue?" + PQ + "&visitorId=" + encodeURIComponent(VID), { headers: authHeaders() }).then(function (r) { return r.json(); }).then(function (data) {
             grid().querySelectorAll(".poster.suggested").forEach(function (el) { el.remove(); });
             (data.items || []).forEach(function (it) { if (!inSection(section, it.title)) grid().insertBefore(card(it), slot); });
             state = data;
@@ -417,8 +450,25 @@
       .catch(function () { err.textContent = "Couldn't reach the server. Try again in a bit."; countXbox(); });
   }
 
+  // Games: hide a list.js "In the Queue" game once the same game is in Recently Played. Exact title match, ignoring only
+  // case and symbols like ™ (the Worker's normalize), so "Gears of War" never hides "Gears of War: E-Day".
+  // The Worker drops it from the cap too; tools/pull_live.py deletes it from list.js for good.
+  function sameTitle(t) {
+    return String(t).toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/&/g, "and").replace(/[^a-z0-9]+/g, " ").trim();
+  }
+  function hidePlayedQueueGames(items) {
+    if (PAGE !== "games" || !section) return;
+    var played = {};
+    items.forEach(function (it) { played[sameTitle(it.title)] = true; });
+    section.querySelectorAll(".poster:not(.suggested)").forEach(function (fig) {
+      var t = fig.querySelector(".title");
+      if (t && played[sameTitle(t.textContent)]) fig.hidden = true;
+    });
+  }
+
   function renderWatched(items) {
     watchedItems = items;
+    hidePlayedQueueGames(items);
     var g = grid(watchedSection);
     g.querySelectorAll(".poster").forEach(function (el) { el.remove(); });
     items.forEach(function (it) { g.appendChild(card(it, "watched")); });
@@ -431,6 +481,7 @@
       .then(function (r) { return r.json(); })
       .then(function (data) {
         var items = data.items || [];
+        hidePlayedQueueGames(items);
         if (items.length || ADMIN) renderWatched(items); // visitors keep "Coming soon." until there's one
       })
       .catch(function () {});
@@ -445,6 +496,9 @@
       '<button class="close" type="button" aria-label="Close">&times;</button>' +
       "<h2>Suggest a movie</h2>" +
       '<p class="hint"></p>' +
+      // the poster this add will use, at the top once a title is picked
+      '<div class="pick-preview" hidden aria-live="polite"><div class="pp-art"></div>' +
+        '<div class="pp-choices" role="radiogroup" aria-label="Poster to use" hidden></div></div>' +
       '<label for="q-movie">' + (KIND === "game" ? "Game" : "Movie") + "</label>" +
       '<div class="combo">' +
         '<input id="q-movie" type="text" autocomplete="off" placeholder="Start typing a title" role="combobox" aria-expanded="false" aria-controls="q-results" aria-autocomplete="list">' +
@@ -458,6 +512,15 @@
       "</div>" +
       '<label for="q-name">Your name</label>' +
       '<input id="q-name" type="text" maxlength="40" autocomplete="nickname" placeholder="So Nick knows who it\'s from">' +
+      // optional note shown on the card under "Suggested by"; visitors' suggestions only
+      '<label for="q-comment">Why should Nick ' + (KIND === "game" ? "play" : "watch") + ' it? <span class="optional">(optional)</span></label>' +
+      '<textarea id="q-comment" maxlength="' + COMMENT_MAX + '" rows="3" placeholder="' +
+        (KIND === "game" ? "What makes it worth playing?" : "What makes it worth watching?") + '"></textarea>' +
+      '<p class="count" id="q-count" aria-live="polite"></p>' +
+      '<fieldset class="who" id="q-who"><legend>Who can see your note?</legend>' +
+        '<label><input type="radio" name="q-who" value="public" checked> Everyone</label>' +
+        '<label><input type="radio" name="q-who" value="private"> Just Nick</label>' +
+      "</fieldset>" +
       '<p class="error" role="alert"></p>' +
       '<button class="open submit" type="submit" disabled>Add to the queue</button>' +
     "</form>";
@@ -477,6 +540,70 @@
   var seq = 0;
 
   try { nameInput.value = localStorage.getItem("nm-name") || ""; } catch (e) {}
+
+  var commentInput = dialog.querySelector("#q-comment");
+  var commentLabel = dialog.querySelector('label[for="q-comment"]');
+  var commentCount = dialog.querySelector("#q-count");
+  var whoField = dialog.querySelector("#q-who");
+  function commentPrivate() { return dialog.querySelector('input[name="q-who"]:checked').value === "private"; }
+  function showCount() {
+    var left = COMMENT_MAX - commentInput.value.length;
+    commentCount.textContent = left < 60 ? left + " characters left" : "";
+  }
+  commentInput.addEventListener("input", showCount);
+
+  // Poster preview: visitors get the official poster, which the search result already has. Nick's adds get a choice:
+  // GET /poster (owner only) returns up to 3 fan-art posters and the official one; the big preview shows the picked
+  // one (the first, unless he clicks another thumbnail) and his submit sends it as `poster`.
+  var preview = dialog.querySelector(".pick-preview");
+  var previewArt = preview.querySelector(".pp-art");
+  var previewChoices = preview.querySelector(".pp-choices");
+  var previewSeq = 0;
+  var posterOptions = [];
+  var posterPick = 0;
+  function hidePreview() { previewSeq++; preview.hidden = true; posterOptions = []; previewChoices.hidden = true; previewChoices.innerHTML = ""; }
+  function creditText(credit) { return credit && credit.artist ? "Art by " + credit.artist : "Official poster"; }
+  function pickedPoster() { return ADMIN && posterOptions.length ? posterOptions[posterPick] : undefined; }
+  function renderChoices() {
+    var o = posterOptions[posterPick];
+    showPoster(o.image, o.credit);
+    previewChoices.hidden = posterOptions.length < 2;
+    previewChoices.innerHTML = posterOptions.map(function (c, i) {
+      return '<button type="button" role="radio" aria-checked="' + (i === posterPick) + '" data-i="' + i + '" title="' + esc(creditText(c.credit)) + '"' +
+        ' aria-label="' + esc(creditText(c.credit)) + '"><img src="' + esc(imgUrl(c.image, 160)) + '" alt=""></button>';
+    }).join("");
+  }
+  previewChoices.addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-i]");
+    if (!b) return;
+    posterPick = +b.dataset.i;
+    renderChoices();
+    previewChoices.querySelector('[data-i="' + posterPick + '"]').focus();
+  });
+  function showPoster(image, credit) {
+    preview.hidden = false;
+    preview.classList.remove("loading");
+    // just the image; who made it is only in the alt text
+    var alt = "Poster that will be used: " + (credit && credit.artist ? "art by " + credit.artist : "official poster");
+    previewArt.innerHTML = image ? '<img src="' + esc(imgUrl(image, 300)) + '" alt="' + esc(alt) + '">' : '<span class="pp-none">No poster</span>';
+  }
+  function previewFor(r) {
+    var mine = ++previewSeq;
+    if (!ADMIN) return showPoster(r.image, null);
+    preview.hidden = false;
+    preview.classList.add("loading");
+    previewArt.innerHTML = '<span class="pp-spin" role="img" aria-label="Finding poster art"></span>';
+    fetch(API + "/poster?" + PQ + "&imdbId=" + encodeURIComponent(r.id), { headers: authHeaders() })
+      .then(function (res) { return res.ok ? res.json() : null; })
+      .then(function (d) {
+        if (mine !== previewSeq) return;
+        posterOptions = (d && d.options) || [];
+        posterPick = 0;
+        if (posterOptions.length) renderChoices();
+        else showPoster(r.image, null);
+      })
+      .catch(function () { if (mine === previewSeq) showPoster(r.image, null); });
+  }
 
   var nameLabel = dialog.querySelector('label[for="q-name"]');
   var dateInput = dialog.querySelector("#q-date");
@@ -527,7 +654,7 @@
   }
 
   function submitLabel() {
-    return mode === "edit" ? "Save changes" : mode === "watched" ? "Add to " + watchedSec.title : mode === "list" ? "Add to " + target.title
+    return mode === "edit" || mode === "mine" ? "Save changes" : mode === "watched" ? "Add to " + watchedSec.title : mode === "list" ? "Add to " + target.title
       : ADMIN ? "Add to my queue" : "Add to the queue";
   }
 
@@ -539,23 +666,39 @@
     showResults();
     dateInput.value = "";
     setRating(0);
+    commentInput.value = "";
+    showCount();
+    dialog.querySelector('input[name="q-who"][value="public"]').checked = true;
+    hidePreview();
   }
 
   // m: "queue", "watched" (log a movie), "edit" (change the rating/date of a Recently Watched movie `it`)
   // or "list" (add to the live section `it`)
   var editing = null;
+  var mineEdit = null; // a visitor's own suggestion being edited
   var target = null; // the live section being added to
   function openDialog(s, m, it) {
-    if (mode === "edit") resetFields(); // don't carry an edited movie into a new one
+    if (mode === "edit" || mode === "mine") resetFields(); // don't carry an edited movie into a new one
     mode = m || "queue";
     editing = mode === "edit" ? it : null;
+    mineEdit = mode === "mine" ? it : null;
     target = mode === "list" ? it : null;
     var watching = mode === "watched" || !!editing;
     nameLabel.hidden = nameInput.hidden = !!ADMIN;
+    commentLabel.hidden = commentInput.hidden = commentCount.hidden = whoField.hidden = !!ADMIN || (mode !== "queue" && mode !== "mine");
     dateLabel.hidden = dateInput.hidden = !watching;
     rateLabel.hidden = rate.hidden = !watching;
-    movie.readOnly = !!editing;
+    movie.readOnly = !!editing || !!mineEdit;
+    if (mineEdit) {
+      chosen = { id: it.imdbId };
+      movie.value = it.title + (it.year ? " (" + it.year + ")" : "");
+      nameInput.value = it.suggestedBy || "";
+      commentInput.value = it.comment || "";
+      showCount();
+      dialog.querySelector('input[name="q-who"][value="' + (it.commentPrivate ? "private" : "public") + '"]').checked = true;
+    }
     dateInput.max = today();
+    if (editing || mineEdit) showPoster(it.image, it.credit);
     if (editing) {
       chosen = { id: it.imdbId };
       movie.value = it.title + (it.year ? " (" + it.year + ")" : "");
@@ -563,9 +706,11 @@
       setRating(it.rating || 0);
     }
     if (watching && !dateInput.value) dateInput.value = today();
-    heading.textContent = editing ? "Edit " + it.title : watching ? "Log a " + KIND : target ? "Add a " + KIND : ADMIN ? "Submit a " + KIND : "Suggest a " + KIND;
+    heading.textContent = mineEdit ? "Edit your suggestion" : editing ? "Edit " + it.title : watching ? "Log a " + KIND : target ? "Add a " + KIND : ADMIN ? "Submit a " + KIND : "Suggest a " + KIND;
     submit.textContent = submitLabel();
-    hint.textContent = editing
+    hint.textContent = mineEdit
+      ? "Change your name or your note. Picked the wrong " + KIND + "? Remove it from the card instead, and you'll get the spot back."
+      : editing
       ? "Change your rating or the date you " + DID.toLowerCase() + " it."
       : target
       ? "Goes at the end of " + target.title + ". Poster art is picked automatically."
@@ -577,14 +722,15 @@
     errorEl.textContent = "";
     validate();
     dialog.showModal();
-    (editing ? rate : movie).focus();
+    (editing ? rate : mineEdit ? commentInput : movie).focus();
   }
   dialog.querySelector(".close").addEventListener("click", function () { dialog.close(); });
   dialog.addEventListener("close", function () { resetFields(); errorEl.textContent = ""; });
   dialog.addEventListener("click", function (e) { if (e.target === dialog) dialog.close(); });
 
   function validate() {
-    submit.disabled = !(chosen && (ADMIN || nameInput.value.trim()) && (mode === "queue" || mode === "list" || dateInput.value));
+    // a date is only needed when logging or editing something watched/played
+    submit.disabled = !(chosen && (ADMIN || nameInput.value.trim()) && (mode === "queue" || mode === "list" || mode === "mine" || dateInput.value));
   }
   nameInput.addEventListener("input", validate);
   dateInput.addEventListener("input", validate);
@@ -610,12 +756,14 @@
     movie.value = chosen.title + (chosen.year ? " (" + chosen.year + ")" : "");
     results = [];
     showResults();
+    previewFor(chosen);
     validate();
     (ADMIN ? submit : nameInput).focus();
   }
 
   movie.addEventListener("input", function () {
     chosen = null;
+    hidePreview();
     noMatch = false;
     validate();
     clearTimeout(timer);
@@ -652,10 +800,12 @@
     e.preventDefault();
     if (submit.disabled) return;
     if (editing) return saveEdit();
+    if (mineEdit) return saveMine();
     if (target) return saveToList();
     var watching = mode === "watched";
     submit.disabled = true;
-    submit.textContent = "Finding poster art…";
+    // searching for art only when nothing was picked in the preview (visitors never search)
+    submit.textContent = (ADMIN || watching) && !pickedPoster() ? "Finding poster art…" : "Adding…";
     errorEl.textContent = "";
     if (!ADMIN) { try { localStorage.setItem("nm-name", nameInput.value.trim()); } catch (e2) {} }
     var label = submitLabel();
@@ -663,8 +813,9 @@
       method: "POST",
       headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify(watching
-        ? { page: PAGE, imdbId: chosen.id, date: dateInput.value, rating: rating }
-        : { page: PAGE, imdbId: chosen.id, name: ADMIN ? "" : nameInput.value.trim(), visitorId: VID }),
+        ? { page: PAGE, imdbId: chosen.id, date: dateInput.value, rating: rating, poster: pickedPoster() }
+        : { page: PAGE, imdbId: chosen.id, name: ADMIN ? "" : nameInput.value.trim(), visitorId: VID, poster: pickedPoster(),
+            comment: ADMIN ? "" : commentInput.value.trim(), commentPrivate: !ADMIN && commentPrivate() }),
     })
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
       .then(function (res) {
@@ -696,6 +847,27 @@
       });
   });
 
+  // a visitor saving changes to their own suggestion
+  function saveMine() {
+    var it = mineEdit;
+    submit.disabled = true;
+    errorEl.textContent = "";
+    try { localStorage.setItem("nm-name", nameInput.value.trim()); } catch (e) {}
+    fetch(API + "/queue/" + encodeURIComponent(it.imdbId), {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ page: PAGE, visitorId: VID, name: nameInput.value.trim(), comment: commentInput.value.trim(), commentPrivate: commentPrivate() }),
+    })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (!res.ok) { errorEl.textContent = res.d.error || "Couldn't save that."; validate(); return; }
+        var old = section.querySelector('.poster.suggested[data-imdb="' + it.imdbId + '"]');
+        if (old) old.replaceWith(card(res.d.item));
+        dialog.close();
+      })
+      .catch(function () { errorEl.textContent = "Couldn't reach the server. Try again in a bit."; validate(); });
+  }
+
   function saveToList() {
     var l = target;
     // list.js entries aren't in the Worker, so check those here
@@ -704,12 +876,12 @@
     });
     if (have) { errorEl.textContent = chosen.title + " is already in " + l.title + "."; return; }
     submit.disabled = true;
-    submit.textContent = "Finding poster art…";
+    submit.textContent = pickedPoster() ? "Adding…" : "Finding poster art…";
     errorEl.textContent = "";
     fetch(API + "/lists", {
       method: "POST",
       headers: authHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ page: PAGE, list: l.key, imdbId: chosen.id }),
+      body: JSON.stringify({ page: PAGE, list: l.key, imdbId: chosen.id, poster: pickedPoster() }),
     })
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
       .then(function (res) {

@@ -12,6 +12,18 @@
 // New movies, games, or photos don't need a version (that's content; the home Lately strip covers it).
 window.CHANGELOG = [
   {
+    version: "1.1",
+    date: "2026-10-01",
+    title: "Say why",
+    changes: [
+      { page: "movies", text: "When you suggest a movie for my queue, you can add a short note on why I should watch it. Show it on the card under your name, or keep it just between us." },
+      { page: "games", text: "Same for games: tell me why I should play the one you suggest, publicly or just to me." },
+      { page: "site", text: "Made a mistake? You can now edit or remove the movies and games you've suggested (from the same browser). Removing one gives you the spot back." },
+      { page: "games", text: "Once I start playing something from the queue, it comes off the queue on its own." },
+      { page: "extras", text: "Nick's Nine 1.1: a leaderboard. Finish all 9 holes, type your name, and see how your round stacks up (and whether you beat my ghost)." }
+    ]
+  },
+  {
     version: "1.0",
     date: "2026-09-30",
     title: "Launch",

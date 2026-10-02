@@ -15,6 +15,9 @@ NICKMADE_ADMIN_TOKEN, or it will ask).
 
 Visitor suggestions and Recently Watched/Played stay on the live site (they need the site to
 show names, dates, and ratings), but everything live is saved to backups/live-YYYY-MM-DD.json.
+
+It also deletes games from games/list.js In the Queue that are now in Recently Played (same title,
+ignoring only case and symbols like the trademark sign). The site already hides them; this makes it permanent.
 """
 import argparse
 import datetime
@@ -124,6 +127,39 @@ def section_titles(text, marker):
     return {json.loads('"%s"' % t).lower() for t in re.findall(r'title:\s*"((?:[^"\\]|\\.)*)"', block)}
 
 
+def same_title(s):
+    """The Worker's normalize(): lowercase, accents dropped, & -> and, anything else not a letter/digit -> one space."""
+    import unicodedata
+    s = unicodedata.normalize("NFKD", str(s).lower())
+    s = "".join(ch for ch in s if not unicodedata.combining(ch)).replace("&", "and")
+    return re.sub(r"[^a-z0-9]+", " ", s).strip()
+
+
+def drop_played(text, played):
+    """Remove In the Queue items (one per line) whose title is in played (same_title form). Returns (text, titles)."""
+    marker = 'live: "queue"'
+    if marker not in text:
+        return text, []
+    m = re.compile(r"items: \[").search(text, text.index(marker))
+    if not m or text.startswith("]", m.end()):
+        return text, []
+    end = text.index("\n    ]", m.end())
+    lines = text[m.end():end].split("\n")
+    kept, dropped = [], []
+    for line in lines:
+        t = re.match(r'\s*\{\s*title:\s*"((?:[^"\\]|\\.)*)"', line)
+        if t and same_title(json.loads('"%s"' % t.group(1))) in played:
+            dropped.append(json.loads('"%s"' % t.group(1)))
+        else:
+            kept.append(line)
+    if not dropped:
+        return text, []
+    items = [l for l in kept if l.strip()]
+    items = [l.rstrip().rstrip(",") for l in items]
+    body = ("\n" + ",\n".join(items)) if items else ""
+    return text[:m.end()] + body + (text[end:] if items else text[end:].lstrip("\n").lstrip()), dropped
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--dry-run", action="store_true", help="show what would change, touch nothing")
@@ -137,6 +173,16 @@ def main():
     for page in PAGES:
         snapshot["watched"][page] = get_json(api + "/watched?page=" + page).get("items", [])
         snapshot["queue"][page] = get_json(api + "/queue?page=" + page).get("items", [])
+    # Games now in Recently Played come out of list.js In the Queue
+    played = {same_title(it.get("title", "")) for it in snapshot["watched"]["games"]}
+    games_path = os.path.join(args.root, "games", "list.js")
+    new_text, dropped = drop_played(open(games_path, encoding="utf-8").read(), played)
+    for t in dropped:
+        print("  played %s: %s (in Recently Played, removing it from list.js In the Queue)" % ("games", t))
+    if dropped and not args.dry_run:
+        with open(games_path, "w", encoding="utf-8") as f:
+            f.write(new_text)
+
     work = []  # (page, marker, section name, item, delete path)
     for page in PAGES:
         lists = get_json(api + "/lists?page=" + page).get("lists", {})
