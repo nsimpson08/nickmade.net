@@ -69,7 +69,11 @@ window.SECTIONS = [
       { title: "Rocket League", year: 2015, image: "posters/rocket-league.jpg", credit: { official: true } },
       { title: "The Witcher 3: Wild Hunt", year: 2015, image: "posters/the-witcher-3.jpg", credit: { artist: "Joe Cosentino", url: "https://posterspy.com/profile/joecosentinodesign/" } },
       { title: "Red Dead Redemption 2", year: 2018, image: "posters/red-dead-redemption-2.jpg", credit: { artist: "edwardjmoran", url: "https://posterspy.com/profile/edwardjmoran" } },
-      { title: "Super Mario World 2: Yoshi's Island", year: 1995, image: "posters/yoshis-island.jpg", credit: { official: true } }
+      { title: "Super Mario World 2: Yoshi's Island", year: 1995, image: "posters/yoshis-island.jpg", credit: { official: true } },
+      { title: "Shadow of the Colossus", year: 2005, image: "posters/shadow-of-the-colossus.jpg", credit: { artist: "Koke Núñez", url: "https://posterspy.com/profile/koke" } },
+      { title: "Super Smash Bros.", year: 1999, image: "posters/super-smash-bros.jpg", credit: { artist: "VGAfanatic", url: "https://www.deviantart.com/vgafanatic/art/Super-Smash-Bros-64-Anniversary-Print-1149939180" } },
+      { title: "Portal", year: 2007, image: "posters/portal.jpg", credit: { artist: "therealbobmayo", url: "https://posterspy.com/profile/therealbobmayo" } },
+      { title: "Final Fantasy X", year: 2001, image: "posters/final-fantasy-x.jpg", credit: { official: true } }
     ]
   },
   {
@@ -78,6 +82,22 @@ window.SECTIONS = [
     title: "Best Soundtracks",
     layout: "grid",
     items: [
+      {
+        title: "Mirror's Edge", year: 2008, image: "posters/mirrors-edge.jpg", credit: { artist: "nrwirth65", url: "https://posterspy.com/profile/nrwirth65" },
+        song: { id: 1579465849, title: "Still Alive (Idun Sessions)", artist: "Lisa Miskovsky" }
+      },
+      {
+        title: "Final Fantasy X", year: 2001, image: "posters/final-fantasy-x.jpg", credit: { official: true },
+        song: { id: 62444655, title: "Zanarkand", artist: "Nobuo Uematsu" }
+      },
+      {
+        title: "Final Fantasy VII", year: 1997, image: "posters/final-fantasy-vii.jpg", credit: { artist: "viet-anh_cao", url: "https://posterspy.com/profile/viet-anh_cao" },
+        song: { id: 61018643, title: "One-Winged Angel", artist: "Nobuo Uematsu" }
+      },
+      {
+        title: "The Last of Us", year: 2013, image: "posters/the-last-of-us.jpg", credit: { artist: "bruno-illustra", url: "https://posterspy.com/profile/bruno-illustra" },
+        song: { id: 655118443, title: "The Last of Us", artist: "Gustavo Santaolalla" }
+      },
       {
         title: "Hotline Miami", year: 2012, image: "posters/hotline-miami.jpg", credit: { artist: "Mbdsgns", url: "https://posterspy.com/profile/mbdsgns" },
         song: { id: 1134673053, title: "Hotline", artist: "Jasper Byrne" }
