@@ -22,6 +22,8 @@ Personal site, served by GitHub Pages from the root of `main`. Plain HTML, no bu
   It reads `extras/golf/scores.js` and `trackman.js` at runtime, so new rounds and stats change the game with no rebuild
 - `extras/golf/`: the Golf page (Extras). Rounds and bag in `scores.js`; Trackman rounds are imported into `trackman.js`
   (and course photos into `courses/`) by `python3 tools/import_trackman.py`, from the round cards' HTML copied off Trackman's site
+- Recently Watched/Played show the newest 12; older ones are listed by the Archive link under them. The favorites/best
+  sections have no limit: in owner mode each item has Remove (hidden on the site, deleted from list.js by pull_live.py)
 - `tools/pull_live.py`: copies site additions into list.js and posters/ (then commit and push); run it again
   after pushing to clear the now-duplicate live copies. Also saves a snapshot to `backups/`.
 - `photography/`: the Photography page, in sections (Film, Pixel, Cats). Drop photos into the section's folder,

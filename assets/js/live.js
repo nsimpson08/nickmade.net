@@ -302,6 +302,39 @@
     });
   }
 
+  // Favorites/best sections (everything but In the Queue and Recently ...): no cap, Nick keeps them at 12 himself.
+  // In owner mode every list.js item there gets a Remove button. The Worker can't edit list.js, so Remove hides it
+  // (POST /hidden; hidden for everyone) and tools/pull_live.py deletes it from list.js for good.
+  var FAVS = (window.SECTIONS || []).filter(function (s) { return s.title && s.live !== "queue" && s.live !== "watched"; }).map(function (s) {
+    return { key: s.live || "s:" + slug(s.title), title: s.title, el: document.getElementById(slug(s.title)) };
+  }).filter(function (f) { return f.el; });
+  function codedItems(el) { return [].slice.call(el.querySelectorAll("[data-title]")); }
+  function applyHidden(hidden) {
+    FAVS.forEach(function (f) {
+      var gone = (hidden[f.key] || []).map(function (t) { return sameTitle(t); });
+      codedItems(f.el).forEach(function (item) { if (gone.indexOf(sameTitle(item.dataset.title)) >= 0) item.hidden = true; });
+    });
+  }
+  function addRemoveButtons() {
+    if (!ADMIN) return;
+    FAVS.forEach(function (f) {
+      codedItems(f.el).forEach(function (item) {
+        if (item.querySelector(".owner-actions")) return;
+        var bar = document.createElement("div");
+        bar.className = "owner-actions";
+        bar.innerHTML = '<button class="remove" type="button">Remove</button>';
+        (item.querySelector(".entry-body") || item).appendChild(bar);
+        bar.querySelector(".remove").addEventListener("click", function () {
+          var title = item.dataset.title;
+          if (!confirm("Remove " + title + " from " + f.title + "?")) return;
+          fetch(API + "/hidden", { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ page: PAGE, list: f.key, title: title }) })
+            .then(function (r) { if (!r.ok) throw new Error(); item.hidden = true; })
+            .catch(function () { alert("Couldn't remove it. Try logging in again."); });
+        });
+      });
+    });
+  }
+
   function renderListSlot(l) {
     if (!ADMIN) return;
     if (l.slot) l.slot.remove();
@@ -317,21 +350,24 @@
     if (track) l.slot.style.marginTop = (track.nextElementSibling.offsetTop - track.offsetTop) + "px";
   }
 
-  if (LISTS.length) {
+  if (FAVS.length) {
     ready
       .then(function () { return fetch(API + "/lists?page=" + PAGE); })
       .then(function (r) { return r.json(); })
       .then(function (data) {
+        applyHidden(data.hidden || {});
+        addRemoveButtons();
         var lists = data.lists || {};
         LISTS.forEach(function (l) {
-          var items = (lists[l.key] || []).filter(function (it) { return !inSection(l.el, it.title); });
+          var items = (lists[l.key] || []).filter(function (it) { return !inSection(l.el, it.title); }); // newest first
           if (!items.length && !ADMIN) return;
           var g = grid(l.el);
-          items.forEach(function (it) { g.appendChild(card(it, "list", l)); });
+          // site-added picks go on top, newest first, above the list.js ones
+          items.slice().reverse().forEach(function (it) { g.insertBefore(card(it, "list", l), g.firstChild); });
           renderListSlot(l);
         });
       })
-      .catch(function () { /* service unreachable: just show list.js */ });
+      .catch(function () { addRemoveButtons(); /* service unreachable: just show list.js */ });
   }
 
   // ---------- Recently Watched / Recently Played ----------
@@ -466,7 +502,8 @@
     });
   }
 
-  function renderWatched(items) {
+  function renderWatched(items, archive) {
+    if (archive && window.NMArchive) window.NMArchive.setLive(watchedSection, archive);
     watchedItems = items;
     hidePlayedQueueGames(items);
     var g = grid(watchedSection);
@@ -482,6 +519,7 @@
       .then(function (data) {
         var items = data.items || [];
         hidePlayedQueueGames(items);
+        if (window.NMArchive) window.NMArchive.setLive(watchedSection, data.archive);
         if (items.length || ADMIN) renderWatched(items); // visitors keep "Coming soon." until there's one
       })
       .catch(function () {});
@@ -887,7 +925,8 @@
       .then(function (res) {
         submit.textContent = submitLabel();
         if (!res.ok) { errorEl.textContent = res.d.error || "Couldn't add that one."; validate(); return; }
-        grid(l.el).insertBefore(card(res.d.item, "list", l), l.slot);
+        var g = grid(l.el);
+        g.insertBefore(card(res.d.item, "list", l), g.firstChild); // newest goes in the first slot
         resetFields();
         validate();
         dialog.close();
@@ -901,7 +940,7 @@
 
   function reloadWatched() {
     return fetch(API + "/watched?" + PQ).then(function (r) { return r.json(); }).then(function (data) {
-      renderWatched(data.items || []);
+      renderWatched(data.items || [], data.archive);
       resetFields();
       validate();
       dialog.close();

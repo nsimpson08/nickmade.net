@@ -14,11 +14,13 @@ import { golfRoute } from "./golf.js";
 //   PATCH  /queue/:imdbId       { page, visitorId, name, comment, commentPrivate } -> a visitor edits their own suggestion
 //   DELETE /queue/:imdbId       remove a submission: Nick (Authorization: Bearer ADMIN_TOKEN), or the visitor who suggested
 //                               it (?visitorId=), which also gives them that suggestion back
-//   GET    /watched             Recently Watched, newest first
+//   GET    /watched             Recently Watched, newest first (12), and its archive: { items, archive }
 //   POST   /watched             { imdbId, date: "YYYY-MM-DD", rating: 0.5-5 in halves, optional } (admin) -> adds a movie; also drops it from the queue
 //   PATCH  /watched/:id         { rating, date } (admin) -> change the rating and/or date watched
 //   DELETE /watched/:id         remove one (admin)
-//   GET    /lists?page=movies   Nick's site-added picks for each live section of a page: { lists: { <key>: [items] } }
+//   GET    /lists?page=movies   Nick's site-added picks for each live section (newest first) and the list.js items he
+//                               removed on the site: { lists: { <key>: [items] }, hidden: { <key>: [titles] } }
+//   POST   /hidden              { page, list, title } (admin) hide a list.js item (Remove in owner mode); DELETE undoes it
 //   POST   /lists               { page, list, imdbId } (admin) -> adds a movie/game to that section
 //   DELETE /lists/:page/:list/:imdbId  remove one (admin)
 //   GET    /xbox/recent         (admin) your most recently played Xbox games via OpenXBL, with playtime and achievements
@@ -44,6 +46,9 @@ import { golfRoute } from "./golf.js";
 //   xbox:recent                    10-minute cache of /xbox/recent (OpenXBL allows 150 requests/hour, shared with the Montage app)
 
 const PER_VISITOR = 3;
+// Recently Watched/Played shows the newest 12 by date; older ones move to watched-archive (listed under the section).
+// The favorites/best sections have no cap: Nick keeps those at 12 himself (adding new ones on top, removing old ones).
+const SECTION_MAX = 12;
 // Words in a comment that start with a BLOCKED term but are fine ("hit me" with the space removed would read "shit",
 // so comments are checked word by word, unlike names)
 const ALLOWED_WORDS = new Set(["cocktail", "cocktails", "cockpit", "cockroach", "cockroaches", "cockatoo", "cocky", "dickens", "dickinson", "dickie", "shitake"]);
@@ -104,8 +109,13 @@ export default {
       if (url.pathname.startsWith("/queue/") && request.method === "DELETE") return await removeFromQueue(request, url, env, cors);
       if (url.pathname.startsWith("/queue/") && request.method === "PATCH") return await editSuggestion(request, url, env, cors);
       if (url.pathname === "/poster" && request.method === "GET") return await previewPoster(request, url, env, cors);
+      if (url.pathname === "/hidden" && (request.method === "POST" || request.method === "DELETE")) return await setHidden(request, env, cors);
       if (url.pathname === "/watched" && request.method === "GET") {
-        return json({ items: sortWatched(await getList(env, watchedKey(pageOf(url.searchParams.get("page"))))) }, 200, cors);
+        const wpage = pageOf(url.searchParams.get("page"));
+        return json({
+          items: sortWatched(await getList(env, watchedKey(wpage))).slice(0, SECTION_MAX),
+          archive: sortWatched(await getList(env, watchedKey(wpage) + "-archive")).map(archived),
+        }, 200, cors);
       }
       if (url.pathname === "/watched" && request.method === "POST") return await addWatched(request, env, cors);
       if (url.pathname.startsWith("/watched/") && request.method === "PATCH") return await editWatched(request, url, env, cors);
@@ -191,12 +201,17 @@ function normalize(s) {
 
 // Your own "In the Queue" titles, read from the live site's list.js so the cap stays right when you edit it.
 async function ownerQueueTitles(env, page) {
+  return listJsTitles(env, page, "queue", "In the Queue");
+}
+
+// Titles of a section in the live site's list.js, found by its live key (or its title); null if it can't be read
+async function listJsTitles(env, page, key, title) {
   try {
     const res = await fetch(env.SITE_URL.replace(/\/$/, "") + "/" + page + "/list.js", { cf: { cacheTtl: 300 } });
     const text = await res.text();
-    let start = text.indexOf('live: "queue"');
-    if (start < 0) start = text.indexOf('title: "In the Queue"');
-    if (start < 0) throw new Error("no queue section");
+    let start = text.indexOf('live: "' + key + '"');
+    if (start < 0 && title) start = text.indexOf('title: "' + title + '"');
+    if (start < 0) throw new Error("no section " + key);
     const open = text.indexOf("items: [", start);
     if (open < 0) throw new Error("no items");
     if (text[open + 8] === "]") return []; // items: []
@@ -561,6 +576,32 @@ function sortWatched(items) {
   return items.slice().sort((a, b) => (b.date + b.createdAt).localeCompare(a.date + a.createdAt));
 }
 
+// What an Archive lists: just enough to name it
+function archived(it) {
+  const out = { title: it.title, year: it.year || null };
+  if (it.date) out.date = it.date;
+  if (it.rating) out.rating = it.rating;
+  if (it.archivedAt) out.archivedAt = it.archivedAt;
+  return out;
+}
+
+// Save Recently Watched/Played: newest first by date, at most SECTION_MAX; the oldest ones beyond that move to
+// watched-archive (for the record, e.g. a year-in-review page someday) instead of being deleted
+async function saveWatched(env, page, items) {
+  const sorted = sortWatched(items);
+  const keep = sorted.slice(0, SECTION_MAX);
+  const old = sorted.slice(SECTION_MAX);
+  if (old.length) {
+    const archiveKey = watchedKey(page) + "-archive";
+    const archive = await getList(env, archiveKey);
+    const ids = new Set(archive.map((it) => it.id));
+    const now = new Date().toISOString();
+    await env.QUEUE.put(archiveKey, JSON.stringify(archive.concat(old.filter((it) => !ids.has(it.id)).map((it) => ({ ...it, archivedAt: now })))));
+  }
+  await env.QUEUE.put(watchedKey(page), JSON.stringify(keep));
+  return keep;
+}
+
 async function addWatched(request, env, cors) {
   if (!isAdmin(request, env)) return json({ error: "Unauthorized" }, 401, cors);
   let body;
@@ -580,7 +621,7 @@ async function addWatched(request, env, cors) {
 
   const items = (await getList(env, watchedKey(page))).filter((it) => it.id !== item.id);
   items.push(item);
-  await env.QUEUE.put(watchedKey(page), JSON.stringify(items));
+  await saveWatched(env, page, items); // a 13th pushes the oldest out
 
   // Watching/playing something from the queue takes it out of the queue
   const queue = await getQueue(env, page);
@@ -639,10 +680,37 @@ async function readLists(env, page) {
   try { return JSON.parse((await env.QUEUE.get("lists:" + page)) || "{}"); } catch (e) { return {}; }
 }
 
+// hidden: list.js items Nick removed on the site, { <section key>: [titles] }. The Worker can't edit list.js, so the
+// page hides these, and tools/pull_live.py deletes them from list.js (then clears them here once that's pushed).
+// Section key: its live key, or "s:" + its title as a slug for sections without one (All Time Favorites).
+async function readHidden(env, page) {
+  try { return JSON.parse((await env.QUEUE.get("hidden:" + page)) || "{}"); } catch (e) { return {}; }
+}
+
+// lists: Nick's site-added picks per section, newest first; hidden: see readHidden
 async function getLists(url, env, cors) {
   const page = url.searchParams.get("page") || "";
   if (!PAGES[page]) return json({ error: "Unknown page." }, 400, cors);
-  return json({ lists: await readLists(env, page) }, 200, cors);
+  const lists = await readLists(env, page);
+  for (const k of Object.keys(lists)) lists[k] = lists[k].slice().sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+  return json({ lists, hidden: await readHidden(env, page) }, 200, cors);
+}
+
+// Nick removing a list.js item on the site (POST) or tools/pull_live.py clearing one that's gone from list.js (DELETE)
+async function setHidden(request, env, cors) {
+  if (!isAdmin(request, env)) return json({ error: "Unauthorized" }, 401, cors);
+  let body;
+  try { body = await request.json(); } catch (e) { return json({ error: "Bad request." }, 400, cors); }
+  const page = String(body.page || "");
+  const key = String(body.list || "");
+  const title = String(body.title || "").trim();
+  if (!PAGES[page] || !/^[a-z0-9:-]{1,80}$/.test(key) || !title || title.length > 200) return json({ error: "Bad request." }, 400, cors);
+  const hidden = await readHidden(env, page);
+  const others = (hidden[key] || []).filter((t) => normalize(t) !== normalize(title));
+  hidden[key] = request.method === "DELETE" ? others : others.concat(title);
+  if (!hidden[key].length) delete hidden[key];
+  await env.QUEUE.put("hidden:" + page, JSON.stringify(hidden));
+  return json({ hidden: hidden[key] || [] }, 200, cors);
 }
 
 async function addToList(request, env, cors) {
@@ -662,8 +730,15 @@ async function addToList(request, env, cors) {
   const item = { ...found, createdAt: new Date().toISOString() };
 
   const latest = await readLists(env, page); // re-read after the slow poster lookup
-  latest[key] = (latest[key] || []).filter((it) => it.imdbId !== imdbId).concat(item);
+  latest[key] = [item].concat((latest[key] || []).filter((it) => it.imdbId !== imdbId)); // newest first
   await env.QUEUE.put("lists:" + page, JSON.stringify(latest));
+  // adding something Nick had removed from list.js brings it back
+  const hidden = await readHidden(env, page);
+  if ((hidden[key] || []).some((t) => normalize(t) === normalize(item.title))) {
+    hidden[key] = hidden[key].filter((t) => normalize(t) !== normalize(item.title));
+    if (!hidden[key].length) delete hidden[key];
+    await env.QUEUE.put("hidden:" + page, JSON.stringify(hidden));
+  }
   return json({ item }, 201, cors);
 }
 
@@ -841,7 +916,7 @@ async function xboxImport(request, env, cors) {
     importedTitles.push(g.name);
     added++;
   }
-  await env.QUEUE.put(watchedKey("games"), JSON.stringify(items));
+  await saveWatched(env, "games", items); // newest 12 by last played; older ones to the archive
 
   // Playing something from the queue takes it out of the queue. Matched by exact title (ignoring only case and symbols
   // like ™, so "Gears of War" never removes "Gears of War: E-Day"), since queue games come from IMDb, not Xbox

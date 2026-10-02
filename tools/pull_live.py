@@ -7,7 +7,10 @@
 For every movie/game you added from the site to a live section (live: "key" in list.js),
 and everything you added to a page's In the Queue yourself, this:
   1. saves its poster into movies/posters/ or games/posters/ (max 700px wide)
-  2. adds it to the end of that section in list.js, with the art credit
+  2. adds it to that section in list.js with the art credit: at the TOP for live sections (newest first, the order
+     the site shows), at the end for In the Queue
+and for every list.js item you removed on the site (owner mode Remove), deletes it from list.js; once that's pushed,
+the next run clears it from the live site's hidden list.
 Then commit and push as usual. Until you push, the site keeps showing the live copy; after you
 push, the page hides the live copy (same title already in list.js), and the next run of this
 script clears those from the live site's storage (needs the admin password: set
@@ -116,6 +119,85 @@ def append_items(text, marker, lines):
     return text[:start] + body + "\n" + ",\n".join(lines) + text[end:]
 
 
+def _match(text, i):
+    """Index just past the bracket/brace that closes the one at text[i], skipping over strings."""
+    open_ch = text[i]
+    close_ch = {"[": "]", "{": "}"}[open_ch]
+    depth, j, quote = 0, i, None
+    while j < len(text):
+        c = text[j]
+        if quote:
+            if c == "\\":
+                j += 2
+                continue
+            if c == quote:
+                quote = None
+        elif c in "\"'":
+            quote = c
+        elif c in "[{":
+            depth += 1
+        elif c in "]}":
+            depth -= 1
+            if depth == 0:
+                return j + 1
+        j += 1
+    raise ValueError("unbalanced list.js")
+
+
+def _objects(block):
+    """The top-level { ... } entries in an array's inside text, as written."""
+    out, i = [], 0
+    while True:
+        i = block.find("{", i)
+        if i < 0:
+            return out
+        end = _match(block, i)
+        out.append(block[i:end])
+        i = end
+
+
+def _title(obj):
+    m = re.search(r'title:\s*"((?:[^"\\]|\\.)*)"', obj)
+    return json.loads('"%s"' % m.group(1)) if m else ""
+
+
+def _items_span(text, marker):
+    """(start, end) of the inside of the items array of the section containing marker."""
+    m = re.compile(r"items: \[").search(text, text.index(marker))
+    close = _match(text, m.end() - 1)
+    return m.end(), close - 1
+
+
+def _rebuild(text, marker, objs):
+    a, b = _items_span(text, marker)
+    body = ("\n      " + ",\n      ".join(objs) + "\n    ") if objs else ""
+    return text[:a] + body + text[b:]
+
+
+def put_on_top(text, marker, new_lines):
+    """Live sections: new entries go first (newest first), above what's already there."""
+    a, b = _items_span(text, marker)
+    return _rebuild(text, marker, [l.strip() for l in new_lines] + _objects(text[a:b]))
+
+
+def remove_titled(text, marker, title):
+    """Delete the entries titled `title` (same_title match) from the section containing marker. Returns (text, removed?)."""
+    a, b = _items_span(text, marker)
+    objs = _objects(text[a:b])
+    kept = [o for o in objs if same_title(_title(o)) != same_title(title)]
+    return (_rebuild(text, marker, kept), True) if len(kept) != len(objs) else (text, False)
+
+
+def section_marker(text, key):
+    """The list.js marker for a section key: 'live: "key"', or for "s:<slug>" (no live key) its title line."""
+    if not key.startswith("s:"):
+        return 'live: "%s"' % key
+    for t in re.findall(r'\n    title: "((?:[^"\\]|\\.)*)"', text):
+        if slug(json.loads('"%s"' % t)) == key[2:]:
+            return 'title: %s' % js(json.loads('"%s"' % t))
+    return None
+
+
 def section_titles(text, marker):
     """Titles in the items of the section containing marker ("" text or no section: none)."""
     if marker not in text:
@@ -185,8 +267,10 @@ def main():
 
     work = []  # (page, marker, section name, item, delete path)
     for page in PAGES:
-        lists = get_json(api + "/lists?page=" + page).get("lists", {})
+        got = get_json(api + "/lists?page=" + page)
+        lists = got.get("lists", {})
         snapshot["lists"][page] = lists
+        snapshot.setdefault("hidden", {})[page] = got.get("hidden", {})
         for key, items in lists.items():
             for it in items:
                 work.append((page, 'live: "%s"' % key, key, it, "/lists/%s/%s/%s" % (page, key, it["imdbId"])))
@@ -201,6 +285,37 @@ def main():
         with open(snap, "w") as f:
             json.dump(snapshot, f, indent=2, ensure_ascii=False)
         print("Saved a snapshot of everything live to", os.path.relpath(snap, args.root))
+
+    # list.js items removed on the site: delete them from list.js; once the live list.js no longer has them, clear them
+    unhide = []  # (page, key, title) to clear from the live site
+    for page in PAGES:
+        hidden = snapshot["hidden"].get(page, {})
+        if not hidden:
+            continue
+        path = os.path.join(args.root, page, "list.js")
+        text = open(path, encoding="utf-8").read()
+        live_text = request("%s/%s/list.js?nocache=%d" % (args.site.rstrip("/"), page, datetime.datetime.now().timestamp())).decode("utf-8")
+        for key, titles in hidden.items():
+            marker, live_marker = section_marker(text, key), section_marker(live_text, key)
+            for title in titles:
+                gone_live = not live_marker or same_title(title) not in {same_title(t) for t in section_titles(live_text, live_marker)}
+                if gone_live:
+                    unhide.append((page, key, title))
+                    print("  unhide %s / %s: %s (deleted from the live list.js, clearing it)" % (page, key, title))
+                    continue
+                if marker:
+                    text, removed = remove_titled(text, marker, title)
+                    print("  remove %s / %s: %s (%s)" % (page, key, title, "deleted from list.js; push it" if removed else "already deleted here, not pushed yet"))
+        if not args.dry_run:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(text)
+    if unhide and not args.dry_run:
+        token = os.environ.get("NICKMADE_ADMIN_TOKEN") or getpass.getpass("Admin password (to clear removed ones from the live site): ")
+        os.environ["NICKMADE_ADMIN_TOKEN"] = token
+        for page, key, title in unhide:
+            req = urllib.request.Request(api + "/hidden", method="DELETE", data=json.dumps({"page": page, "list": key, "title": title}).encode(),
+                                         headers={"User-Agent": UA, "Content-Type": "application/json", "Authorization": "Bearer " + token})
+            urllib.request.urlopen(req, timeout=60).read()
 
     if not work:
         print("Nothing to copy: no site additions waiting.")
@@ -236,7 +351,10 @@ def main():
                 image = None if args.dry_run else save_poster(args.root, page, it)
                 lines.append(entry(it, image or ("posters/%s.jpg" % slug(it["title"]))))
                 print("  copy   %s / %s: %s (%s)" % (page, name, it["title"], it.get("year") or "?"))
-            text = append_items(text, marker, lines)
+            if marker == 'live: "queue"':
+                text = append_items(text, marker, lines)
+            else:
+                text = put_on_top(text, marker, lines)  # group is newest first (the Worker's order)
         if not args.dry_run:
             with open(path, "w", encoding="utf-8") as f:
                 f.write(text)

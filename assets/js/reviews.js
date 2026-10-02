@@ -42,7 +42,7 @@
         }).join("") + "</div>"
       : '<div class="review pending"><p>Review coming soon.</p></div>';
 
-    return '<article class="entry">' +
+    return '<article class="entry" data-title="' + esc(it.title) + '">' +
       '<figure class="poster">' + poster(it) + credit(it) + "</figure>" +
       '<div class="entry-body">' +
         "<h3>" + esc(it.title) + "</h3>" +
@@ -88,7 +88,7 @@
   }
 
   function gridItem(it, withPlayers) {
-    return '<figure class="poster">' + track(it, withPlayers) + poster(it) +
+    return '<figure class="poster" data-title="' + esc(it.title) + '">' + track(it, withPlayers) + poster(it) +
       '<figcaption><span class="title">' + esc(it.title) + "</span>" +
         (it.year ? ' <span class="year">' + esc(it.year) + "</span>" : "") +
       "</figcaption>" + credit(it) + trackCredit(it) + "</figure>";
@@ -109,7 +109,12 @@
       (sec.title ? '<h2 class="subhead"><span>' + esc(sec.title) + "</span>" +
         (sec.subtitle ? '<small class="sub">' + esc(sec.subtitle) + "</small>" : "") +
         "</h2>" : "") +
-      body(sec) + "</section>";
+      body(sec) +
+      (sec.live === "watched" && sec.title // only Recently Watched/Played have an Archive (filled by live.js)
+        ? '<div class="archive"><button type="button" class="archive-toggle" aria-expanded="false">Archive</button>' +
+          '<div class="archive-panel" hidden></div></div>'
+        : "") +
+      "</section>";
   }
 
   // Consecutive sections sharing a `group` go together; the first one's groupNote/groupStyle describe the group
@@ -137,4 +142,46 @@
         (g.note ? '<span class="group-note">' + esc(g.note) + "</span>" : "") + "</div>" +
       inner + "</div>";
   }).join("");
+
+  // ---------- Archive (Recently Watched/Played only): what was pushed out of the newest 12 ----------
+  var els = root.querySelectorAll("section.subsection");
+  [].forEach.call(els, function (el) {
+    if (el.querySelector(".archive")) el.nmArchive = { live: [] };
+  });
+
+  function archiveDate(d) {
+    var date = new Date(d + "T00:00:00");
+    return isNaN(date) ? "" : date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  }
+  function renderArchive(el) {
+    var a = el.nmArchive;
+    var seen = {};
+    var all = a.live.filter(function (it) {
+      var k = String(it.title).toLowerCase() + "|" + (it.year || "") + "|" + (it.date || "");
+      return seen[k] ? false : (seen[k] = true);
+    });
+    var panel = el.querySelector(".archive-panel");
+    panel.innerHTML = all.length
+      ? '<ol class="archive-list">' + all.map(function (it) {
+          return "<li><span class=\"t\">" + esc(it.title) + "</span>" + (it.year ? ' <span class="y">' + esc(it.year) + "</span>" : "") +
+            (it.date ? ' <span class="d">' + esc(archiveDate(it.date)) + "</span>" : "") + "</li>";
+        }).join("") + "</ol>"
+      : '<p class="archive-empty">Nothing archived yet.</p>';
+    el.querySelector(".archive-toggle").textContent = "Archive" + (all.length ? " (" + all.length + ")" : "");
+  }
+  [].forEach.call(els, function (el) {
+    if (!el.nmArchive) return;
+    renderArchive(el);
+    var btn = el.querySelector(".archive-toggle");
+    btn.addEventListener("click", function () {
+      var panel = el.querySelector(".archive-panel");
+      panel.hidden = !panel.hidden;
+      btn.setAttribute("aria-expanded", String(!panel.hidden));
+    });
+  });
+
+  // for live.js
+  window.NMArchive = {
+    setLive: function (el, items) { if (el && el.nmArchive) { el.nmArchive.live = items || []; renderArchive(el); } },
+  };
 })();

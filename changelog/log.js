@@ -20,6 +20,7 @@ window.CHANGELOG = [
       { page: "games", text: "Same for games: tell me why I should play the one you suggest, publicly or just to me." },
       { page: "site", text: "Made a mistake? You can now edit or remove the movies and games you've suggested (from the same browser). Removing one gives you the spot back." },
       { page: "games", text: "Once I start playing something from the queue, it comes off the queue on its own." },
+      { page: "site", text: "Recently Watched and Recently Played show my latest 12. Older ones move to an Archive link underneath, so nothing's lost." },
       { page: "extras", text: "Nick's Nine 1.1: a leaderboard. Finish all 9 holes, type your name, and see how your round stacks up (and whether you beat my ghost)." }
     ]
   },
