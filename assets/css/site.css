@@ -558,6 +558,140 @@ a.tag:hover, a.tag:focus-visible { background: color-mix(in srgb, var(--tag) 14%
   .bag .club-type { grid-column: 2 / -1; }
 }
 
+/* ---------- Games: Xbox gamerscore banner (xbox-banner.js) ---------- */
+/* The space is held while it loads so the page doesn't jump; the script removes it if the Worker can't answer.
+   Animation, on every load: the badge pops in with a ring, the pill opens to the right, the text fades in,
+   a shine sweeps across, the number counts up, then "Achievement unlocked" flips to "Total gamerscore". */
+.xa { min-height: 64px; margin-top: 28px; }
+.xa-toast {
+  --xa-green: #107c10;
+  --xa-green-hi: #45d145;
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  max-width: 100%;
+  padding: 8px 28px 8px 8px;
+}
+a.xa-toast { color: inherit; text-decoration: none; cursor: pointer; }
+a.xa-toast::before { transition: box-shadow .25s, filter .25s; }
+a.xa-toast:hover::before, a.xa-toast:focus-visible::before {
+  box-shadow: inset 0 0 0 1px var(--xa-green-hi), 0 12px 32px rgba(0, 0, 0, 0.55), 0 0 24px rgba(69, 209, 69, 0.18);
+}
+a.xa-toast:focus-visible { outline: none; }
+.xa-toast::before,
+.xa-toast::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 40px;
+  clip-path: inset(0 0 0 0 round 40px);
+}
+.xa-toast::before {
+  background: linear-gradient(180deg, #1d1d20, #111113);
+  box-shadow: inset 0 0 0 1px #2c2c30, 0 12px 32px rgba(0, 0, 0, 0.55);
+}
+.xa-toast::after {
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.09) 50%, transparent 65%) no-repeat;
+  background-size: 250% 100%;
+  background-position: 150% 0;
+}
+.xa-badge {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  color: #fff;
+  background: radial-gradient(circle at 35% 30%, #2bb52b, var(--xa-green) 72%);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+}
+.xa-badge svg { width: 24px; height: 24px; }
+.xa-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid var(--xa-green-hi);
+  opacity: 0;
+  pointer-events: none;
+}
+.xa-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.xa-label {
+  height: 1.25em;
+  overflow: hidden;
+  font-size: 0.78rem;
+  line-height: 1.25;
+  color: var(--muted);
+}
+.xa-label-in { display: flex; flex-direction: column; transform: translateY(-1.25em); }
+.xa-label-in > span { height: 1.25em; white-space: nowrap; }
+.xa-score { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; }
+.xa-total {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--display);
+  font-size: 1.3rem;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+.xa-total b { font-weight: 600; }
+.xa-g {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  font-family: var(--body);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+.xa-gain { font-size: 0.85rem; font-weight: 500; color: var(--xa-green-hi); white-space: nowrap; }
+.xa-gain span { color: var(--muted); font-weight: 400; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .xa.play .xa-badge { animation: xa-pop 0.5s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+  .xa.play .xa-ring { animation: xa-ring 0.8s 0.3s ease-out both; }
+  .xa.play .xa-toast::before { animation: xa-open 0.6s 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  .xa.play .xa-body { animation: xa-fade 0.4s 0.8s ease-out both; }
+  .xa.play .xa-toast::after { animation: xa-shine 1s 1.1s ease-in-out both; }
+  .xa.play .xa-gain { animation: xa-fade 0.4s 1.95s ease-out both; }
+  .xa.play .xa-label-in { animation: xa-flip 0.35s 2.4s cubic-bezier(0.4, 0, 0.2, 1) both; }
+}
+@keyframes xa-pop {
+  0% { transform: scale(0); }
+  70% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+@keyframes xa-ring {
+  0% { opacity: 0.9; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.9); }
+}
+@keyframes xa-open {
+  0% { opacity: 0; clip-path: inset(0 calc(100% - 64px) 0 0 round 40px); }
+  15% { opacity: 1; }
+  100% { opacity: 1; clip-path: inset(0 0 0 0 round 40px); }
+}
+@keyframes xa-fade {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes xa-shine {
+  from { background-position: 150% 0; }
+  to { background-position: -50% 0; }
+}
+@keyframes xa-flip {
+  from { transform: translateY(0); }
+  to { transform: translateY(-1.25em); }
+}
+
 /* ---------- Reviews (games & movies) ---------- */
 
 .jump {
@@ -585,6 +719,145 @@ a.tag:hover, a.tag:focus-visible { background: color-mix(in srgb, var(--tag) 14%
   margin: 0 6px;
   background: var(--line);
 }
+
+/* ---------- Poster wall (Movies and Games, assets/js/wall.js) ---------- */
+.wall-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color .2s, color .2s;
+}
+.wall-open svg, .wall-name svg { width: 14px; height: 14px; fill: currentColor; }
+.wall-open:hover, .wall-open:focus-visible { border-color: var(--accent); color: var(--accent); outline: none; }
+html.wall-on { overflow: hidden; }
+.wall {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow: hidden;
+  background: #000;
+  opacity: 0;
+  transition: opacity .3s;
+}
+.wall.in { opacity: 1; }
+.wall-cols {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 120vw;
+  height: 150vh;
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 6), 1fr);
+  gap: 6px;
+  transform: translate(-50%, -50%) rotate(-5deg);
+}
+.wall-col { min-width: 0; overflow: hidden; }
+/* each column holds its posters twice; sliding by exactly half loops seamlessly (margins, not gap, keep it exact) */
+.wall-track { animation: wall-down linear infinite; }
+.wall-track.up { animation-name: wall-up; }
+.wall-col:hover .wall-track, .wall-col:focus-within .wall-track { animation-play-state: paused; }
+@keyframes wall-down { from { transform: translateY(-50%); } to { transform: translateY(0); } }
+@keyframes wall-up { from { transform: translateY(0); } to { transform: translateY(-50%); } }
+.wall-tile {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  margin: 0 0 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #111;
+  cursor: pointer;
+  transition: opacity .3s;
+}
+.wall-tile img { display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: transform .5s cubic-bezier(.2,.8,.2,1), opacity .6s; }
+.wall-tile img.in { opacity: 1; } /* fades in once loaded (the page's own posters load lazily) */
+.wall-cols:hover .wall-tile { opacity: 0.5; }
+.wall-cols:hover .wall-tile:hover, .wall-tile:focus-visible { opacity: 1; }
+.wall-tile:hover img, .wall-tile:focus-visible img { transform: scale(1.05); }
+.wall-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.wall-cap {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: grid;
+  gap: 2px;
+  padding: 48px 12px 12px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.88) 55%);
+  color: #fff;
+  text-align: left;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity .25s, transform .25s;
+}
+.wall-tile:hover .wall-cap, .wall-tile:focus-visible .wall-cap { opacity: 1; transform: none; }
+.wall-cap b { font-weight: 600; font-size: 0.92rem; line-height: 1.25; }
+.wall-meta { font-size: 0.75rem; color: rgba(255, 255, 255, 0.65); }
+.wall-rating { font-size: 0.85rem; color: var(--accent); }
+.wall-rating .rating { margin: 0; }
+.wall-bar {
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 40px;
+  background: linear-gradient(rgba(0, 0, 0, 0.8), transparent);
+  pointer-events: none;
+}
+.wall-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--accent);
+}
+.wall-name small { font-family: var(--body); font-weight: 400; font-size: 0.8rem; color: rgba(255, 255, 255, 0.6); }
+.wall-close {
+  pointer-events: auto;
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.wall-close:hover, .wall-close:focus-visible { border-color: var(--accent); color: var(--accent); outline: none; }
+/* reduced motion: a still grid that scrolls */
+.wall.still .wall-cols {
+  inset: 0;
+  left: 0;
+  top: 0;
+  width: auto;
+  height: auto;
+  padding: 72px 6px 6px;
+  overflow-y: auto;
+  align-items: start;
+  transform: none;
+}
+/* background mode (wall.js, data-background on the script tag): the same wall behind the page, dimmed by
+   --wall-shade, with no hover, captions or clicks */
+.wall.wall-bg { z-index: -1; pointer-events: none; transition: opacity 1.2s; }
+.wall-bg::after { content: ""; position: absolute; inset: 0; background: rgba(0, 0, 0, var(--wall-shade, 0.75)); }
+.wall-bg .wall-cols:hover .wall-tile { opacity: 1; }
+.wall.wall-bg.still .wall-cols { overflow: hidden; }
+/* the poster the wall jumped to */
+.poster.wall-found .art, .entry.wall-found .art { animation: lead-glow 2.4s ease-out; }
 
 /* Groups of sections (e.g. Lately / Favorites on Movies) */
 .group + .group { margin-top: 80px; }
@@ -739,6 +1012,57 @@ a.tag:hover, a.tag:focus-visible { background: color-mix(in srgb, var(--tag) 14%
 }
 
 /* ---------- Movie queue submissions ---------- */
+
+/* In the Queue votes (live.js): an upvote pill under each poster, right of the title; the most-voted are listed first */
+.vote-hint { display: flex; align-items: center; gap: 6px; margin: -14px 0 22px; font-size: 0.85rem; color: var(--muted); }
+.vote-hint svg { width: 14px; height: 14px; color: var(--accent); }
+.poster-grid figcaption:has(.vote) { display: grid; grid-template-columns: 1fr auto; column-gap: 10px; align-items: start; }
+.poster-grid figcaption:has(.vote) > :not(.vote) { grid-column: 1; }
+.vote {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 44px;
+  height: 28px;
+  margin-top: -1px;
+  padding: 0 11px 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background .2s, border-color .2s, color .2s, transform .15s;
+}
+.vote svg { width: 14px; height: 14px; }
+.vote:hover { border-color: var(--accent); color: var(--fg); }
+.vote:active { transform: scale(0.94); }
+.vote:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.vote.on { background: var(--accent); border-color: var(--accent); color: #000; }
+.vote[disabled] { cursor: progress; }
+.vote.own, .vote.display { cursor: default; }
+.vote.own:active, .vote.display:active { transform: none; }
+.vote.display:hover { border-color: var(--line); color: var(--muted); }
+.vote.own { opacity: 0.85; } /* a visitor's own suggestion: already voted, can't be clicked */
+@media (prefers-reduced-motion: no-preference) {
+  .vote.on svg { animation: vote-pop .3s ease-out; }
+}
+@keyframes vote-pop { 50% { transform: translateY(-3px) scale(1.2); } }
+/* a poster that just took the lead (live.js takeTheLead): it slides to the first slot, then its art glows once */
+.poster.lead-new { position: relative; z-index: 2; }
+@media (prefers-reduced-motion: no-preference) {
+  .poster.lead-new .art { animation: lead-glow 1.6s ease-out; }
+}
+@keyframes lead-glow {
+  0%, 40% { box-shadow: 0 0 0 0 transparent; }
+  60% { box-shadow: 0 0 0 3px var(--accent), 0 0 28px color-mix(in srgb, var(--accent) 55%, transparent); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
 
 .poster.suggested .suggested-by {
   margin-top: 4px;
@@ -1359,6 +1683,125 @@ button.queue-slot:hover .plus { transform: rotate(90deg); }
 }
 .playlist-group .group-head { margin-bottom: -24px; }
 .playlist .empty { margin-top: 12px; }
+
+/* Music "Community Recs" (assets/js/recs.js): search Spotify, pick a song, send it to Nick's playlist */
+.recs [hidden] { display: none !important; }
+.recs, .recs .playlist { min-width: 0; } /* grid items: let long one-line titles shrink instead of widening the panel */
+.rec-form { margin-top: 20px; }
+.rec-search { position: relative; }
+.rec-search input {
+  width: 100%;
+  padding: 14px 44px 14px 18px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #000;
+  color: var(--fg);
+  font: inherit;
+  font-size: 1rem;
+}
+.rec-search input:focus { outline: none; border-color: var(--accent); }
+.rec-search input::-webkit-search-cancel-button { filter: invert(1) opacity(0.5); }
+.rec-spin {
+  position: absolute;
+  top: 50%;
+  right: 18px;
+  width: 16px;
+  height: 16px;
+  margin-top: -8px;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: rec-spin 0.8s linear infinite;
+}
+@keyframes rec-spin { to { transform: rotate(360deg); } }
+.rec-results { margin-top: 10px; max-height: 420px; overflow-y: auto; }
+.rec-results button[disabled] { opacity: 0.45; cursor: default; }
+.rec-results .recent-row .recent-when { color: var(--accent); }
+.rec-results button[disabled] .recent-when { color: var(--faint); }
+.rec-none { padding: 14px; color: var(--muted); font-size: 0.9rem; }
+.rec-e {
+  display: inline-grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  margin-left: 2px;
+  border-radius: 3px;
+  background: var(--muted);
+  color: #000;
+  font-size: 9px;
+  font-weight: 700;
+  text-decoration: none;
+  vertical-align: 1px;
+}
+.rec-pick {
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
+  border-radius: 16px;
+  background: var(--panel);
+}
+.rec-chosen { display: grid; grid-template-columns: 48px 1fr auto; gap: 14px; align-items: center; padding: 4px; }
+.rec-cancel {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.rec-cancel:hover { color: var(--fg); border-color: var(--fg); }
+.rec-send { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 10px 4px 4px; }
+.rec-send input {
+  flex: 1 1 200px;
+  padding: 10px 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #000;
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.95rem;
+}
+.rec-send input:focus { outline: none; border-color: var(--accent); }
+.rec-send .open { cursor: pointer; background: transparent; color: var(--fg); font: inherit; font-size: 0.9rem; border-color: var(--accent); }
+.rec-send .open[disabled] { opacity: 0.6; cursor: default; }
+.rec-send .left { font-size: 0.8rem; color: var(--faint); }
+.rec-out { margin: 8px 4px 4px; color: var(--muted); font-size: 0.9rem; }
+.rec-msg { margin: 12px 0 0; min-height: 1.2em; font-size: 0.9rem; color: var(--muted); }
+.rec-msg.ok { color: var(--accent); }
+.rec-msg.error { color: #ff8a8a; }
+.rec-sent { margin-top: 40px; }
+.rec-sent h3 { margin: 0; font-family: var(--display); font-weight: 600; font-size: 1.1rem; letter-spacing: -0.02em; }
+.rec-sent-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.rec-all { cursor: pointer; background: transparent; color: var(--fg); font: inherit; font-size: 0.85rem; padding: 7px 16px; }
+/* each sent song plays in the player above (the whole row is the play button); Remove sits above it */
+.rec-row { position: relative; cursor: pointer; }
+.rec-play { position: absolute; inset: 0; width: 100%; border: 0; border-radius: 10px; background: transparent; cursor: pointer; }
+.rec-play:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.rec-row:has(.rec-play:hover) { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.rec-row:has(.rec-play:hover) .recent-play, .rec-row:has(.rec-play:focus-visible) .recent-play { opacity: 1; }
+.rec-row .recent-art, .rec-row .recent-text { pointer-events: none; }
+.rec-remove {
+  position: relative;
+  margin-left: 6px;
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.rec-remove:hover { color: #ff8a8a; border-color: #ff8a8a; }
+.rec-more { margin-top: 14px; cursor: pointer; background: transparent; color: var(--fg); font: inherit; font-size: 0.85rem; }
+@media (max-width: 560px) {
+  .rec-chosen { grid-template-columns: 44px 1fr auto; gap: 12px; }
+  .rec-list .recent-row { grid-template-columns: 44px 1fr; }
+  .rec-list .recent-when { grid-column: 2; }
+}
 
 .player {
   border-radius: 14px;

@@ -1,4 +1,6 @@
 import { golfRoute } from "./golf.js";
+import { musicRoute, MUSIC_SCOPES } from "./music.js";
+import { votesRoute } from "./votes.js";
 
 // nickmade-queue: the live sections of the Movies and Games pages: visitor suggestions for "In the Queue",
 // Nick's "Recently Watched"/"Recently Played" lists, and Nick's site-added picks for other sections.
@@ -25,7 +27,8 @@ import { golfRoute } from "./golf.js";
 //   DELETE /lists/:page/:list/:imdbId  remove one (admin)
 //   GET    /xbox/recent         (admin) your most recently played Xbox games via OpenXBL, with playtime and achievements
 //   POST   /xbox/import         { games: [{ titleId, date }] } (admin) -> logs them in Games' Recently Played
-//   POST   /xbox/sync           (admin) run the nightly Recently Played refresh now (see scheduled() below)
+//   POST   /xbox/sync           (admin) run the nightly Recently Played refresh and gamerscore snapshot now (see scheduled() below)
+//   GET    /xbox/gamerscore     Nick's total gamerscore and how much it went up since the night before (Games banner)
 //                               (or refreshes their Xbox stats if already there), poster from PosterSpy or the Xbox store
 //   GET    /spotify/top?playlist=<id>  the first song on a public Spotify playlist (home page "Lately" strip)
 //   GET    /spotify/now         what Nick is playing on Spotify now, or his last played song (home "Lately" strip)
@@ -36,6 +39,8 @@ import { golfRoute } from "./golf.js";
 //                               (POST /queue as owner, POST /watched and POST /lists take the picked one as body.poster)
 //   GET    /img?u=url           image proxy for posters (allowlisted hosts only)
 //   /golf/leaderboard           Nick's Nine leaderboard (GET, POST; DELETE /golf/leaderboard/:id as admin), see golf.js
+//   /music/search, /music/recs  Music's "Suggest a song": songs added to Nick's private community playlist, see music.js
+//   GET/POST /votes             upvotes on In the Queue (Movies and Games), see votes.js
 //
 // Storage: one KV namespace (QUEUE). Keys (Movies keeps the original unprefixed names):
 //   queue / queue:games            JSON array of queue submissions
@@ -43,7 +48,9 @@ import { golfRoute } from "./golf.js";
 //   lists:<page>                   JSON object { <section key>: [items] } for the other live sections
 //   visitor:<hash> / visitor:games:<hash>  number of queue submissions from that visitor (browser id or hashed IP)
 //   spotify:refresh / spotify:access / spotify:now / spotify:state:<x>  Spotify login and a 1-minute cache
+//   spotify:scope                  the permissions granted at the last connect; music:* keys are in music.js
 //   xbox:recent                    10-minute cache of /xbox/recent (OpenXBL allows 150 requests/hour, shared with the Montage app)
+//   xbox:gamerscore                { total, at, history: [{ date, total }] }: one snapshot a night, the last 60 kept
 
 const PER_VISITOR = 3;
 // Recently Watched/Played shows the newest 12 by date; older ones move to watched-archive (listed under the section).
@@ -71,6 +78,8 @@ function watchedKey(page) {
 }
 const IMG_HOSTS = ["m.media-amazon.com", "alternativemovieposters.com", "store-images.s-microsoft.com", "media.posterspy.com"];
 const XBOX_RECENT = 30; // how many recent Xbox games /xbox/recent lists
+const GAMERSCORE_KEY = "xbox:gamerscore";
+const GAMERSCORE_NIGHTS = 60;
 const BLOCKED = ["fuck", "shit", "cunt", "nigg", "fag", "retard", "bitch", "whore", "slut", "nazi", "rape", "porn", "dick", "cock", "pussy"];
 
 export default {
@@ -87,11 +96,16 @@ export default {
       if (url.pathname === "/xbox/import" && request.method === "POST") return await xboxImport(request, env, cors);
       if (url.pathname === "/xbox/sync" && request.method === "POST") {
         if (!isAdmin(request, env)) return json({ error: "Unauthorized" }, 401, cors);
-        try { return json(await syncRecentlyPlayed(env), 200, cors); } catch (e) {
+        try {
+          const result = await syncRecentlyPlayed(env);
+          result.gamerscore = (await recordGamerscore(env)).total;
+          return json(result, 200, cors);
+        } catch (e) {
           if (e instanceof XblError) return json({ error: e.message }, 502, cors);
           throw e;
         }
       }
+      if (url.pathname === "/xbox/gamerscore" && request.method === "GET") return await gamerscore(env, cors);
       if (url.pathname === "/lists" && request.method === "GET") return await getLists(url, env, cors);
       if (url.pathname === "/lists" && request.method === "POST") return await addToList(request, env, cors);
       if (url.pathname.startsWith("/lists/") && request.method === "DELETE") return await removeFromList(request, url, env, cors);
@@ -124,6 +138,14 @@ export default {
         const res = await golfRoute(request, url, env, cors, { json, isAdmin, sha256, normalize, BLOCKED });
         if (res) return res;
       }
+      if (url.pathname === "/votes") {
+        const res = await votesRoute(request, url, env, cors, { json, sha256, normalize, pageOf, queueState, suggesterId, isAdmin });
+        if (res) return res;
+      }
+      if (url.pathname.startsWith("/music/")) {
+        const res = await musicRoute(request, url, env, cors, { json, isAdmin, normalize, BLOCKED, visitorKeys, usedBy, suggesterId, spotifyAccess });
+        if (res) return res;
+      }
       return json({ error: "Not found" }, 404, cors);
     } catch (err) {
       return json({ error: "Something went wrong. Try again in a bit." }, 500, cors);
@@ -135,6 +157,7 @@ export default {
   async scheduled(event, env, ctx) {
     if (hourIn(env.TIMEZONE, new Date(event.scheduledTime)) !== 0) return;
     ctx.waitUntil(syncRecentlyPlayed(env).catch((e) => console.log("nightly Xbox sync failed:", e.message)));
+    ctx.waitUntil(recordGamerscore(env).catch((e) => console.log("nightly gamerscore failed:", e.message)));
   },
 };
 
@@ -234,7 +257,10 @@ async function queueState(env, page) {
   }
   const ownerCount = owner ? owner.length : page === "movies" ? parseInt(env.OWNER_QUEUE_FALLBACK, 10) || 0 : 0;
   const items = await getQueue(env, page);
-  return { limit, owner: owner || [], items, open: ownerCount + items.length < limit, remaining: Math.max(0, limit - ownerCount - items.length) };
+  return {
+    limit, owner: owner || [], ownerKnown: owner !== null, items,
+    open: ownerCount + items.length < limit, remaining: Math.max(0, limit - ownerCount - items.length),
+  };
 }
 
 // ---------- routes ----------
@@ -996,6 +1022,35 @@ async function syncRecentlyPlayed(env) {
   return result;
 }
 
+// ---------- Gamerscore banner (Games page) ----------
+
+// Nick's total gamerscore (1 OpenXBL request), saved by the nightly cron. The banner shows the total and the
+// change since the previous night's snapshot ("+75G in the last 24h").
+async function recordGamerscore(env) {
+  const account = await xbl(env, "/account");
+  const settings = ((account.profileUsers || [])[0] || {}).settings || [];
+  const total = parseInt((settings.find((s) => s.id === "Gamerscore") || {}).value, 10);
+  if (!(total >= 0)) throw new XblError("Xbox didn't send a gamerscore.");
+  const saved = (await env.QUEUE.get(GAMERSCORE_KEY, "json")) || { history: [] };
+  const date = dateIn(env.TIMEZONE, new Date().toISOString());
+  const history = saved.history.filter((h) => h.date !== date).concat({ date, total }).slice(-GAMERSCORE_NIGHTS);
+  const out = { total, at: new Date().toISOString(), history };
+  await env.QUEUE.put(GAMERSCORE_KEY, JSON.stringify(out));
+  return out;
+}
+
+async function gamerscore(env, cors) {
+  let saved = await env.QUEUE.get(GAMERSCORE_KEY, "json");
+  if (!saved) { // first visit before the first nightly snapshot
+    try { saved = await recordGamerscore(env); } catch (e) {
+      if (e instanceof XblError) return json({ error: e.message }, 502, cors);
+      throw e;
+    }
+  }
+  const prev = saved.history.length > 1 ? saved.history[saved.history.length - 2] : null;
+  return json({ total: saved.total, gained: prev ? saved.total - prev.total : null, at: saved.at }, 200, cors);
+}
+
 // ---------- Spotify: top song of a public playlist ----------
 
 // Spotify's embed page carries the playlist's track list in its __NEXT_DATA__ JSON, so no API key or
@@ -1028,9 +1083,10 @@ async function spotifyTop(url, cors) {
 //
 // One-time setup: a Spotify developer app (SPOTIFY_CLIENT_ID in wrangler.toml, SPOTIFY_CLIENT_SECRET as a
 // secret) with this Worker's /spotify/callback as a redirect URI, then tools/spotify_connect.py to sign in.
-// Scopes are read-only: currently playing and recently played.
+// Scopes: currently playing and recently played (read-only), plus reading and editing private playlists for
+// Music's community playlist (music.js). Adding a scope means running tools/spotify_connect.py again.
 
-const SPOTIFY_SCOPES = "user-read-currently-playing user-read-recently-played";
+const SPOTIFY_SCOPES = "user-read-currently-playing user-read-recently-played " + MUSIC_SCOPES;
 
 // Must match a redirect URI in the Spotify app exactly. Set per environment (wrangler dev reports the live
 // hostname in request.url, so it can't be worked out from the request locally).
@@ -1084,6 +1140,7 @@ async function spotifyCallback(url, env) {
     const t = await spotifyToken(env, { grant_type: "authorization_code", code: url.searchParams.get("code") || "", redirect_uri: spotifyRedirect(url, env) });
     await env.QUEUE.put("spotify:refresh", t.refresh_token);
     await env.QUEUE.put("spotify:access", t.access_token, { expirationTtl: Math.max(60, (t.expires_in || 3600) - 120) });
+    await env.QUEUE.put("spotify:scope", t.scope || "");
     await env.QUEUE.delete("spotify:now");
   } catch (e) {
     return page("Not connected", String(e.message));

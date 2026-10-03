@@ -13,6 +13,17 @@
 // New movies, games, or photos don't need a version (that's content; the home Lately strip covers it).
 window.CHANGELOG = [
   {
+    version: "1.2",
+    date: "2026-10-02",
+    title: "Have your say",
+    changes: [
+      { page: "site", text: "Vote on what I should watch or play next. The most-voted movies and games move to the front of the queue." },
+      { page: "site", text: "Poster wall: every poster on the page in one slowly drifting wall. Hover for the details, click one to jump to it." },
+      { page: "games", text: "My Xbox gamerscore up top, with how much I've earned in the last day. Click it to see all my achievements." },
+      { page: "music", text: "Send me a song: search Spotify and it goes straight onto my Community Recs playlist. You can play everything people have sent right on the page." }
+    ]
+  },
+  {
     version: "1.1",
     date: "2026-10-01",
     title: "Say why",

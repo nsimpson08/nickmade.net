@@ -16,7 +16,7 @@
   h.textContent = "Recently Listened";
   var sub = document.createElement("small");
   sub.className = "recent-sub";
-  sub.textContent = "recent 10";
+  sub.textContent = "";
   h.appendChild(sub);
   section.appendChild(h);
   var player = document.createElement("div");
@@ -59,15 +59,33 @@
     queued = uri;
     if (loading) return;
     loading = true;
-    window.onSpotifyIframeApiReady = function (IFrameAPI) {
+    spotifyApi(function (IFrameAPI) {
       IFrameAPI.createController(embed, { uri: queued, width: "100%", height: 80 }, function (c) {
         controller = c;
         c.addListener("ready", function () { c.play(); });
         c.addListener("playback_update", function (e) {
+          var was = paused;
           paused = !!(e.data && e.data.isPaused);
+          if (was && !paused) document.dispatchEvent(new CustomEvent("nm-spotify-play", { detail: "recent" }));
           mark();
         });
       });
+    });
+  }
+  // Only one song at a time: pause when Community Recs (recs.js) starts playing
+  document.addEventListener("nm-spotify-play", function (e) {
+    if (e.detail !== "recent" && controller && !paused) controller.pause();
+  });
+
+  // Spotify's iFrame API, loaded once and shared with recs.js (it calls onSpotifyIframeApiReady a single time)
+  function spotifyApi(cb) {
+    if (window.NMSpotifyAPI) return cb(window.NMSpotifyAPI);
+    var wait = window.NMSpotifyWait = window.NMSpotifyWait || [];
+    wait.push(cb);
+    if (wait.length > 1) return;
+    window.onSpotifyIframeApiReady = function (api) {
+      window.NMSpotifyAPI = api;
+      wait.splice(0).forEach(function (f) { f(api); });
     };
     var sc = document.createElement("script");
     sc.src = "https://open.spotify.com/embed/iframe-api/v1";

@@ -288,8 +288,129 @@
         var g = grid();
         (data.items || []).forEach(function (it) { if (!inSection(section, it.title)) g.appendChild(card(it)); });
         renderSlot(data);
+        return loadVotes();
       })
       .catch(function () { /* service unreachable: just show your own queue */ });
+  }
+
+  // ---------- votes on In the Queue ----------
+  // Every queue poster (list.js picks and suggestions) gets an upvote button under it, right of the title; most-voted go first.
+  // The order is set when the page loads, not on each click, so a poster doesn't jump away from the cursor.
+  // Every title starts at 1: whoever added it counts as its first vote. So a visitor's own suggestion shows as voted
+  // and can't be clicked, and in owner mode the pills only show the counts (Nick's picks are already his votes).
+  // Votes are keyed by sameTitle() (the Worker's normalize). See worker/src/votes.js.
+  var votes = {}, myVotes = {}, ownVotes = {};
+  var ARROW = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5 13 9.5H9.6V13H6.4V9.5H3z" fill="currentColor"/></svg>';
+  function loadVotes() {
+    return fetch(API + "/votes?" + PQ + "&visitorId=" + encodeURIComponent(VID))
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        votes = d.votes || {};
+        myVotes = {};
+        ownVotes = {};
+        (d.mine || []).forEach(function (k) { myVotes[k] = true; });
+        (d.own || []).forEach(function (k) { ownVotes[k] = true; });
+        applyVotes(true);
+      })
+      .catch(function () {});
+  }
+  function queuePosters() {
+    return [].filter.call(grid().querySelectorAll(".poster"), function (fig) { return fig.querySelector(".title"); });
+  }
+  function voteKey(fig) { return sameTitle(fig.querySelector(".title").textContent); }
+  function voteCount(k) { return votes[k] || 1; } // 1 = just the adder's vote
+  function paintVote(btn, k) {
+    var n = voteCount(k), own = !!ownVotes[k], on = own || !!myVotes[k];
+    var votes_ = n + (n === 1 ? " vote" : " votes");
+    btn.classList.toggle("on", on);
+    btn.classList.toggle("own", own);
+    btn.classList.toggle("display", !!ADMIN);
+    btn.disabled = own || !!ADMIN;
+    btn.setAttribute("aria-pressed", String(on));
+    btn.title = own ? "Your suggestion counts as your vote" : ADMIN ? votes_ : "";
+    btn.setAttribute("aria-label", own ? "Your suggestion counts as your vote (" + votes_ + ")"
+      : ADMIN ? votes_ : (on ? "Take back your vote" : "Upvote") + " (" + votes_ + ")");
+    btn.querySelector(".n").textContent = n;
+  }
+  function applyVotes(sort) {
+    if (!section) return;
+    if (!ADMIN && !section.querySelector(".vote-hint")) {
+      var hint = document.createElement("p");
+      hint.className = "vote-hint";
+      hint.innerHTML = ARROW + "<span>Vote for what I should " + (PAGE === "games" ? "play" : "watch") + " next</span>";
+      section.querySelector(".subhead").after(hint);
+    }
+    queuePosters().forEach(function (fig) {
+      var k = voteKey(fig);
+      var btn = fig.querySelector(".vote");
+      if (!btn) {
+        btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "vote";
+        btn.innerHTML = ARROW + '<span class="n"></span>';
+        btn.addEventListener("click", function () { castVote(btn, k); });
+        (fig.querySelector("figcaption") || fig).appendChild(btn); // under the poster, on the right of the title
+      }
+      paintVote(btn, k);
+    });
+    if (!sort) return;
+    // Most votes first; ties keep their current order (Array sort is stable). The + card stays last.
+    var g = grid();
+    queuePosters()
+      .map(function (fig, i) { return { fig: fig, i: i, n: voteCount(voteKey(fig)) }; })
+      .sort(function (a, b) { return b.n - a.n || a.i - b.i; })
+      .forEach(function (x) { g.insertBefore(x.fig, slot && slot.parentNode === g ? slot : null); });
+  }
+  // A vote that gives a poster more votes than every other one (a tie isn't enough) slides it into the first slot,
+  // the rest sliding along one place to make room (FLIP: note where everything is, move it, then animate from there).
+  function takeTheLead(fig, k) {
+    var all = queuePosters();
+    if (all[0] === fig) return;
+    var n = voteCount(k);
+    var beaten = all.every(function (f) { return f === fig || voteCount(voteKey(f)) < n; });
+    if (!beaten) return;
+    var g = grid();
+    var moving = all.concat(slot && slot.parentNode === g ? [slot] : []);
+    var before = moving.map(function (el) { return el.getBoundingClientRect(); });
+    g.insertBefore(fig, all[0]);
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    fig.classList.add("lead-new"); // above the others while it passes over them, then a glow
+    moving.forEach(function (el, i) {
+      var now = el.getBoundingClientRect();
+      var dx = before[i].left - now.left, dy = before[i].top - now.top;
+      if (!dx && !dy) return;
+      el.animate([{ transform: "translate(" + dx + "px," + dy + "px)" }, { transform: "none" }],
+        { duration: el === fig ? 750 : 550, easing: "cubic-bezier(.2,.8,.2,1)" });
+    });
+    setTimeout(function () { fig.classList.remove("lead-new"); }, 1600);
+  }
+  function castVote(btn, k) {
+    var fig = btn.closest(".poster");
+    if (ownVotes[k] || ADMIN) return;
+    var on = !myVotes[k];
+    // show it right away; put it back if the Worker says no
+    var before = { n: voteCount(k), on: !!myVotes[k] };
+    votes[k] = before.n + (on ? 1 : -1);
+    if (on) myVotes[k] = true; else delete myVotes[k];
+    paintVote(btn, k);
+    btn.disabled = true;
+    fetch(API + "/votes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ page: PAGE, title: fig.querySelector(".title").textContent, visitorId: VID, vote: on }),
+    })
+      .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || "Couldn't save your vote."); return d; }); })
+      .then(function (d) {
+        votes[k] = d.count;
+        if (d.voted) myVotes[k] = true; else delete myVotes[k];
+        if (d.voted) takeTheLead(fig, k);
+      })
+      .catch(function (e) {
+        votes[k] = before.n;
+        if (before.on) myVotes[k] = true; else delete myVotes[k];
+        alert(e.message);
+      })
+      .then(function () { paintVote(btn, k); });
   }
 
   // ---------- live sections (owner adds from the site) ----------
@@ -478,6 +599,7 @@
           return fetch(API + "/queue?" + PQ + "&visitorId=" + encodeURIComponent(VID), { headers: authHeaders() }).then(function (r) { return r.json(); }).then(function (data) {
             grid().querySelectorAll(".poster.suggested").forEach(function (el) { el.remove(); });
             (data.items || []).forEach(function (it) { if (!inSection(section, it.title)) grid().insertBefore(card(it), slot); });
+            applyVotes(true);
             state = data;
             renderSlot(data);
           });
@@ -869,6 +991,8 @@
           return reloadWatched();
         }
         grid().insertBefore(card(res.d.item), slot);
+        if (!ADMIN) ownVotes[sameTitle(res.d.item.title)] = true; // their suggestion is their vote
+        applyVotes(false);
         state.yourRemaining = res.d.yourRemaining;
         state.remaining = res.d.remaining;
         state.open = res.d.open;
@@ -901,6 +1025,7 @@
         if (!res.ok) { errorEl.textContent = res.d.error || "Couldn't save that."; validate(); return; }
         var old = section.querySelector('.poster.suggested[data-imdb="' + it.imdbId + '"]');
         if (old) old.replaceWith(card(res.d.item));
+        applyVotes(false);
         dialog.close();
       })
       .catch(function () { errorEl.textContent = "Couldn't reach the server. Try again in a bit."; validate(); });
