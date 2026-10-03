@@ -1,5 +1,6 @@
 // Home page "Lately" strip: the newest game from Games' Recently Played, the newest movie from Movies'
-// Recently Watched (with its rating), and what's playing on Nick's Spotify (or his last played song). Without
+// Recently Watched (with its rating), what's playing on Nick's Spotify (or his last played song), and his newest golf
+// round from any source on the Golf page (score, to-par when known, course). Without
 // Spotify it falls back to the top song on Music's Lately playlist, then that playlist's name.
 // Updates itself as those lists change.
 // A spinner shows while they load; parts that can't load are left out, and if none load, the strip hides.
@@ -102,11 +103,35 @@
     return m;
   }
 
+  // The newest golf round from any source on the Golf page: Trackman (trackman.js + GOLF.trackman), X-Golf, 18Birdies
+  // (scores.js). Read like now.js's other data, without touching this page's globals.
+  function loadData(src, name) {
+    return fetch(src)
+      .then(function (r) { return r.ok ? r.text() : ""; })
+      .then(function (code) { var w = {}; try { new Function("window", code)(w); } catch (e) {} return w[name]; })
+      .catch(function () { return undefined; });
+  }
+  function latestRound() {
+    return Promise.all([loadData("/extras/golf/scores.js", "GOLF"), loadData("/extras/golf/trackman.js", "GOLF_TRACKMAN")]).then(function (d) {
+      var golf = d[0] || {};
+      var rounds = (d[1] || []).concat(golf.trackman || [], golf.xgolf || [], golf.birdies || [])
+        .filter(function (r) { return r && r.date && r.score && r.course && !r.hidden && !r.example; })
+        .sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
+      return rounds[0] || null;
+    });
+  }
+  function golf(r) {
+    var toPar = r.toPar != null ? r.toPar : r.par ? r.score - r.par : null; // X-Golf rounds don't know par
+    var par = toPar == null ? "" : ' <span class="now-par">' + (toPar === 0 ? "E" : (toPar > 0 ? "+" : "") + toPar) + (r.net ? " net" : "") + "</span>";
+    return part("golf", "/extras/golf/", 'shot <span class="now-score">' + esc(r.score) + "</span>" + par + " at", r.course, "", ago(r.date));
+  }
+
   // Each part shows up as soon as it loads (in its fixed order), with a spinner after them until the last one is in
   var sources = [
     [API ? newest("games") : null, function (g) { return part("games", "/games/#recently-played", "playing", g.title, stars(g.rating), ago(g.date)); }],
     [API ? newest("movies") : null, function (mv) { return part("movies", "/movies/#recently-watched", "watched", mv.title, stars(mv.rating), ago(mv.date)); }],
     [listening(), music],
+    [latestRound(), golf],
   ];
   var slots = sources.map(function () { return ""; });
   var pending = sources.length;

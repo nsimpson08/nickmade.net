@@ -356,6 +356,8 @@ def main():
 
     total = sum(p["bytes"] for p in photos)
     print("\n%d photo(s), %.1f MB full resolution. photography/photos.js updated." % (len(photos), total / 1e6))
+    # the poster walls' small copies (photography/thumbs/), made from the 800px sizes
+    subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "thumbs.py")])
     if full_url:
         return sync_r2(photos)
     big = [p["src"] for p in photos if p["bytes"] > 50e6]

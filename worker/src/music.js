@@ -8,8 +8,13 @@
 //   POST   /music/recs               { trackId, name?, visitorId } -> adds the song to the playlist; with the admin token
 //                                    it's Nick's own (no name, no limit)
 //   DELETE /music/recs/:trackId      Nick (admin), or the visitor who suggested it (?visitorId=), which gives it back
+//   GET    /music/covers             album covers from the playlists on the Music page (for its poster wall):
+//                                    { albums: [{ album, artist, image, trackId, playlist }] }, one per album, cached 6h.
+//                                    The playlists are the ones in the live site's music/playlist.js, so nothing else
+//                                    can be fetched through it.
 //
 // Storage (the QUEUE namespace): music:recs  JSON array of suggestions, newest first
+//                                music:covers  6-hour cache of /music/covers
 //                                music:playlist  the playlist's Spotify id (found by name, or created, on first use)
 //                                visitor:music:<hash>  songs suggested by that visitor (browser id or hashed IP)
 //                                spotify:scope  the permissions Nick granted at the last connect
@@ -26,6 +31,7 @@ export async function musicRoute(request, url, env, cors, h) {
   if (url.pathname === "/music/recs" && request.method === "GET") return list(request, url, env, cors, h);
   if (url.pathname === "/music/recs" && request.method === "POST") return add(request, env, cors, h);
   if (url.pathname.startsWith("/music/recs/") && request.method === "DELETE") return remove(request, url, env, cors, h);
+  if (url.pathname === "/music/covers" && request.method === "GET") return covers(env, cors, h);
   return null;
 }
 
@@ -211,4 +217,55 @@ async function remove(request, url, env, cors, h) {
     for (const k of keys) await env.QUEUE.put(k, String(Math.max(0, used - 1)));
   }
   return h.json({ removed: 1 }, 200, cors);
+}
+
+// ---------- album covers for the Music poster wall ----------
+
+const COVERS = "music:covers";
+const COVERS_TTL = 6 * 3600;
+const COVERS_PER_PLAYLIST = 500;
+
+// [{ id, title }] for each Spotify playlist link in the live site's music/playlist.js
+async function sitePlaylists(env) {
+  const res = await fetch(env.SITE_URL.replace(/\/$/, "") + "/music/playlist.js", { cf: { cacheTtl: 300 } });
+  const text = await res.text();
+  const out = [];
+  for (const m of text.matchAll(/title:\s*"([^"]*)"[\s\S]*?url:\s*"([^"]*)"/g)) {
+    const id = (m[2].match(/open\.spotify\.com\/(?:intl-[a-z-]+\/)?playlist\/([A-Za-z0-9]+)/) || [])[1];
+    if (id && !out.some((p) => p.id === id)) out.push({ id, title: m[1] });
+  }
+  return out;
+}
+
+async function covers(env, cors, h) {
+  const cached = await env.QUEUE.get(COVERS, "json");
+  if (cached) return h.json(cached, 200, cors);
+  const albums = [];
+  const seen = new Set();
+  try {
+    for (const pl of await sitePlaylists(env)) {
+      let next = "/playlists/" + pl.id + "/items?limit=50";
+      for (let n = 0; next && n < COVERS_PER_PLAYLIST; n += 50) {
+        const res = await api(env, h, next);
+        if (!res.ok) break; // a playlist Spotify won't share is skipped, not fatal
+        const data = await res.json();
+        for (const it of data.items || []) {
+          const t = it && (it.item || it.track);
+          if (!t || t.type !== "track" || !t.id || !t.album) continue;
+          const key = t.album.id || t.album.name;
+          if (seen.has(key)) continue;
+          const s = song(t);
+          if (!s.image) continue;
+          seen.add(key);
+          albums.push({ album: t.album.name, artist: s.artist, image: s.image, trackId: t.id, playlist: pl.title });
+        }
+        next = data.next ? data.next.replace("https://api.spotify.com/v1", "") : null;
+      }
+    }
+  } catch (e) {
+    if (!albums.length) return h.json({ error: "Spotify isn't available right now." }, 502, cors);
+  }
+  const out = { albums, fetchedAt: new Date().toISOString() };
+  if (albums.length) await env.QUEUE.put(COVERS, JSON.stringify(out), { expirationTtl: COVERS_TTL });
+  return h.json(out, 200, cors);
 }

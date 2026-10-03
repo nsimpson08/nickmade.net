@@ -1,8 +1,8 @@
 :root {
   --bg: #000;
   --fg: #ecebe7;
-  --muted: #8a8882;
-  --faint: #55534f;
+  --muted: #9d9b95; /* subtexts (a shade whiter on 2026-10-02; was #8a8882) */
+  --faint: #6b6964; /* dates, small labels, the footer (was #55534f) */
   --line: #1f1f22;
   --panel: #0b0b0d;
   --mint: #7ee0b5;
@@ -116,6 +116,9 @@ img { display: block; max-width: 100%; }
 .now-games .now-title { color: var(--violet); }
 .now-movies .now-title { color: var(--amber); }
 .now-music .now-title { color: var(--pink); }
+.now-golf .now-title { color: var(--mint); }
+.now-score { color: var(--fg); font-weight: 500; }
+.now-par { color: var(--mint); font-size: 0.8rem; }
 .now-extra { color: var(--amber); letter-spacing: 0.04em; font-size: 0.8rem; }
 .now-games .now-extra { color: var(--violet); }
 .now-music .now-extra { color: var(--muted); letter-spacing: 0; font-size: 0.88rem; }
@@ -134,10 +137,10 @@ img { display: block; max-width: 100%; }
   mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
   animation: spin .9s linear infinite;
 }
-@media (max-width: 560px) {
-  .banner p.now { flex-direction: column; align-items: center; gap: 6px; }
-  .now-sep { display: none; }
-}
+/* Stacked on every screen (Nick): "Lately" on top, then playing / watched / listening, one per line, centered */
+.banner p.now { flex-direction: column; align-items: center; gap: 6px; }
+.banner p.now .now-label { margin-bottom: 2px; }
+.now-sep { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .now-label i { animation: none; }
   .banner p.now { transition: none; }
@@ -720,23 +723,68 @@ a.xa-toast:focus-visible { outline: none; }
   background: var(--line);
 }
 
-/* ---------- Poster wall (Movies and Games, assets/js/wall.js) ---------- */
-.wall-open {
+/* ---------- Poster wall (every page, assets/js/wall.js) ---------- */
+/* The header control: one pill, "Poster wall" (opens the interactive wall) | a switch (the page background) */
+.wall-ctl {
   display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 14px;
+  align-items: stretch;
+  height: 34px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: transparent;
-  color: var(--muted);
-  font: inherit;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: border-color .2s, color .2s;
+  transition: border-color .2s;
 }
+.wall-ctl:hover, .wall-ctl:focus-within { border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); }
+.wall-ctl button { border: 0; background: transparent; font: inherit; cursor: pointer; }
+.wall-ctl .wall-open {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  padding: 0 9px 0 12px;
+  border-radius: 999px 0 0 999px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  white-space: nowrap;
+  transition: color .2s;
+}
+/* just the icon; "Poster wall" appears as a small tag under it on hover or keyboard focus (touch screens: icon only).
+   It floats, so the header never shifts. */
+.wall-label {
+  position: absolute;
+  top: calc(100% + 9px);
+  left: 50%;
+  z-index: 6;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(10, 10, 12, 0.92);
+  color: var(--fg);
+  font-size: 0.75rem;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -4px);
+  transition: opacity .2s, transform .2s;
+}
+.wall-ctl .wall-open:hover .wall-label, .wall-ctl .wall-open:focus-visible .wall-label { opacity: 1; transform: translate(-50%, 0); }
+@media (hover: none) { .wall-ctl .wall-open:hover .wall-label { opacity: 0; } }
+.wall-ctl .wall-open:hover, .wall-ctl .wall-open:focus-visible { color: var(--accent); outline: none; }
 .wall-open svg, .wall-name svg { width: 14px; height: 14px; fill: currentColor; }
-.wall-open:hover, .wall-open:focus-visible { border-color: var(--accent); color: var(--accent); outline: none; }
+.bg-toggle { display: inline-grid; place-items: center; padding: 0 12px 0 10px; border-left: 1px solid var(--line) !important; }
+.bg-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: -5px; border-radius: 999px; }
+.bg-toggle .knob { position: relative; width: 28px; height: 16px; border-radius: 999px; background: #2b2b30; transition: background .2s; }
+.bg-toggle .knob::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform .2s, background .2s;
+}
+.bg-toggle:hover .knob::after { background: var(--fg); }
+.bg-toggle[aria-checked="true"] .knob { background: color-mix(in srgb, var(--accent) 40%, #2b2b30); }
+.bg-toggle[aria-checked="true"] .knob::after { transform: translateX(12px); background: var(--accent); }
 html.wall-on { overflow: hidden; }
 .wall {
   position: fixed;
@@ -850,12 +898,103 @@ html.wall-on { overflow: hidden; }
   align-items: start;
   transform: none;
 }
-/* background mode (wall.js, data-background on the script tag): the same wall behind the page, dimmed by
-   --wall-shade, with no hover, captions or clicks */
+/* Music: square album covers; the clicked one is outlined while its song plays in the player at the bottom */
+.wall.albums .wall-tile { aspect-ratio: 1; }
+.wall-tile.playing { outline: 3px solid var(--accent); outline-offset: -3px; opacity: 1 !important; }
+.wall-player {
+  position: absolute;
+  left: 50%;
+  bottom: 20px;
+  z-index: 3;
+  width: min(480px, calc(100% - 32px));
+  transform: translateX(-50%);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+}
+.wall-player[hidden] { display: none; }
+.wall-player iframe { display: block; width: 100% !important; border: 0; }
+/* Extras: 16:9 tiles; clips fade in over their still frame once playing; rounds carry their score */
+.wall.extras .wall-tile { aspect-ratio: 16 / 9; }
+.wall-tile video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .4s; }
+.wall-tile video.in { opacity: 1; }
+.wall-score {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.62);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.wall-score b { font-family: var(--display); font-size: 0.95rem; }
+.wall-score span { color: var(--accent); }
+/* the header control's place: after the nav at the right end of the top bar; on Home (no top bar) it floats where the
+   other pages have it (top right of the 960px column); on phones it stays on the first row beside the wordmark */
+.topbar:has(.wall-ctl) nav { margin-left: auto; }
+.wall-ctl.floating { position: absolute; top: 28px; right: max(16px, calc((100vw - 960px) / 2 + 16px)); z-index: 5; }
+body:has(.wall-ctl.floating) .home { padding-top: max(14vh, 96px); } /* room for it above the big title on short screens */
+@media (max-width: 560px) {
+  .topbar .wall-ctl { order: 2; margin-left: auto; }
+  .topbar:has(.wall-ctl) nav { order: 3; margin-left: 0; width: 100%; }
+}
+/* the background wall runs behind the page, dimmed by --wall-shade, with no hover, captions or clicks */
 .wall.wall-bg { z-index: -1; pointer-events: none; transition: opacity 1.2s; }
-.wall-bg::after { content: ""; position: absolute; inset: 0; background: rgba(0, 0, 0, var(--wall-shade, 0.75)); }
+/* the dimming: --wall-shade at the sides, a little darker down the middle where the page's text is (the 960px
+   content column, feathered over 120px; on narrow screens the whole width is the middle) */
+.wall-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  --edge: rgba(0, 0, 0, var(--wall-shade, 0.75));
+  --mid: rgba(0, 0, 0, var(--wall-shade, 0.75)); /* behind the content: 25% brightness (was 15%; Nick lightened it 10 points) */
+  background: linear-gradient(90deg, var(--edge) calc(50% - 600px), var(--mid) calc(50% - 480px), var(--mid) calc(50% + 480px), var(--edge) calc(50% + 600px));
+}
+/* Desktop, where there's room either side of the content: the sides are brighter (--wall-shade - 0.2), easing down
+   into the content column's darkness over ~170px (tightened 2026-10-02), so the dark stays close to the text */
+@media (min-width: 1100px) {
+  .wall-bg::after {
+    --side: rgba(0, 0, 0, calc(var(--wall-shade, 0.75) - 0.2));
+    --ease: rgba(0, 0, 0, calc(var(--wall-shade, 0.75) - 0.08));
+    background: linear-gradient(90deg,
+      var(--side) calc(50% - 640px), var(--ease) calc(50% - 545px), var(--mid) calc(50% - 470px),
+      var(--mid) calc(50% + 470px), var(--ease) calc(50% + 545px), var(--side) calc(50% + 640px));
+  }
+  /* Home: its content is wider (1080px) and there's less text to read, so its sides are brighter still (~60%) */
+  .wall-bg.wall-home::after {
+    --side: rgba(0, 0, 0, calc(var(--wall-shade, 0.75) - 0.35));
+    --ease: rgba(0, 0, 0, calc(var(--wall-shade, 0.75) - 0.18));
+    background: linear-gradient(90deg,
+      var(--side) calc(50% - 700px), var(--ease) calc(50% - 600px), var(--mid) calc(50% - 520px),
+      var(--mid) calc(50% + 520px), var(--ease) calc(50% + 600px), var(--side) calc(50% + 700px));
+  }
+}
+/* While the background is on: softly shadowed text, slightly brighter grey text, and a dark fill behind the
+   see-through pills and panels, so everything reads over the posters */
+html.wall-bg-on { --muted: #b9b7b1; --faint: #92908a; }
+html.wall-bg-on body { text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 1px rgba(0, 0, 0, 0.6); }
+html.wall-bg-on .wall:not(.wall-bg) { text-shadow: none; } /* the popup wall has its own caption backgrounds */
+/* gradient-filled text (Home's "Made"): a shadow would paint over the see-through letters, so a glow behind instead */
+html.wall-bg-on .banner h1 .made { text-shadow: none; filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.85)); }
+html.wall-bg-on :is(.jump a, .wall-ctl, .open, .vote:not(.on), .archive-toggle, .layout-toggle, .tags li) {
+  background-color: rgba(0, 0, 0, 0.55);
+}
+html.wall-bg-on .group.panel {
+  background:
+    radial-gradient(95% 65% at 0% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 74%),
+    radial-gradient(95% 65% at 100% 100%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 74%),
+    rgba(8, 8, 10, 0.62);
+}
 .wall-bg .wall-cols:hover .wall-tile { opacity: 1; }
 .wall.wall-bg.still .wall-cols { overflow: hidden; }
+.wall.photos .wall-tile { aspect-ratio: 3 / 2; }
 /* the poster the wall jumped to */
 .poster.wall-found .art, .entry.wall-found .art { animation: lead-glow 2.4s ease-out; }
 
@@ -1818,10 +1957,12 @@ button.queue-slot:hover .plus { transform: rotate(90deg); }
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  justify-content: flex-start;
+  gap: 10px;
   margin-top: -24px;
 }
+/* the Poster wall button (wall.js) beside the Instagram link, the same size as it */
+.photo-controls > *, .photo-controls .open { align-self: center; margin-top: 0; } /* .open pills default to align-self: start, and get a top margin on phones (for the Extras cards) */
 .layout-toggle {
   display: inline-flex;
   border: 1px solid var(--line);

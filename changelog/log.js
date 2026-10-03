@@ -15,10 +15,12 @@ window.CHANGELOG = [
   {
     version: "1.2",
     date: "2026-10-02",
-    title: "Have your say",
+    title: "Posters and upvotes",
     changes: [
       { page: "site", text: "Vote on what I should watch or play next. The most-voted movies and games move to the front of the queue." },
-      { page: "site", text: "Poster wall: every poster on the page in one slowly drifting wall. Hover for the details, click one to jump to it." },
+      { page: "site", text: "Poster wall, top right on every page: every poster, album cover, photo, or game clip in one slowly drifting wall, and on the home page an even mix of all five. Hover for the details, click one to jump to it, or on Music, to play it." },
+      { page: "site", text: "Every page now has a slowly drifting poster wall behind it. Prefer plain black? Flip the switch at the top right, and it stays off as you browse." },
+      { page: "home", text: "Lately now shows my latest golf round too, from the sim or the course." },
       { page: "games", text: "My Xbox gamerscore up top, with how much I've earned in the last day. Click it to see all my achievements." },
       { page: "music", text: "Send me a song: search Spotify and it goes straight onto my Community Recs playlist. You can play everything people have sent right on the page." }
     ]
