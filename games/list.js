@@ -11,6 +11,7 @@
 //            and "watched" (Recently Played: dated and rated, newest first).
 //            Those additions are stored in Cloudflare, not here; run tools/pull_live.py to copy them into this file.
 //            Don't change a key once set (the title can change freely).
+//   archive  optional, "watched" sections only: false hides the Archive link of older entries under it
 //   items    the games, in the order you want them shown
 //
 // Game fields:
@@ -39,6 +40,7 @@ window.SECTIONS = [
     live: "watched",
     title: "Recently Played",
     subtitle: "",
+    archive: false, // no Archive link under it (older games are still kept by the Worker)
     layout: "grid",
     items: []
   },

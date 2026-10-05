@@ -118,7 +118,7 @@
         "</h2>" : "") +
       body(sec) +
       (capped(sec) ? '<div class="cap-more" hidden><button type="button" class="cap-toggle" aria-expanded="false"></button></div>' : "") +
-      (sec.live === "watched" && sec.title // only Recently Watched/Played have an Archive (filled by live.js)
+      (sec.live === "watched" && sec.title && sec.archive !== false // only Recently Watched/Played have an Archive (filled by live.js); archive: false turns it off (Games, 1.3)
         ? '<div class="archive"><button type="button" class="archive-toggle" aria-expanded="false">Archive</button>' +
           '<div class="archive-panel" hidden></div></div>'
         : "") +
