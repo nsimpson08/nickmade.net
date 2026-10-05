@@ -133,8 +133,10 @@
   root.innerHTML = jump + sections.join("");
 
   // ---------- Score Trend chart: 18-hole Trackman and X-Golf scores over time ----------
-  // One strokes axis; 2px lines, 8px dots with a surface ring, a faint least-squares trend per series,
-  // the best round called out. Hover/focus snaps a crosshair to the nearest round; click jumps to its card.
+  // One strokes axis fitted to the scores. Each round is a dot (with a surface ring); the line is each source's rolling
+  // average of its last AVG rounds, drawn as a smooth curve with a soft fill under it (1.3: it replaced round-to-round
+  // lines, which zig-zagged and spiked on two-round days, and the faint least-squares trends). The best round is called
+  // out; each average ends with its current value. Hover/focus snaps a crosshair to the nearest round; click jumps to its card.
   // Colors validated for the dark surface (dataviz validate_palette: lightness, chroma, CVD, contrast).
   var SERIES = [
     { key: "trackman", name: "Trackman", color: "#c97f1c" },
@@ -158,14 +160,38 @@
     return e;
   }
 
-  // Least-squares line through (t, score); null with fewer than 3 rounds
-  function trendLine(pts) {
-    if (pts.length < 3) return null;
-    var n = pts.length, mx = 0, my = 0, sxy = 0, sxx = 0;
-    pts.forEach(function (p) { mx += p.t / n; my += p.r.score / n; });
-    pts.forEach(function (p) { sxy += (p.t - mx) * (p.r.score - my); sxx += (p.t - mx) * (p.t - mx); });
-    var slope = sxx ? sxy / sxx : 0;
-    return function (t) { return my + slope * (t - mx); };
+  // The rolling average after each round (of up to the last AVG rounds); rounds on the same day give one point
+  var AVG = 5;
+  function rolling(pts) {
+    var out = [];
+    pts.forEach(function (p, i) {
+      var win = pts.slice(Math.max(0, i - AVG + 1), i + 1);
+      var v = win.reduce(function (a, q) { return a + q.r.score; }, 0) / win.length;
+      if (out.length && out[out.length - 1].t === p.t) out[out.length - 1].v = v;
+      else out.push({ t: p.t, v: v });
+    });
+    return out;
+  }
+  // A smooth path through points with increasing x that never overshoots them (monotone cubic, Fritsch-Carlson)
+  function smoothPath(xy) {
+    if (xy.length < 3) return xy.map(function (q, i) { return (i ? "L" : "M") + q[0].toFixed(1) + " " + q[1].toFixed(1); }).join("");
+    var n = xy.length, dx = [], m = [], tan = [];
+    for (var i = 0; i < n - 1; i++) { dx[i] = xy[i + 1][0] - xy[i][0]; m[i] = (xy[i + 1][1] - xy[i][1]) / dx[i]; }
+    tan[0] = m[0]; tan[n - 1] = m[n - 2];
+    for (i = 1; i < n - 1; i++) tan[i] = m[i - 1] * m[i] <= 0 ? 0 : (m[i - 1] + m[i]) / 2;
+    for (i = 0; i < n - 1; i++) {
+      if (!m[i]) { tan[i] = tan[i + 1] = 0; continue; }
+      var a = tan[i] / m[i], b = tan[i + 1] / m[i], h = a * a + b * b;
+      if (h > 9) { var k = 3 / Math.sqrt(h); tan[i] = k * a * m[i]; tan[i + 1] = k * b * m[i]; }
+    }
+    var d = "M" + xy[0][0].toFixed(1) + " " + xy[0][1].toFixed(1);
+    for (i = 0; i < n - 1; i++) {
+      var c = dx[i] / 3;
+      d += "C" + (xy[i][0] + c).toFixed(1) + " " + (xy[i][1] + tan[i] * c).toFixed(1) + " " +
+        (xy[i + 1][0] - c).toFixed(1) + " " + (xy[i + 1][1] - tan[i + 1] * c).toFixed(1) + " " +
+        xy[i + 1][0].toFixed(1) + " " + xy[i + 1][1].toFixed(1);
+    }
+    return d;
   }
 
   function drawChart() {
@@ -177,8 +203,10 @@
 
     var t0 = Math.min.apply(null, all.map(function (p) { return p.t; })) - 4 * DAY;
     var t1 = Math.max.apply(null, all.map(function (p) { return p.t; })) + 4 * DAY;
-    var lo = Math.floor((Math.min.apply(null, all.map(function (p) { return p.r.score; })) - 4) / 10) * 10;
-    var hi = Math.ceil((Math.max.apply(null, all.map(function (p) { return p.r.score; })) + 4) / 10) * 10;
+    // the axis fits the scores (a little room either side), in steps of 5 strokes
+    var lo = Math.floor((Math.min.apply(null, all.map(function (p) { return p.r.score; })) - 2) / 5) * 5;
+    var hi = Math.ceil((Math.max.apply(null, all.map(function (p) { return p.r.score; })) + 2) / 5) * 5;
+    var step = hi - lo > 30 ? 10 : 5;
     function x(t) { return M.left + (t - t0) / (t1 - t0) * iw; }
     function y(v) { return M.top + (hi - v) / (hi - lo) * ih; }
 
@@ -195,8 +223,7 @@
     });
     var tl = document.createElement("span");
     tl.className = "trend-key";
-    tl.appendChild(document.createElement("i"));
-    tl.appendChild(document.createTextNode("Trend"));
+    tl.textContent = "Line: " + AVG + "-round average · dots: rounds";
     legend.appendChild(tl);
     chartBox.appendChild(legend);
 
@@ -206,7 +233,7 @@
     chartBox.appendChild(svg);
 
     // y grid + ticks every 10 strokes
-    for (var v = lo; v <= hi; v += 10) {
+    for (var v = Math.ceil(lo / step) * step; v <= hi; v += step) {
       el("line", { x1: M.left, x2: W - M.right, y1: y(v), y2: y(v), class: "trend-grid" }, svg);
       el("text", { x: M.left - 10, y: y(v) + 4, class: "trend-tick", "text-anchor": "end" }, svg).textContent = v;
     }
@@ -221,37 +248,54 @@
         .textContent = new Date(t).toLocaleDateString("en-US", { month: "short" });
     });
 
-    // trend lines (under the data), then lines, then dots
+    // each source's average: a soft fill down to the axis, then the smooth line; the rounds' dots on top
+    var defs = el("defs", {}, svg);
     series.forEach(function (sr) {
-      var f = trendLine(sr.pts);
-      if (!f) return;
-      var a = sr.pts[0].t, b = sr.pts[sr.pts.length - 1].t;
-      el("line", { x1: x(a), y1: y(f(a)), x2: x(b), y2: y(f(b)), stroke: sr.s.color, class: "trend-fit" }, svg);
+      sr.avg = rolling(sr.pts);
+      var xy = sr.avg.map(function (q) { return [x(q.t), y(q.v)]; });
+      var line = smoothPath(xy);
+      var gid = "trend-fill-" + sr.s.key;
+      var g = el("linearGradient", { id: gid, x1: 0, x2: 0, y1: 0, y2: 1 }, defs);
+      el("stop", { offset: "0%", "stop-color": sr.s.color, "stop-opacity": 0.13 }, g);
+      el("stop", { offset: "100%", "stop-color": sr.s.color, "stop-opacity": 0 }, g);
+      if (xy.length > 1) {
+        el("path", { d: line + "L" + xy[xy.length - 1][0].toFixed(1) + " " + (M.top + ih) + "L" + xy[0][0].toFixed(1) + " " + (M.top + ih) + "Z",
+          fill: "url(#" + gid + ")", class: "trend-area" }, svg);
+      }
+      sr.linePath = line;
     });
-    series.forEach(function (sr) {
-      el("path", { d: sr.pts.map(function (p, i) { return (i ? "L" : "M") + x(p.t).toFixed(1) + " " + y(p.r.score).toFixed(1); }).join(""),
-        stroke: sr.s.color, class: "trend-line" }, svg);
-    });
+    series.forEach(function (sr) { el("path", { d: sr.linePath, stroke: sr.s.color, class: "trend-line" }, svg); });
     var best = all.reduce(function (a, p) { return p.r.score < a.r.score ? p : a; });
     series.forEach(function (sr) {
       sr.pts.forEach(function (p) {
-        el("circle", { cx: x(p.t), cy: y(p.r.score), r: p === best ? 6 : 4, fill: sr.s.color, class: "trend-dot" }, svg);
+        el("circle", { cx: x(p.t), cy: y(p.r.score), r: p === best ? 6 : 3.5, fill: sr.s.color, class: "trend-dot" + (p === best ? " best" : "") }, svg);
       });
     });
 
     // the one direct callout: the best round
     var bx = x(best.t), by = y(best.r.score);
     var right = bx < M.left + iw * 0.7;
-    el("text", { x: bx + (right ? 12 : -12), y: by + 20, class: "trend-callout", "text-anchor": right ? "start" : "end" }, svg)
-      .textContent = "Best " + best.r.score + " · " + best.r.course;
+    var callout = el("text", { x: bx + (right ? 12 : -12), y: by + 20, class: "trend-callout", "text-anchor": right ? "start" : "end" }, svg);
+    callout.textContent = "Best " + best.r.score + " · " + best.r.course;
+    try { // too long for the side it's on (phones): the other side, or just the score
+      var cw = callout.getComputedTextLength();
+      if (right && bx + 12 + cw > W - 4) {
+        if (bx - 12 - cw >= 4) { callout.setAttribute("x", bx - 12); callout.setAttribute("text-anchor", "end"); }
+        else callout.textContent = "Best " + best.r.score;
+      }
+    } catch (e) {}
 
     // end labels when there's room on the right and they don't collide
     if (W >= 560) {
-      var ends = series.map(function (sr) { var p = sr.pts[sr.pts.length - 1]; return { sr: sr, p: p, y: y(p.r.score) }; });
-      var clash = ends.length > 1 && Math.abs(ends[0].y - ends[1].y) < 18;
-      if (!clash) ends.forEach(function (e) {
-        el("text", { x: W - M.right + 12, y: e.y + 4, class: "trend-end" }, svg).textContent = e.sr.s.name + " " + e.p.r.score;
-        el("line", { x1: x(e.p.t) + 7, x2: W - M.right + 8, y1: e.y, y2: e.y, class: "trend-leader" }, svg);
+      // each average's current value, where its line ends; nudged apart if they'd overlap
+      var ends = series.map(function (sr) { var q = sr.avg[sr.avg.length - 1]; return { sr: sr, q: q, y: y(q.v), ly: y(q.v) }; })
+        .sort(function (a, b) { return a.y - b.y; });
+      for (var k = 1; k < ends.length; k++) if (ends[k].ly - ends[k - 1].ly < 30) ends[k].ly = ends[k - 1].ly + 30;
+      ends.forEach(function (e) {
+        var t = el("text", { x: W - M.right + 12, y: e.ly - 2, class: "trend-end" }, svg);
+        t.textContent = e.sr.s.name;
+        el("tspan", { x: W - M.right + 12, dy: 15, class: "trend-end-v", fill: e.sr.s.color }, t).textContent = "avg " + Math.round(e.q.v);
+        el("line", { x1: x(e.q.t) + 4, x2: W - M.right + 8, y1: e.y, y2: e.ly + 2, class: "trend-leader" }, svg);
       });
     }
 

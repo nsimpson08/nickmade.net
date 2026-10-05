@@ -196,7 +196,8 @@
       (watched && it.xbox
         ? '<div class="xbox-stats">' +
             (it.xbox.minutes != null ? "<span>" + esc(playtime(it.xbox.minutes)) + " played</span>" : "") +
-            (it.xbox.percent != null ? '<span title="' + esc(it.xbox.gamerscore + " / " + it.xbox.totalGamerscore + " Gamerscore") + '">Achievements ' + esc(it.xbox.percent) + "%</span>" : "") +
+            (it.xbox.percent != null ? '<span' + (it.xbox.percent >= 100 ? ' class="complete"' : "") + // 100%: gold (site.css)
+              ' title="' + esc(it.xbox.gamerscore + " / " + it.xbox.totalGamerscore + " Gamerscore" + (it.xbox.percent >= 100 ? ", 100% complete" : "")) + '">Achievements ' + esc(it.xbox.percent) + "%</span>" : "") +
           "</div>"
         : "") +
       (watched && it.date ? '<div class="watched-on">' + (it.xbox ? "Last played" : DID) + " " + esc(watchedOn(it.date)) + "</div>" : "") +
@@ -512,9 +513,52 @@
       xboxSlot.innerHTML = '<span class="plus" aria-hidden="true"></span><span class="label">Get latest from Xbox</span>';
       xboxSlot.addEventListener("click", openXbox);
       grid(watchedSection).insertBefore(xboxSlot, watchedSlot);
+      renderSyncButton();
     }
   }
   var xboxSlot;
+
+  // ---------- Refresh from Xbox (Games, owner only) ----------
+  // A button in Recently Played's heading runs the every-4-hours Xbox sync now (POST /xbox/sync: playtime,
+  // achievements and last played for every game here, plus the latest gamerscore total; 3 OpenXBL requests), then
+  // redraws this section and the gamerscore banner.
+  var syncBtn = null;
+  function renderSyncButton() {
+    if (syncBtn || !watchedSection) return;
+    var head = watchedSection.querySelector(".subhead");
+    if (!head) return;
+    var box = document.createElement("span");
+    box.className = "xbox-sync";
+    box.innerHTML = '<span class="xbox-sync-status" role="status"></span>' +
+      '<button type="button" class="xbox-sync-btn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.75 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>' +
+      "<span>Refresh</span></button>";
+    head.appendChild(box);
+    syncBtn = box.querySelector("button");
+    syncBtn.title = "Get the latest playtime, achievements and gamerscore from Xbox";
+    syncBtn.addEventListener("click", syncXbox);
+  }
+
+  function syncXbox() {
+    var status = watchedSection.querySelector(".xbox-sync-status");
+    syncBtn.disabled = true;
+    syncBtn.classList.add("busy");
+    status.textContent = "Checking Xbox…";
+    fetch(API + "/xbox/sync", { method: "POST", headers: authHeaders() })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (!res.ok) throw { said: res.d.error || "Couldn't refresh from Xbox." };
+        return Promise.all([
+          fetch(API + "/watched?" + PQ, { cache: "no-store" }).then(function (r) { return r.json(); }),
+          window.NMXboxBanner ? window.NMXboxBanner.reload().catch(function () {}) : null,
+        ]).then(function (out) {
+          renderWatched(out[0].items || [], out[0].archive);
+          var n = res.d.updated || 0;
+          status.textContent = "Updated just now · " + (n ? n + (n === 1 ? " game" : " games") + " changed" : "no changes");
+        });
+      })
+      .catch(function (e) { status.textContent = (e && e.said) || "Couldn't reach the server. Try again in a bit."; })
+      .then(function () { syncBtn.disabled = false; syncBtn.classList.remove("busy"); });
+  }
 
   // ---------- Get latest from Xbox (Games, owner only) ----------
 

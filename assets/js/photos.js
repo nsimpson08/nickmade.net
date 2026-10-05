@@ -1,5 +1,7 @@
 // Photography page: renders window.PHOTOS in the sections from PHOTO_CONFIG.sections (Film, Pixel, Cats...),
-// the 1/2/4 column toggle, and the full-resolution lightbox. The newest photo overall is featured above them.
+// the 1/2/4 column toggle, and the full-resolution lightbox. (The framed "Featured" photo above them was removed in 1.3.)
+// The toggle's 4th option is a slideshow (see "Slideshow" below): one big photo and a strip of thumbnails instead of
+// the long page.
 (function () {
   var all = window.PHOTOS || [];
   var config = window.PHOTO_CONFIG || {};
@@ -7,14 +9,9 @@
   var sections = (config.sections || []).map(function (s) {
     return { id: s.folder, title: s.title, photos: all.filter(function (p) { return p.section === s.folder; }) };
   }).filter(function (s) { return s.photos.length; });
-  // featured first, then each section's photos in page order; this is also the lightbox's order
-  // config.featured names a photo by its original's file name (matched the way tools/photos.py names the copies)
-  var want = String(config.featured || "").toLowerCase().replace(/\.[a-z0-9]+$/, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  var featuredPhoto = (want && all.filter(function (p) { return /([^/]+)\.jpg$/.exec(p.src)[1] === want; })[0]) || all[0];
-  var photos = featuredPhoto ? [featuredPhoto] : [];
-  sections.forEach(function (s) {
-    s.photos.forEach(function (p) { if (p !== featuredPhoto) photos.push(p); });
-  });
+  // each section's photos in page order; this is also the lightbox's and the slideshow's order
+  var photos = [];
+  sections.forEach(function (s) { photos = photos.concat(s.photos); });
 
   // Instagram link
   if (config.instagram) {
@@ -49,39 +46,24 @@
       (i > 1 ? ' loading="lazy"' : "") + ' decoding="async"></a>';
   }
 
-  // The first photo sits above the grid in a gilded frame with a "Featured" plaque
-  var featured = document.createElement("div");
-  featured.className = "featured";
-  featured.innerHTML = '<div class="frame"><div class="mat">' + photoLink(photos[0], 0) +
-    '<span class="plaque">Featured</span></div></div>';
-  featured.querySelector("img").sizes = "(max-width: 900px) 100vw, 900px";
-  root.parentNode.insertBefore(featured, root);
-  featured.addEventListener("click", function (e) {
-    if (e.metaKey || e.ctrlKey || e.shiftKey || !e.target.closest(".photo")) return;
-    e.preventDefault();
-    open(0);
-  });
-
   // A row with the jump links (when there's more than one section) and the column toggle, then a header and
   // grid per section
   var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
-  var n = 1;
+  var n = 0;
   root.innerHTML = '<div class="photo-bar">' + (sections.length > 1
-    ? '<nav class="jump photo-jump" aria-label="Sections">' + sections.map(function (s) {
+    ? '<div class="bar-group"><span class="bar-label" aria-hidden="true">Category</span>' +
+      '<nav class="jump photo-jump" aria-label="Sections">' + sections.map(function (s) {
         return '<a href="#' + esc(s.id) + '">' + esc(s.title) + "</a>";
-      }).join("") + "</nav>"
-    : "") + "</div>" +
+      }).join("") + "</nav></div>"
+    : "") + '<div class="bar-group"><span class="bar-label" aria-hidden="true">Layout</span></div></div>' +
     sections.map(function (s) {
-      var rest = s.photos.filter(function (p) { return p !== featuredPhoto; });
       return '<section class="photo-section" id="' + esc(s.id) + '">' +
         '<h2 class="subhead"><span>' + esc(s.title) + "</span></h2>" +
-        (rest.length
-          ? '<div class="photos">' + rest.map(function (p) { return photoLink(p, n++); }).join("") + "</div>"
-          : '<p class="photo-only-featured">Featured above.</p>') +
+        '<div class="photos">' + s.photos.map(function (p) { return photoLink(p, n++); }).join("") + "</div>" +
         "</section>";
     }).join("");
-  // the column toggle moves from the page header into that row, beside the section links
-  root.querySelector(".photo-bar").appendChild(document.querySelector(".photo-controls .layout-toggle"));
+  // the column toggle moves from the page header into that row, beside the section links, under its "Layout" label
+  root.querySelector(".photo-bar .bar-group:last-child").appendChild(document.querySelector(".photo-controls .layout-toggle"));
 
   // Pinned control bar, bottom right, once you've scrolled down: a link per section (the one you're in is lit),
   // the 1/2/4 column toggle (kept in sync with the one at the top), and the jump button. It rests collapsed to
@@ -102,7 +84,8 @@
       '<div class="layout-toggle" role="group" aria-label="Columns">' + [1, 2, 4].map(function (c) {
         return '<button type="button" data-cols="' + c + '" aria-label="' + c + (c === 1 ? " column" : " columns") + '">' +
           new Array(c + 1).join("<i></i>") + "</button>";
-      }).join("") + "</div>" +
+      }).join("") +
+      '<button type="button" data-cols="show" aria-label="Slideshow"><i></i><b><i></i><i></i><i></i></b></button>' + "</div>" +
     "</div>" +
     '<button type="button" class="to-top"><span aria-hidden="true">&uarr;</span><b></b></button>';
   document.body.appendChild(dock);
@@ -186,21 +169,149 @@
   }, true);
   updateDock();
 
-  // Column toggle (the one at the top and the dock's), remembered per visitor
+  // Column toggle (the one at the top and the dock's): 1, 2, 4, or "show" (the slideshow, the default since 1.3).
+  // Saved only when a visitor clicks one (localStorage nm-photo-layout), so everyone else gets the default. (The old
+  // key, nm-photo-cols, was written on every visit, so it can't tell a choice from the old default; it's ignored.)
   var buttons = document.querySelectorAll(".layout-toggle button");
-  function setCols(cols) {
-    root.querySelectorAll(".photos").forEach(function (g) { g.setAttribute("data-cols", cols); });
-    buttons.forEach(function (b) { b.setAttribute("aria-pressed", String(+b.dataset.cols === cols)); });
-    root.querySelectorAll("img").forEach(function (img) { img.sizes = sizesFor(cols); });
-    try { localStorage.setItem("nm-photo-cols", cols); } catch (e) {}
+  function setCols(cols, chosen) {
+    var slides = cols === "show";
+    document.documentElement.classList.toggle("photo-slides", slides);
+    if (slides) slideshow();
+    else {
+      root.querySelectorAll(".photos").forEach(function (g) { g.setAttribute("data-cols", cols); });
+      root.querySelectorAll(".photos img").forEach(function (img) { img.sizes = sizesFor(cols); });
+    }
+    buttons.forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.cols === String(cols))); });
+    if (chosen) try { localStorage.setItem("nm-photo-layout", cols); } catch (e) {}
+    updateDock();
   }
-  var DEFAULT_COLS = 2; // until a visitor picks their own
+  function colsOf(v) { return v === "show" ? "show" : [1, 2, 4].indexOf(+v) >= 0 ? +v : DEFAULT_COLS; }
+  var DEFAULT_COLS = "show"; // the slideshow, until a visitor picks their own
   var saved = DEFAULT_COLS;
-  try { saved = parseInt(localStorage.getItem("nm-photo-cols"), 10) || DEFAULT_COLS; } catch (e) {}
-  setCols([1, 2, 4].indexOf(saved) >= 0 ? saved : DEFAULT_COLS);
+  try { saved = localStorage.getItem("nm-photo-layout") || DEFAULT_COLS; } catch (e) {}
   buttons.forEach(function (b) {
-    b.addEventListener("click", function () { setCols(+b.dataset.cols); });
+    b.addEventListener("click", function () { setCols(colsOf(b.dataset.cols), true); });
   });
+
+  // ---------- Slideshow (the toggle's 4th option) ----------
+  // The long section grids give way to one viewer about a screen tall: the photo on the left
+  // (75% of the width) and a narrow column of small square thumbnails on the right, grouped by section, scrolling on
+  // its own. Arrows, the arrow keys, and swipes step through every photo (the lightbox's order); clicking the photo
+  // opens it full resolution in the lightbox; the Film / Pixel / Cats links jump to that section's first photo.
+  // Phones: the photo on top, the thumbnails in a strip below that scrolls sideways.
+  var ss = null, ssAt = 0;
+  var titleOf = {};
+  sections.forEach(function (s) { titleOf[s.id] = s.title; });
+  function thumbOf(p) { // tools/thumbs.py's 400px copy of the 800px size
+    var small = p.sizes.length ? p.sizes[0].src : p.src;
+    return small.replace(/^sizes\/(.+)-\d+\.jpg$/, "thumbs/$1.webp");
+  }
+  function slideshow() {
+    if (ss) return slideTo(ssAt);
+    ss = document.createElement("div");
+    ss.className = "slideshow";
+    var groups = [];
+    var k = 0;
+    sections.forEach(function (s) {
+      groups.push({ title: s.title, id: s.id, idx: s.photos.map(function () { return k++; }) });
+    });
+    ss.innerHTML =
+      '<div class="ss-stage">' +
+        '<a class="ss-main" href="#"><img alt="" sizes="(max-width: 760px) 100vw, 75vw"></a>' +
+        '<button type="button" class="ss-prev" aria-label="Previous photo">&larr;</button>' +
+        '<button type="button" class="ss-next" aria-label="Next photo">&rarr;</button>' +
+        '<div class="ss-bar"><span class="ss-where"></span><a class="ss-full" target="_blank" rel="noopener"></a></div>' +
+      "</div>" +
+      '<div class="ss-thumbs" aria-label="All photos">' + groups.map(function (g) {
+        return '<div class="ss-group"' + (g.id ? ' data-section="' + esc(g.id) + '"' : "") + '><p class="ss-sec">' + esc(g.title) + "</p>" +
+          '<div class="ss-grid">' + g.idx.map(function (i) {
+            var p = photos[i];
+            return '<button type="button" class="ss-thumb" data-index="' + i + '" aria-label="Photo ' + (i + 1) + '">' +
+              '<img src="' + esc(thumbOf(p)) + '" alt="" loading="lazy" decoding="async"' +
+              ' onerror="if (!this.dataset.f) { this.dataset.f = 1; this.src = \'' + esc(p.sizes.length ? p.sizes[0].src : p.src) + '\'; }"></button>';
+          }).join("") + "</div></div>";
+      }).join("") + "</div>";
+    root.querySelector(".photo-bar").after(ss);
+    ss.querySelector(".ss-prev").addEventListener("click", function () { slideTo(ssAt - 1); });
+    ss.querySelector(".ss-next").addEventListener("click", function () { slideTo(ssAt + 1); });
+    ss.querySelector(".ss-main").addEventListener("click", function (e) { e.preventDefault(); open(ssAt); });
+    ss.querySelector(".ss-thumbs").addEventListener("click", function (e) {
+      var t = e.target.closest(".ss-thumb");
+      if (t) slideTo(+t.dataset.index);
+    });
+    // swipe on touch screens
+    var x0 = null;
+    var stage = ss.querySelector(".ss-stage");
+    stage.addEventListener("touchstart", function (e) { x0 = e.touches[0].clientX; }, { passive: true });
+    stage.addEventListener("touchend", function (e) {
+      if (x0 === null) return;
+      var dx = e.changedTouches[0].clientX - x0;
+      x0 = null;
+      if (Math.abs(dx) > 40) slideTo(ssAt + (dx < 0 ? 1 : -1));
+    });
+    slideTo(ssAt);
+  }
+  function srcsetOf(p) {
+    return p.sizes.map(function (s) { return s.src + " " + s.w + "w"; }).concat([p.src + " " + p.w + "w"]).join(", ");
+  }
+  function slideTo(i) {
+    if (!ss) return;
+    ssAt = (i + photos.length) % photos.length;
+    var p = photos[ssAt];
+    var img = ss.querySelector(".ss-main img");
+    img.classList.add("loading");
+    img.onload = function () { img.classList.remove("loading"); };
+    img.srcset = srcsetOf(p);
+    img.src = p.sizes.length ? p.sizes[p.sizes.length > 1 ? 1 : 0].src : p.src;
+    img.alt = "Photo " + (ssAt + 1);
+    if (img.complete) img.classList.remove("loading");
+    ss.querySelector(".ss-main").href = p.src;
+    ss.querySelector(".ss-where").textContent = (titleOf[p.section] || "") + " · " + (ssAt + 1) + " / " + photos.length;
+    var full = ss.querySelector(".ss-full");
+    full.href = p.src;
+    full.textContent = "Full resolution · " + p.w + " × " + p.h + " · " + mb(p.bytes);
+    // the thumbnail: lit, and scrolled to the middle of its strip (without moving the page)
+    var strip = ss.querySelector(".ss-thumbs");
+    ss.querySelectorAll(".ss-thumb").forEach(function (t) {
+      var on = +t.dataset.index === ssAt;
+      t.classList.toggle("on", on);
+      if (on) {
+        t.setAttribute("aria-current", "true");
+        var st = t.getBoundingClientRect(), sr = strip.getBoundingClientRect();
+        strip.scrollTo({
+          top: strip.scrollTop + st.top - sr.top - (strip.clientHeight - st.height) / 2,
+          left: strip.scrollLeft + st.left - sr.left - (strip.clientWidth - st.width) / 2,
+          behavior: reduceMotion ? "auto" : "smooth",
+        });
+      } else t.removeAttribute("aria-current");
+    });
+    // the next and previous ones, ready to show
+    [ssAt + 1, ssAt - 1].forEach(function (j) {
+      var q = photos[(j + photos.length) % photos.length];
+      if (q.sizes.length > 1) { var pre = new Image(); pre.src = q.sizes[1].src; }
+    });
+  }
+  // the section links (top and dock) go to that section's first photo in the slideshow
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest(".photo-jump a, .dock-sections a");
+    if (!a || !ss || !document.documentElement.classList.contains("photo-slides")) return;
+    var g = ss.querySelector('.ss-group[data-section="' + a.getAttribute("href").slice(1) + '"] .ss-thumb');
+    if (!g) return;
+    e.preventDefault();
+    e.stopPropagation();
+    slideTo(+g.dataset.index);
+  }, true);
+  document.addEventListener("keydown", function (e) {
+    if (!ss || !box.hidden || !document.documentElement.classList.contains("photo-slides")) return;
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || "")) return;
+    if (e.key === "ArrowLeft") { e.preventDefault(); slideTo(ssAt - 1); }
+    else if (e.key === "ArrowRight") { e.preventDefault(); slideTo(ssAt + 1); }
+  });
+  // for the poster wall (wall.js): in the slideshow, a photo on the wall opens in it instead of scrolling the page
+  window.NMPhotos = {
+    slides: function () { return !!ss && document.documentElement.classList.contains("photo-slides"); },
+    slideTo: function (i) { slideTo(i); ss.scrollIntoView({ block: "nearest" }); },
+  };
 
   // Lightbox with the full-resolution file
   var box = document.getElementById("lightbox");
@@ -246,6 +357,8 @@
   box.querySelector(".lightbox-prev").addEventListener("click", function () { show(current - 1); });
   box.querySelector(".lightbox-next").addEventListener("click", function () { show(current + 1); });
   box.addEventListener("click", function (e) { if (e.target === box) close(); });
+  setCols(colsOf(saved)); // last, once the lightbox it uses is set up
+
   document.addEventListener("keydown", function (e) {
     if (box.hidden) return;
     if (e.key === "Escape") close();

@@ -3,7 +3,9 @@
 Personal site, served by GitHub Pages from the root of `main`. Plain HTML, no build step.
 
 - `index.html`: home page with the section tiles
-- `extras/`: the Extras page (hobbies, projects, and lists; edit the HTML directly)
+- `extras/`: the Extras page (Golf and the Video Game Montage Maker; edit the HTML directly)
+- `play/`: the Play page (the games). The games themselves still live at `extras/golf-game/` and `extras/rapture/`,
+  where their publish scripts put them; gameplay clips for the cards are in `play/wall/`
 - `games/list.js`, `movies/list.js`: favorite games and movies with reviews; the format is described at the top of each file
 - `games/posters/`, `movies/posters/`: poster art
 - `music/playlist.js`: the Spotify playlists shown on the Music page
@@ -14,7 +16,9 @@ Personal site, served by GitHub Pages from the root of `main`. Plain HTML, no bu
   Watched movies / Recently Played games with a date and rating, and remove site additions. Visitors can suggest
   movies and games for each page's In the Queue. On Games, "Get latest from Xbox" lists recently played
   Xbox games (via [OpenXBL](https://xbl.io)) to add with their playtime, achievement progress, and last played date.
-  Every night at midnight Central the Worker refreshes those games' last played date, achievements, and playtime. These are stored by the Worker, not in this repo.
+  Every 4 hours the Worker refreshes those games' last played date, achievements, and playtime, and the Games page's
+  gamerscore banner (its gains over the last day, week and month update once a day, at midnight Central). In owner
+  mode, Refresh in Recently Played does it on demand. These are stored by the Worker, not in this repo.
 - `extras/rapture/`: the built Rapture: ADAM & Dice game (one self-contained file). Its source is a separate project;
   don't edit this copy, publish a new build from the game's folder with `npm run publish:site`
 - `extras/golf-game/`: the built Nick's Nine golf game (one self-contained file). Its source is a separate project
@@ -22,8 +26,9 @@ Personal site, served by GitHub Pages from the root of `main`. Plain HTML, no bu
   It reads `extras/golf/scores.js` and `trackman.js` at runtime, so new rounds and stats change the game with no rebuild
 - `extras/golf/`: the Golf page (Extras). Rounds and bag in `scores.js`; Trackman rounds are imported into `trackman.js`
   (and course photos into `courses/`) by `python3 tools/import_trackman.py`, from the round cards' HTML copied off Trackman's site
-- Recently Watched/Played show the newest 12; older ones are listed by the Archive link under them. The favorites/best
-  sections have no limit: in owner mode each item has Remove (hidden on the site, deleted from list.js by pull_live.py)
+- Recently Watched/Played keep the newest 8; older ones are listed by the Archive link under them. Poster grids (all but
+  In the Queue) show 8 at a time, 6 on phones, with an Expand button. The favorites/best sections have no limit: in
+  owner mode each item has Remove (hidden on the site, deleted from list.js by pull_live.py)
 - `tools/pull_live.py`: copies site additions into list.js and posters/ (then commit and push); run it again
   after pushing to clear the now-duplicate live copies. Also saves a snapshot to `backups/`.
 - `photography/`: the Photography page, in sections (Film, Pixel, Cats). Drop photos into the section's folder,
@@ -31,8 +36,15 @@ Personal site, served by GitHub Pages from the root of `main`. Plain HTML, no bu
   metadata-free copies (location, camera data and phones' hidden extra images removed; only an artist and
   copyright tag added), smaller versions in `photography/sizes/`, and `photography/photos.js`. The full-resolution
   copies are too big for GitHub Pages, so the script uploads them to Cloudflare R2 (bucket `nickmade-photos`,
-  served at photos.nickmade.net) with wrangler instead of committing them. Sections, the featured photo, the
-  Instagram username and the R2 address are set in `photography/config.js`
+  served at photos.nickmade.net) with wrangler instead of committing them. Sections, the Instagram username and the
+  R2 address are set in `photography/config.js`. The page opens in a slideshow (one big photo, thumbnails beside it);
+  1, 2 and 4 columns are in the layout toggle
+- `movies/library/`: the Library page (Movies > Library), the discs I own, shelved like a video store with a Covers /
+  Spines view. `discs.js` was built once from a My Movies app export by `python3 tools/discs.py` (the export itself
+  isn't committed); new discs are added in owner mode and stored by the Worker, with details from IMDb, the synopsis
+  from Wikipedia, and the extras from TheDiscDb or typed in. `covers/` are the case covers; `logos/` are the spines'
+  title logos from TMDB (needs a free `TMDB_API_KEY`, in `worker/.dev.vars` and the Worker's secrets)
+- `tools/thumbs.py`: makes the small WebP copies the poster walls use; run it after adding posters (`photos.py` runs it)
 - `changelog/log.js`: the site's version history (newest first). The footer on every page (`assets/js/footer.js`)
   shows the newest version, linking to `/changelog/`; returning visitors see a dot when there's a version they
   haven't seen. Add an entry at the top for each new feature (1.1, 1.2...); new movies/games/photos don't need one

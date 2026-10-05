@@ -17,7 +17,8 @@ script clears those from the live site's storage (needs the admin password: set
 NICKMADE_ADMIN_TOKEN, or it will ask).
 
 Visitor suggestions and Recently Watched/Played stay on the live site (they need the site to
-show names, dates, and ratings), but everything live is saved to backups/live-YYYY-MM-DD.json.
+show names, dates, and ratings), but everything live is saved to backups/live-YYYY-MM-DD.json,
+including the Library's site-added and removed discs (they live only in the Worker).
 
 It also deletes games from games/list.js In the Queue that are now in Recently Played (same title,
 ignoring only case and symbols like the trademark sign). The site already hides them; this makes it permanent.
@@ -252,6 +253,9 @@ def main():
     api = args.api.rstrip("/")
 
     snapshot = {"lists": {}, "watched": {}, "queue": {}}
+    # Movies > Library: discs added on the site live only in the Worker (no list.js to copy them into), so the
+    # snapshot is their backup
+    snapshot["library"] = get_json(api + "/library")
     for page in PAGES:
         snapshot["watched"][page] = get_json(api + "/watched?page=" + page).get("items", [])
         snapshot["queue"][page] = get_json(api + "/queue?page=" + page).get("items", [])

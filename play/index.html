@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Play · NickMade</title>
+  <meta name="description" content="Browser games made by Nick Simpson: Nick's Nine and Rapture: ADAM & Dice. Free to play, nothing to install.">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500&family=Unbounded:wght@500;600;700;800&display=swap">
+  <link rel="stylesheet" href="/assets/css/site.css">
+</head>
+<body class="page-play">
+  <header class="topbar">
+    <a class="wordmark" href="/">Nick<span>Made</span></a>
+    <nav>
+      <a href="/games/">Games</a>
+      <a href="/movies/">Movies</a>
+      <a href="/music/">Music</a>
+      <a href="/photography/">Photography</a>
+      <a href="/play/" aria-current="page">Play</a>
+      <a href="/extras/">Extras</a>
+    </nav>
+  </header>
+
+  <main class="content">
+    <header class="page-head">
+      <h1>Play</h1>
+      <p>Games I made. They run right in your browser: nothing to install.</p>
+    </header>
+
+    <!-- The games themselves still live at /extras/golf-game/ and /extras/rapture/: they're built in their own
+         projects, whose publish scripts copy them there (see NOTES). -->
+    <section class="games-list">
+      <article class="project game-card">
+        <a class="game-clip" href="/extras/golf-game/" tabindex="-1" aria-hidden="true">
+          <video src="/play/wall/nicks-nine.mp4" poster="/play/wall/nicks-nine.jpg" muted loop playsinline preload="none"></video>
+        </a>
+        <div>
+          <h2>Nick's Nine</h2>
+          <p>A 9-hole HD-2D pixel-art golf game played with my real bag and my real swing. Club distances, misses, and putting all come from my Trackman and X-Golf stats on the Golf page, so the game gets easier as I get better. Nick's ghost plays alongside you, tuned to my real scoring, and the best rounds make the leaderboard.</p>
+          <ul class="tags">
+            <li>Golf</li>
+            <li>Three.js</li>
+            <li>HD-2D</li>
+            <li>Leaderboard</li>
+          </ul>
+        </div>
+        <a class="open" href="/extras/golf-game/">Play <span>&rarr;</span></a>
+      </article>
+      <article class="project game-card">
+        <a class="game-clip" href="/extras/rapture/" tabindex="-1" aria-hidden="true">
+          <video src="/play/wall/rapture.mp4" poster="/play/wall/rapture.jpg" muted loop playsinline preload="none"></video>
+        </a>
+        <div>
+          <h2>Rapture: ADAM &amp; Dice</h2>
+          <p>A pixel-art strategy board game set in an underwater Art Deco city. Roll to move across nine districts, fight Splicers in dice battles, spend ADAM on plasmids, and take down the Big Daddy. A BioShock fan tribute.</p>
+          <ul class="tags">
+            <li>Board game</li>
+            <li>TypeScript</li>
+            <li>Canvas</li>
+            <li>Web Audio</li>
+          </ul>
+        </div>
+        <a class="open" href="/extras/rapture/">Play <span>&rarr;</span></a>
+      </article>
+    </section>
+  </main>
+  <footer id="site-footer">&copy; 2026 Nick Simpson</footer>
+  <script>
+    // Each card's gameplay clip plays (muted) while it's on screen; with reduced motion it stays a still frame
+    (function () {
+      if (!window.IntersectionObserver || (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches)) return;
+      var watch = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) { e.target.preload = "auto"; var p = e.target.play(); if (p && p.catch) p.catch(function () {}); }
+          else e.target.pause();
+        });
+      });
+      [].forEach.call(document.querySelectorAll(".game-clip video"), function (v) { watch.observe(v); });
+    })();
+  </script>
+  <script src="/changelog/log.js"></script>
+  <script src="/assets/js/footer.js"></script>
+</body>
+</html>

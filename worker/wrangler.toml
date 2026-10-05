@@ -18,13 +18,14 @@ OWNER_QUEUE_FALLBACK = "4"
 # its Client Secret is a secret: npx wrangler secret put SPOTIFY_CLIENT_SECRET
 SPOTIFY_CLIENT_ID = "1c18f59367834eaf9edd982c5858fa9b"
 SPOTIFY_REDIRECT = "https://api.nickmade.net/spotify/callback"
-# Time zone for the nightly Xbox refresh and its "Last played" dates
+# Time zone for Recently Played's "Last played" dates
 TIMEZONE = "America/Chicago"
 
-# Nightly refresh of Games' Recently Played from Xbox. Cron times are UTC: midnight in Chicago is 05:00 UTC
-# in daylight time and 06:00 UTC in standard time, so both fire and scheduled() only works at local midnight.
+# Refresh of Games' Recently Played and the gamerscore banner from Xbox, every 4 hours (UTC times: 0:00, 4:00, 8:00...),
+# plus one at midnight in Chicago for the daily "+XG in the last 24h" snapshot. Midnight in Chicago is 05:00 UTC in
+# daylight time and 06:00 UTC in standard time, so both fire and scheduled() skips the one that isn't midnight.
 [triggers]
-crons = ["0 5 * * *", "0 6 * * *"]
+crons = ["0 */4 * * *", "0 5 * * *", "0 6 * * *"]
 
 # Created with: npx wrangler kv namespace create QUEUE  (paste the id it prints)
 [[kv_namespaces]]

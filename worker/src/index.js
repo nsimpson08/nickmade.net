@@ -1,6 +1,7 @@
 import { golfRoute } from "./golf.js";
 import { musicRoute, MUSIC_SCOPES } from "./music.js";
 import { votesRoute } from "./votes.js";
+import { libraryRoute } from "./library.js";
 
 // nickmade-queue: the live sections of the Movies and Games pages: visitor suggestions for "In the Queue",
 // Nick's "Recently Watched"/"Recently Played" lists, and Nick's site-added picks for other sections.
@@ -16,7 +17,7 @@ import { votesRoute } from "./votes.js";
 //   PATCH  /queue/:imdbId       { page, visitorId, name, comment, commentPrivate } -> a visitor edits their own suggestion
 //   DELETE /queue/:imdbId       remove a submission: Nick (Authorization: Bearer ADMIN_TOKEN), or the visitor who suggested
 //                               it (?visitorId=), which also gives them that suggestion back
-//   GET    /watched             Recently Watched, newest first (12), and its archive: { items, archive }
+//   GET    /watched             Recently Watched, newest first (8), and its archive: { items, archive }
 //   POST   /watched             { imdbId, date: "YYYY-MM-DD", rating: 0.5-5 in halves, optional } (admin) -> adds a movie; also drops it from the queue
 //   PATCH  /watched/:id         { rating, date } (admin) -> change the rating and/or date watched
 //   DELETE /watched/:id         remove one (admin)
@@ -27,9 +28,10 @@ import { votesRoute } from "./votes.js";
 //   DELETE /lists/:page/:list/:imdbId  remove one (admin)
 //   GET    /xbox/recent         (admin) your most recently played Xbox games via OpenXBL, with playtime and achievements
 //   POST   /xbox/import         { games: [{ titleId, date }] } (admin) -> logs them in Games' Recently Played
-//   POST   /xbox/sync           (admin) run the nightly Recently Played refresh and gamerscore snapshot now (see scheduled() below)
-//   GET    /xbox/gamerscore     Nick's total gamerscore and how much it went up since the night before (Games banner)
+//   POST   /xbox/sync           (admin) run the every-4-hours Recently Played refresh and gamerscore snapshot now (see scheduled() below)
+//   GET    /xbox/gamerscore     Nick's total gamerscore and how much it went up in the last 24 hours (Games banner)
 //                               (or refreshes their Xbox stats if already there), poster from PosterSpy or the Xbox store
+//   GET    /library ...         Movies > Library: discs Nick adds on the site (see library.js)
 //   GET    /spotify/top?playlist=<id>  the first song on a public Spotify playlist (home page "Lately" strip)
 //   GET    /spotify/now         what Nick is playing on Spotify now, or his last played song (home "Lately" strip)
 //   GET    /spotify/recent      his last 10 songs (now playing first, marked live) for the Music page
@@ -53,9 +55,9 @@ import { votesRoute } from "./votes.js";
 //   xbox:gamerscore                { total, at, history: [{ date, total }] }: one snapshot a night, the last 60 kept
 
 const PER_VISITOR = 3;
-// Recently Watched/Played shows the newest 12 by date; older ones move to watched-archive (listed under the section).
+// Recently Watched/Played keeps the newest 8 by date; older ones move to watched-archive (listed under the section).
 // The favorites/best sections have no cap: Nick keeps those at 12 himself (adding new ones on top, removing old ones).
-const SECTION_MAX = 12;
+const SECTION_MAX = 8; // Recently Watched/Played keep the newest 8; everything older is in the Archive (was 12 until 1.3)
 // Words in a comment that start with a BLOCKED term but are fine ("hit me" with the space removed would read "shit",
 // so comments are checked word by word, unlike names)
 const ALLOWED_WORDS = new Set(["cocktail", "cocktails", "cockpit", "cockroach", "cockroaches", "cockatoo", "cocky", "dickens", "dickinson", "dickie", "shitake"]);
@@ -80,6 +82,8 @@ const IMG_HOSTS = ["m.media-amazon.com", "alternativemovieposters.com", "store-i
 const XBOX_RECENT = 30; // how many recent Xbox games /xbox/recent lists
 const GAMERSCORE_KEY = "xbox:gamerscore";
 const GAMERSCORE_NIGHTS = 60;
+const GAMERSCORE_BACKFILL = 31; // nights rebuilt from achievement history the first time (30-day gain + 1)
+const EVERY_4H = "0 */4 * * *"; // wrangler.toml's 4-hourly cron; the other two only matter at midnight in TIMEZONE
 const BLOCKED = ["fuck", "shit", "cunt", "nigg", "fag", "retard", "bitch", "whore", "slut", "nazi", "rape", "porn", "dick", "cock", "pussy"];
 
 export default {
@@ -98,7 +102,9 @@ export default {
         if (!isAdmin(request, env)) return json({ error: "Unauthorized" }, 401, cors);
         try {
           const result = await syncRecentlyPlayed(env);
-          result.gamerscore = (await recordGamerscore(env)).total;
+          const score = gamerscoreView(env, await recordGamerscore(env));
+          result.gamerscore = score.total;
+          result.gained = score.gained;
           return json(result, 200, cors);
         } catch (e) {
           if (e instanceof XblError) return json({ error: e.message }, 502, cors);
@@ -126,6 +132,7 @@ export default {
       if (url.pathname === "/hidden" && (request.method === "POST" || request.method === "DELETE")) return await setHidden(request, env, cors);
       if (url.pathname === "/watched" && request.method === "GET") {
         const wpage = pageOf(url.searchParams.get("page"));
+        await fitWatched(env, wpage);
         return json({
           items: sortWatched(await getList(env, watchedKey(wpage))).slice(0, SECTION_MAX),
           archive: sortWatched(await getList(env, watchedKey(wpage) + "-archive")).map(archived),
@@ -142,6 +149,10 @@ export default {
         const res = await votesRoute(request, url, env, cors, { json, sha256, normalize, pageOf, queueState, suggesterId, isAdmin });
         if (res) return res;
       }
+      if (url.pathname === "/library" || url.pathname.startsWith("/library/")) {
+        const res = await libraryRoute(request, url, env, cors, { json, isAdmin });
+        if (res) return res;
+      }
       if (url.pathname.startsWith("/music/")) {
         const res = await musicRoute(request, url, env, cors, { json, isAdmin, normalize, BLOCKED, visitorKeys, usedBy, suggesterId, spotifyAccess });
         if (res) return res;
@@ -152,12 +163,14 @@ export default {
     }
   },
 
-  // Cron triggers (wrangler.toml) fire at 05:00 and 06:00 UTC; only the one that lands on midnight in
-  // TIMEZONE (America/Chicago: 05:00 in daylight time, 06:00 in standard time) does the work.
+  // Cron triggers (wrangler.toml): every 4 hours, plus 05:00 and 06:00 UTC, of which only the one landing on
+  // midnight in TIMEZONE (America/Chicago: 05:00 in daylight time, 06:00 in standard time) runs. That midnight run
+  // takes the day's gamerscore snapshot for the banner's "+XG in the last 24h". 3 OpenXBL requests a run
+  // (/titles, /player/stats, /account), 21 a day, well inside the free plan's 150 an hour (shared with the Montage app).
   async scheduled(event, env, ctx) {
-    if (hourIn(env.TIMEZONE, new Date(event.scheduledTime)) !== 0) return;
-    ctx.waitUntil(syncRecentlyPlayed(env).catch((e) => console.log("nightly Xbox sync failed:", e.message)));
-    ctx.waitUntil(recordGamerscore(env).catch((e) => console.log("nightly gamerscore failed:", e.message)));
+    if (event.cron !== EVERY_4H && hourIn(env.TIMEZONE, new Date(event.scheduledTime)) !== 0) return;
+    ctx.waitUntil(syncRecentlyPlayed(env).catch((e) => console.log("Xbox sync failed:", e.message)));
+    ctx.waitUntil(recordGamerscore(env).catch((e) => console.log("gamerscore failed:", e.message)));
   },
 };
 
@@ -628,6 +641,22 @@ async function saveWatched(env, page, items) {
   return keep;
 }
 
+// Keep the list at exactly SECTION_MAX when it can be: more (SECTION_MAX went from 12 to 8 in 1.3) -> the oldest move
+// to the Archive; fewer (one was removed) while the Archive has entries -> the newest archived move back in. Only
+// writes when something moves, so normally it's one read.
+async function fitWatched(env, page) {
+  const key = watchedKey(page);
+  const items = await getList(env, key);
+  if (items.length > SECTION_MAX) { await saveWatched(env, page, items); return; }
+  if (items.length === SECTION_MAX) return;
+  const archive = await getList(env, key + "-archive");
+  if (!archive.length) return;
+  const back = sortWatched(archive).slice(0, SECTION_MAX - items.length);
+  const ids = new Set(back.map((it) => it.id));
+  await env.QUEUE.put(key, JSON.stringify(sortWatched(items.concat(back.map(({ archivedAt, ...it }) => it)))));
+  await env.QUEUE.put(key + "-archive", JSON.stringify(archive.filter((it) => !ids.has(it.id))));
+}
+
 async function addWatched(request, env, cors) {
   if (!isAdmin(request, env)) return json({ error: "Unauthorized" }, 401, cors);
   let body;
@@ -942,7 +971,7 @@ async function xboxImport(request, env, cors) {
     importedTitles.push(g.name);
     added++;
   }
-  await saveWatched(env, "games", items); // newest 12 by last played; older ones to the archive
+  await saveWatched(env, "games", items); // newest 8 by last played; older ones to the archive
 
   // Playing something from the queue takes it out of the queue. Matched by exact title (ignoring only case and symbols
   // like ™, so "Gears of War" never removes "Gears of War: E-Day"), since queue games come from IMDb, not Xbox
@@ -953,7 +982,7 @@ async function xboxImport(request, env, cors) {
   return json({ added, updated }, 200, cors);
 }
 
-// ---------- Nightly refresh of Games' Recently Played (owner's Xbox data) ----------
+// ---------- Refresh of Games' Recently Played every 4 hours (owner's Xbox data) ----------
 
 function hourIn(tz, date) {
   return parseInt(new Intl.DateTimeFormat("en-US", { timeZone: tz || "America/Chicago", hour: "numeric", hourCycle: "h23" }).format(date), 10);
@@ -1024,8 +1053,10 @@ async function syncRecentlyPlayed(env) {
 
 // ---------- Gamerscore banner (Games page) ----------
 
-// Nick's total gamerscore (1 OpenXBL request), saved by the nightly cron. The banner shows the total and the
-// change since the previous night's snapshot ("+75G in the last 24h").
+// Nick's total gamerscore (1 OpenXBL request), checked every 4 hours by the cron and by owner-mode Refresh: the
+// banner's total is always the latest. The gains ("+75G in the last 24h", 7 days, 30 days) are whole days and only
+// change once a day: the first check of each day (the midnight cron) saves that night's snapshot {date, total}, and
+// each gain is the difference between nights. Later checks that day never touch the snapshots.
 async function recordGamerscore(env) {
   const account = await xbl(env, "/account");
   const settings = ((account.profileUsers || [])[0] || {}).settings || [];
@@ -1033,22 +1064,88 @@ async function recordGamerscore(env) {
   if (!(total >= 0)) throw new XblError("Xbox didn't send a gamerscore.");
   const saved = (await env.QUEUE.get(GAMERSCORE_KEY, "json")) || { history: [] };
   const date = dateIn(env.TIMEZONE, new Date().toISOString());
-  const history = saved.history.filter((h) => h.date !== date).concat({ date, total }).slice(-GAMERSCORE_NIGHTS);
-  const out = { total, at: new Date().toISOString(), history };
+  let history = nights(env, saved.history);
+  let backfilled = !!saved.backfilled;
+  if (!backfilled) {
+    try {
+      history = mergeNights(await backfillNights(env, total, date), history);
+      backfilled = true;
+    } catch (e) { console.log("gamerscore backfill failed, will retry:", e.message); }
+  }
+  if (!history.some((h) => h.date === date)) history = history.concat({ date, total });
+  const out = { total, at: new Date().toISOString(), backfilled, history: history.slice(-GAMERSCORE_NIGHTS) };
   await env.QUEUE.put(GAMERSCORE_KEY, JSON.stringify(out));
   return out;
 }
 
+// "YYYY-MM-DD" n days before (or after, negative) a "YYYY-MM-DD" date
+function shiftDate(date, n) {
+  return new Date(Date.parse(date + "T12:00:00Z") - n * 86400000).toISOString().slice(0, 10);
+}
+
+// One time (the first check after 1.3 deploys): rebuild the last GAMERSCORE_BACKFILL nights from achievement unlock
+// times, so the 7- and 30-day gains work right away instead of after a month of snapshots. A night's total = today's
+// total minus everything unlocked on or after that date. Costs 1 + one request per game played in that time (~20).
+async function backfillNights(env, total, today) {
+  const first = shiftDate(today, GAMERSCORE_BACKFILL);
+  const history = await xbl(env, "/titles");
+  const titles = (history.titles || []).filter((t) => t.titleHistory && t.titleHistory.lastTimePlayed &&
+    dateIn(env.TIMEZONE, t.titleHistory.lastTimePlayed) >= first);
+  const byDay = {};
+  const lists = await Promise.all(titles.map((t) => xbl(env, "/achievements/player/" + history.xuid + "/" + t.titleId)));
+  for (const a of lists) {
+    for (const x of a.achievements || []) {
+      if (x.progressState !== "Achieved" || !x.progression || !x.progression.timeUnlocked) continue;
+      const day = dateIn(env.TIMEZONE, x.progression.timeUnlocked);
+      const gs = parseInt(((x.rewards || []).find((r) => r.type === "Gamerscore") || {}).value, 10) || 0;
+      if (day >= first && gs) byDay[day] = (byDay[day] || 0) + gs;
+    }
+  }
+  const out = [];
+  let after = 0; // gamerscore unlocked on or after the date being filled, walking back from today
+  for (let d = today; d >= first; d = shiftDate(d, 1)) {
+    after += byDay[d] || 0;
+    out.unshift({ date: d, total: total - after });
+  }
+  return out;
+}
+
+// Real nightly snapshots win over rebuilt ones for the same date
+function mergeNights(rebuilt, real) {
+  const byDate = new Map(rebuilt.map((h) => [h.date, h]));
+  for (const h of real) byDate.set(h.date, h);
+  return [...byDate.values()].sort((a, b) => (a.date < b.date ? -1 : 1));
+}
+
+// Nightly snapshots {date, total}, one per day (the first; a few local test ones were {at, total})
+function nights(env, history) {
+  const seen = new Set();
+  return history.map((h) => (h.date ? h : { date: dateIn(env.TIMEZONE, h.at), total: h.total }))
+    .filter((h) => (seen.has(h.date) ? false : seen.add(h.date)));
+}
+
+// gained = the last night's snapshot minus the night before's: the gain over one full day, the same all day.
+// gained7 / gained30: minus the night 7 / 30 days before. Each is null when that night is missing (a missed night,
+// or not enough history), which hides it on the banner.
+function gamerscoreView(env, saved) {
+  const h = nights(env, saved.history);
+  const last = h[h.length - 1];
+  const since = (n) => {
+    const then = last && h.find((x) => x.date === shiftDate(last.date, n));
+    return then ? last.total - then.total : null;
+  };
+  return { total: saved.total, gained: since(1), gained7: since(7), gained30: since(30), at: saved.at };
+}
+
 async function gamerscore(env, cors) {
   let saved = await env.QUEUE.get(GAMERSCORE_KEY, "json");
-  if (!saved) { // first visit before the first nightly snapshot
+  if (!saved) { // first visit before the first snapshot
     try { saved = await recordGamerscore(env); } catch (e) {
       if (e instanceof XblError) return json({ error: e.message }, 502, cors);
       throw e;
     }
   }
-  const prev = saved.history.length > 1 ? saved.history[saved.history.length - 2] : null;
-  return json({ total: saved.total, gained: prev ? saved.total - prev.total : null, at: saved.at }, 200, cors);
+  return json(gamerscoreView(env, saved), 200, cors);
 }
 
 // ---------- Spotify: top song of a public playlist ----------

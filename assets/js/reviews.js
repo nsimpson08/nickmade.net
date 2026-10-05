@@ -104,12 +104,20 @@
     return '<div class="entries">' + items.map(reviewEntry).join("") + "</div>";
   }
 
+  // Every poster grid but In the Queue (Recently Watched/Played, Best ..., Hidden Gems, Games' All Time Favorites) shows
+  // 8 posters (2 rows of 4 on desktop), or 6 when the grid is only 2 across (phones), with an Expand button for the rest.
+  // Recently Watched/Played keep only their newest 8 in the Worker (the rest are in their Archive), so on desktop they
+  // never need the button. The queue shows everything, so every suggestion can be voted on.
+  var CAP = 8, CAP_NARROW = 6;
+  function capped(sec) { return sec.layout === "grid" && sec.live !== "queue"; }
+
   function sectionHtml(sec) {
-    return '<section class="subsection"' + (sec.title ? ' id="' + slug(sec.title) + '"' : "") + ">" +
+    return '<section class="subsection"' + (sec.title ? ' id="' + slug(sec.title) + '"' : "") + (capped(sec) ? " data-cap" : "") + ">" +
       (sec.title ? '<h2 class="subhead"><span>' + esc(sec.title) + "</span>" +
         (sec.subtitle ? '<small class="sub">' + esc(sec.subtitle) + "</small>" : "") +
         "</h2>" : "") +
       body(sec) +
+      (capped(sec) ? '<div class="cap-more" hidden><button type="button" class="cap-toggle" aria-expanded="false"></button></div>' : "") +
       (sec.live === "watched" && sec.title // only Recently Watched/Played have an Archive (filled by live.js)
         ? '<div class="archive"><button type="button" class="archive-toggle" aria-expanded="false">Archive</button>' +
           '<div class="archive-panel" hidden></div></div>'
@@ -143,7 +151,7 @@
       inner + "</div>";
   }).join("");
 
-  // ---------- Archive (Recently Watched/Played only): what was pushed out of the newest 12 ----------
+  // ---------- Archive (Recently Watched/Played only): what was pushed out of the newest 8 ----------
   var els = root.querySelectorAll("section.subsection");
   [].forEach.call(els, function (el) {
     if (el.querySelector(".archive")) el.nmArchive = { live: [] };
@@ -177,6 +185,48 @@
       var panel = el.querySelector(".archive-panel");
       panel.hidden = !panel.hidden;
       btn.setAttribute("aria-expanded", String(!panel.hidden));
+    });
+  });
+
+  // ---------- 8 at a time (Nick, 1.3) ----------
+  // Posters past the CAP-th get .capped (hidden by CSS, so the poster wall still finds them) until Expand. The live
+  // sections change after load (site adds, owner Remove hides), so each section re-counts
+  // whenever its posters change. Owner-mode "+" cards aren't posters, so they always show.
+  function applyCap(el) {
+    var grid = el.querySelector(".poster-grid");
+    var more = el.querySelector(".cap-more");
+    if (!more) return;
+    var posters = grid ? [].filter.call(grid.children, function (c) { return c.classList.contains("poster") && !c.hidden; }) : [];
+    var open = el.classList.contains("cap-open");
+    var cols = grid ? getComputedStyle(grid).gridTemplateColumns.split(" ").length : 4;
+    var cap = cols <= 2 ? CAP_NARROW : CAP;
+    posters.forEach(function (c, i) { c.classList.toggle("capped", !open && i >= cap); });
+    var extra = posters.length - cap;
+    more.hidden = extra <= 0;
+    var btn = more.firstChild;
+    var label = open ? "Show fewer" : "Expand \u00b7 " + extra + " more";
+    if (btn.textContent !== label) btn.textContent = label; // (only when it changes: the observer below sees it)
+    btn.setAttribute("aria-expanded", String(open));
+  }
+  var capSections = root.querySelectorAll("section[data-cap]");
+  var capTimer = null;
+  window.addEventListener("resize", function () { // a rotated phone or a resized window can change 2 across <-> 4 across
+    clearTimeout(capTimer);
+    capTimer = setTimeout(function () { [].forEach.call(capSections, applyCap); }, 150);
+  });
+  [].forEach.call(capSections, function (el) {
+    applyCap(el);
+    var queued = false;
+    new MutationObserver(function (list) {
+      if (queued || list.every(function (m) { return m.target.closest && m.target.closest(".cap-more"); })) return;
+      queued = true;
+      requestAnimationFrame(function () { queued = false; applyCap(el); });
+    }).observe(el, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden"] });
+    el.querySelector(".cap-toggle").addEventListener("click", function () {
+      var opening = !el.classList.contains("cap-open");
+      el.classList.toggle("cap-open", opening);
+      applyCap(el);
+      if (!opening) el.querySelector(".cap-more").scrollIntoView({ block: "nearest" }); // don't leave you far below it
     });
   });
 

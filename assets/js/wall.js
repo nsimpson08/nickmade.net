@@ -10,14 +10,18 @@
 // Hovering shows album, artist and where it's from; clicking plays that song in a small Spotify player at the bottom
 // of the wall (a 30-second preview for visitors not signed in to Spotify) instead of jumping to it on the page.
 //
-// Extras page: 16:9 tiles: short looping clips of Nick's Nine, Rapture, and a Montage Maker montage (extras/wall/,
-// silent MP4s that only play while on screen), and the 8 newest Trackman rounds from the Golf page
-// (extras/golf/trackman.js, loaded when the wall opens) as course photos with the score on them. Clicking one jumps to
-// that project's card.
+// Extras page: 16:9 tiles: a short looping clip of a Montage Maker montage (extras/wall/, a silent MP4 that only plays
+// while on screen) and the 8 newest Trackman rounds from the Golf page (extras/golf/trackman.js, loaded when the wall
+// opens) as course photos with the score on them. Clicking one jumps to that project's card.
+//
+// Play page (1.3): 16:9 tiles of the two games: their gameplay clips (play/wall/) plus 5 stills from each clip, so the
+// wall (and the background) isn't just two pictures. Clicking one jumps to that game's card.
 //
 // Photography page: 3:2 tiles of every photo in the sections (their 800px copies); clicking one jumps to it.
 //
-// Home page: an even mix of the five other pages (the same number from each: movie and game posters from their
+// Movies > Library: every disc's cover (from library.js, window.NMLibrary), 2:3; clicking one opens its case.
+//
+// Home page: an even mix of the six other pages (the same number from each: movie and game posters from their
 // list.js, album covers from the Worker, photos from photos.js, Extras' clips and Trackman rounds), each tile in its own
 // shape (2:3, square, 3:2, 16:9); clicking one goes to its page. Home has no top bar, so the header control floats
 // at the top right.
@@ -31,18 +35,21 @@
   var script = document.currentScript;
   var MUSIC = document.body.classList.contains("page-music");
   var EXTRAS = document.body.classList.contains("page-extras");
+  var PLAY = document.body.classList.contains("page-play");
+  var CLIPS_PAGE = EXTRAS || PLAY; // 16:9 tiles, clips that play while visible
   var PHOTOS = document.body.classList.contains("page-photography");
+  var LIBRARY = document.body.classList.contains("page-library");
   var HOME = !!document.querySelector("main.home");
-  var root = HOME ? document.querySelector("main.home") : EXTRAS ? document.querySelector("main.content > section")
-    : document.getElementById(MUSIC ? "playlists" : PHOTOS ? "photos" : "entries");
+  var root = HOME ? document.querySelector("main.home") : CLIPS_PAGE ? document.querySelector("main.content > section")
+    : document.getElementById(MUSIC ? "playlists" : PHOTOS ? "photos" : LIBRARY ? "library" : "entries");
   if (!root) return;
   var local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
   var API = (local ? script.dataset.apiLocal : script.dataset.api) || "";
   var still = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var NAME = HOME ? "NickMade" : MUSIC ? "Music" : EXTRAS ? "Extras" : PHOTOS ? "Photography" : document.body.classList.contains("page-games") ? "Games" : "Movies";
-  var NOUN = HOME ? "from all five pages" : MUSIC ? "album covers" : EXTRAS ? "clips and rounds" : PHOTOS ? "photos" : "posters";
-  var RATIO = HOME ? 1 : MUSIC ? 1 : EXTRAS ? 9 / 16 : PHOTOS ? 2 / 3 : 1.5; // tile height / width (Home: each tile has its own)
-  var COL_W = EXTRAS ? 280 : PHOTOS ? 240 : 190; // about how wide a column is
+  var NAME = HOME ? "NickMade" : MUSIC ? "Music" : EXTRAS ? "Extras" : PLAY ? "Play" : PHOTOS ? "Photography" : LIBRARY ? "Library" : document.body.classList.contains("page-games") ? "Games" : "Movies";
+  var NOUN = HOME ? "from all six pages" : MUSIC ? "album covers" : EXTRAS ? "clips and rounds" : PLAY ? "clips" : PHOTOS ? "photos" : LIBRARY ? "discs" : "posters";
+  var RATIO = HOME ? 1 : MUSIC ? 1 : CLIPS_PAGE ? 9 / 16 : PHOTOS ? 2 / 3 : 1.5; // tile height / width (Home: each tile has its own)
+  var COL_W = CLIPS_PAGE ? 280 : PHOTOS ? 240 : 190; // about how wide a column is
   var BG_DIM = 0.25, BG_MAX = PHOTOS ? 40 : 80; // background: brightness (0-1) and the most tiles it uses (photos are 800px files)
   var ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="1" width="4" height="6" rx="1"/><rect x="6" y="1" width="4" height="9" rx="1"/>' +
     '<rect x="11" y="1" width="4" height="5" rx="1"/><rect x="1" y="8" width="4" height="7" rx="1"/><rect x="6" y="11" width="4" height="4" rx="1"/><rect x="11" y="7" width="4" height="8" rx="1"/></svg>';
@@ -127,12 +134,23 @@
   }
   if (MUSIC && API) setTimeout(playlistCovers, 1500); // warm it up so the wall opens straight away
 
-  // Extras: the clips (made from the games and the Montage Maker; see NOTES) and the Trackman rounds
+  // Extras: the Montage Maker clip (see NOTES for how the clips were made) and the Trackman rounds
   var CLIPS = [
-    { video: "/extras/wall/nicks-nine.mp4", src: "/extras/wall/nicks-nine.jpg", title: "Nick's Nine", meta: "Gameplay", card: "Nick's Nine" },
-    { video: "/extras/wall/rapture.mp4", src: "/extras/wall/rapture.jpg", title: "Rapture: ADAM & Dice", meta: "Gameplay", card: "Rapture: ADAM & Dice" },
     { video: "/extras/wall/montage.mp4", src: "/extras/wall/montage.jpg", title: "Video Game Montage Maker", meta: "A montage it made", card: "Video Game Montage Maker" },
   ];
+  // Play: each game's clip and 5 stills taken from it (play/wall/<game>-1.jpg ... -5.jpg)
+  var GAMES = [
+    { slug: "nicks-nine", title: "Nick's Nine" },
+    { slug: "rapture", title: "Rapture: ADAM & Dice" },
+  ];
+  function collectPlay() {
+    var out = [];
+    GAMES.forEach(function (g) {
+      out.push({ video: "/play/wall/" + g.slug + ".mp4", src: "/play/wall/" + g.slug + ".jpg", title: g.title, section: "Gameplay", el: card(g.title) });
+      for (var n = 1; n <= 5; n++) out.push({ src: "/play/wall/" + g.slug + "-" + n + ".jpg", title: g.title, section: "Screenshot", el: card(g.title) });
+    });
+    return out;
+  }
   var roundsReq = null;
   function golfRounds() {
     if (!roundsReq) roundsReq = loadData("/extras/golf/trackman.js", "GOLF_TRACKMAN").then(function (r) { if (!r) roundsReq = null; return r || []; });
@@ -169,7 +187,7 @@
     });
   }
 
-  // Photography: the photos in the sections (the featured one sits above them, outside root)
+  // Photography: the photos in the sections
   function collectPhotos() {
     var out = [];
     [].forEach.call(root.querySelectorAll(".photo-section"), function (sec) {
@@ -217,6 +235,7 @@
       collectExtras(HOME_EACH).then(function (extras) {
         return extras.map(function (x) { return Object.assign({}, x, { el: null, href: "/extras/", ratio: 9 / 16, section: x.video ? "Extras · " + x.section : x.section }); });
       }),
+      Promise.resolve(collectPlay().map(function (x) { return Object.assign({}, x, { el: null, href: "/play/", ratio: 9 / 16, section: "Play · " + x.section }); })),
     ]).then(function (picks) {
       // the same number from each page (Extras: every clip, then rounds to fill its share)
       var out = [];
@@ -231,7 +250,8 @@
 
   // Everything the wall shows on this page (a promise: Music, Extras and Home fetch theirs)
   function collectAll() {
-    return HOME ? collectHome() : MUSIC ? collectMusic() : EXTRAS ? collectExtras() : Promise.resolve(PHOTOS ? collectPhotos() : collect());
+    return HOME ? collectHome() : MUSIC ? collectMusic() : EXTRAS ? collectExtras() : PLAY ? Promise.resolve(collectPlay())
+      : Promise.resolve(PHOTOS ? collectPhotos() : LIBRARY ? (window.NMLibrary ? window.NMLibrary.wallItems() : []) : collect());
   }
 
   // The wall's copy of an image: the 400px WebP from tools/thumbs.py for the site's own posters, photos and courses;
@@ -282,7 +302,7 @@
   // Fill a wall element's .wall-cols with columns of these posters (bg: plain tiles for the background)
   function build(el, items, bg) {
     var vw = window.innerWidth, vh = window.innerHeight;
-    var cols = Math.max(EXTRAS ? 2 : 3, Math.min(10, Math.round(vw / COL_W)));
+    var cols = Math.max(CLIPS_PAGE ? 2 : 3, Math.min(10, Math.round(vw / COL_W)));
     if (!still) cols += 1; // the tilt needs an extra column to cover the corners
     var colW = (vw * (still ? 1 : 1.2)) / cols;
     var tileH = colW * RATIO; // posters 2:3, album covers square, Extras 16:9
@@ -322,7 +342,7 @@
     items = shuffle(list);
     if (!items.length) return;
     wall = document.createElement("div");
-    wall.className = "wall" + (still ? " still" : "") + (MUSIC ? " albums" : "") + (EXTRAS ? " extras" : "") + (PHOTOS ? " photos" : "");
+    wall.className = "wall" + (still ? " still" : "") + (MUSIC ? " albums" : "") + (CLIPS_PAGE ? " extras" : "") + (PHOTOS ? " photos" : "");
     wall.setAttribute("role", "dialog");
     wall.setAttribute("aria-modal", "true");
     wall.setAttribute("aria-label", NAME + " poster wall");
@@ -332,7 +352,7 @@
       (MUSIC ? '<div class="wall-player" hidden><div></div></div>' : "");
     document.body.appendChild(wall);
     build(wall, items);
-    if (EXTRAS || HOME) playVisible(wall);
+    if (CLIPS_PAGE || HOME) playVisible(wall);
     document.documentElement.classList.add("wall-on"); // stops the page scrolling underneath
     requestAnimationFrame(function () { wall.classList.add("in"); });
     wall.querySelector(".wall-close").focus();
@@ -341,6 +361,7 @@
       var t = e.target.closest(".wall-tile");
       if (t && MUSIC) playSong(+t.dataset.i);
       else if (t && items[+t.dataset.i].href) location.href = items[+t.dataset.i].href; // Home: to its page
+      else if (t && LIBRARY) { var id = items[+t.dataset.i].id; hide(function () { window.NMLibrary.open(id); }); } // its case
       else if (t) goTo(items[+t.dataset.i]);
     });
     document.addEventListener("keydown", onKey);
@@ -365,6 +386,11 @@
   // Close the wall and bring that poster into view on the page, with a brief glow
   function goTo(p) {
     hide(function () {
+      // Photography in slideshow mode: show that photo in the slideshow (the grids are hidden)
+      if (PHOTOS && window.NMPhotos && window.NMPhotos.slides() && p.el.dataset.index != null) return window.NMPhotos.slideTo(+p.el.dataset.index);
+      // past the 8 a capped section shows (reviews.js): expand it first, or there's nothing to scroll to
+      var capSec = p.el.classList.contains("capped") && p.el.closest("section[data-cap]");
+      if (capSec) capSec.querySelector(".cap-toggle").click();
       p.el.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "center" });
       p.el.classList.remove("wall-found");
       void p.el.offsetWidth;
@@ -444,14 +470,24 @@
     else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
   }
 
-  var resizeTimer = null;
+  var resizeTimer = null, bgSize = null;
   window.addEventListener("resize", onResize); // rebuilds the open wall and the background for the new size
   function onResize() {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(function () {
-      if (wall) { build(wall, items); if (EXTRAS || HOME) playVisible(wall); }
-      if (bgWall) build(bgWall, bgItems, true);
+      if (wall) { build(wall, items); if (CLIPS_PAGE || HOME) playVisible(wall); }
+      if (bgWall && bgResized()) buildBg();
     }, 200);
+  }
+  // Phones resize the window whenever the address bar slides in or out while scrolling. The background is sized to the
+  // tallest viewport (100lvh in site.css), so those don't matter; rebuilding then made the columns jump. Only a new width
+  // (rotating, a desktop window) or a much taller window rebuilds it.
+  function bgResized() {
+    return !bgSize || window.innerWidth !== bgSize.w || window.innerHeight > bgSize.h * 1.25;
+  }
+  function buildBg() {
+    bgSize = { w: window.innerWidth, h: window.innerHeight };
+    build(bgWall, bgItems, true);
   }
 
   // ---------- background toggle (top bar, right end) ----------
@@ -501,14 +537,14 @@
       if (!bgOn || bgWall || !list.length) return;
       bgItems = shuffle(list).slice(0, BG_MAX);
       bgWall = document.createElement("div");
-      bgWall.className = "wall wall-bg" + (still ? " still" : "") + (MUSIC ? " albums" : "") + (EXTRAS ? " extras" : "") + (PHOTOS ? " photos" : "") + (HOME ? " wall-home" : "");
+      bgWall.className = "wall wall-bg" + (still ? " still" : "") + (MUSIC ? " albums" : "") + (CLIPS_PAGE ? " extras" : "") + (PHOTOS ? " photos" : "") + (HOME ? " wall-home" : "") + (LIBRARY ? " wall-library" : "");
       if (HOME) bgItems = shuffle(list.filter(function (x, k) { return k % 2 === 0 || x.video; })).slice(0, BG_MAX); // half of each page's share
       bgWall.setAttribute("aria-hidden", "true");
       bgWall.style.setProperty("--wall-shade", String(1 - BG_DIM));
       bgWall.innerHTML = '<div class="wall-cols"></div>';
       document.body.insertBefore(bgWall, document.body.firstChild);
       document.documentElement.classList.add("wall-bg-on"); // readability tweaks for the page on top (site.css)
-      build(bgWall, bgItems, true);
+      buildBg();
       requestAnimationFrame(function () { requestAnimationFrame(function () { if (bgWall) bgWall.classList.add("in"); }); });
     });
   }

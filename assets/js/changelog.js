@@ -2,14 +2,14 @@
 (function () {
   var log = window.CHANGELOG || [];
   var root = document.getElementById("changelog");
-  var PAGES = { site: "Site", home: "Home", games: "Games", movies: "Movies", music: "Music", photography: "Photography", extras: "Extras" };
-  var LINKS = { home: "/", games: "/games/", movies: "/movies/", music: "/music/", photography: "/photography/", extras: "/extras/" };
+  var PAGES = { site: "Site", home: "Home", games: "Games", movies: "Movies", music: "Music", photography: "Photography", play: "Play", extras: "Extras" };
+  var LINKS = { home: "/", games: "/games/", movies: "/movies/", music: "/music/", photography: "/photography/", play: "/play/", extras: "/extras/" };
 
   function esc(s) {
     return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; });
   }
   // A version's lines grouped by part of the site, in nav order; lines keep their written order within a group
-  var ORDER = ["site", "home", "games", "movies", "music", "photography", "extras"];
+  var ORDER = ["site", "home", "games", "movies", "music", "photography", "play", "extras"];
   function grouped(changes) {
     function rank(c) { var i = ORDER.indexOf(c.page); return i < 0 ? 0 : i; }
     return changes.map(function (c, i) { return { c: c, i: i }; })

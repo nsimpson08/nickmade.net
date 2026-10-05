@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Library · NickMade</title>
+  <meta name="description" content="Every movie Nick Simpson owns on disc: 4K, Blu-ray, and DVD, shelved like a video store.">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500&family=Unbounded:wght@500;600;700;800&display=swap">
+  <link rel="stylesheet" href="/assets/css/site.css">
+</head>
+<body class="page-movies page-library">
+  <header class="topbar">
+    <a class="wordmark" href="/">Nick<span>Made</span></a>
+    <nav>
+      <a href="/games/">Games</a>
+      <a href="/movies/" aria-current="page">Movies</a>
+      <a href="/music/">Music</a>
+      <a href="/photography/">Photography</a>
+      <a href="/play/">Play</a>
+      <a href="/extras/">Extras</a>
+    </nav>
+  </header>
+
+  <main class="content library">
+    <header class="page-head">
+      <a class="back" href="/movies/">&larr; Movies</a>
+      <h1>Library</h1>
+      <p>Every movie I own on disc. Browse the shelves like it's Friday night at the video store.</p>
+      <p class="lib-count" id="lib-count"></p>
+    </header>
+
+    <div id="library"></div>
+    <p class="lib-credit">Spine logos from <a href="https://www.themoviedb.org/" target="_blank" rel="noopener">TMDB</a>. This site uses the TMDB API but is not endorsed or certified by TMDB.</p>
+  </main>
+  <footer id="site-footer">&copy; 2026 Nick Simpson</footer>
+  <script src="discs.js"></script>
+  <script src="/assets/js/library.js" data-api="https://api.nickmade.net" data-api-local="http://localhost:8787"></script>
+  <script src="/assets/js/wall.js"></script>
+  <script src="/changelog/log.js"></script>
+  <script src="/assets/js/footer.js"></script>
+</body>
+</html>

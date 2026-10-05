@@ -25,7 +25,8 @@ def tri(t, period):
     return 1 - abs(2 * p - 1)
 
 
-# --- Extras: coding, then a golf shot, then a best-of list, looping ---
+# --- Extras: what's on the page (Golf, Video Game Montage Maker): a golf shot into the cup, the Golf page's score
+# trend drawing itself, then the Montage Maker: a gamertag, three games picked, their clips cut into a montage ---
 def star(d, cx, cy, r, fill):
     pts = []
     for k in range(10):
@@ -42,34 +43,21 @@ def fade(frames, n=5):
         frames[i] = Image.blend(frames[i], Image.new("RGB", (W, H), BG), (k + 1) / (n + 1))
 
 
+def ease(u):
+    u = max(0.0, min(1.0, u))
+    return 1 - (1 - u) ** 3
+
+
+def card(d, title):
+    d.rounded_rectangle((40, 30, W - 40, H - 30), 14, fill=(12, 12, 14), outline=DIM, width=2)
+    d.text((64, 48), title, font=MONO, fill=MINT)
+    d.line((64, 72, 64 + d.textlength(title, font=MONO), 72), fill=MINT, width=2)
+
+
 def extras():
     frames = []
 
-    # 1) coding: a terminal types a command and the checks come in
-    cmd = "nickmade new --idea"
-    checks = ["  [ok] sketching", "  [ok] caffeinating", "  [ok] shipping"]
-    steps = [(i, 0) for i in range(len(cmd) + 1)] + [(len(cmd), k) for k in (1, 1, 1, 1, 2, 2, 2, 2, 3)] + [(len(cmd), 3)] * 12
-    for n, (chars, shown) in enumerate(steps):
-        im = Image.new("RGB", (W, H), BG)
-        d = ImageDraw.Draw(im)
-        d.rounded_rectangle((40, 40, W - 40, H - 40), 14, fill=(12, 12, 14), outline=DIM, width=2)
-        for k, c in enumerate([(255, 95, 87), (254, 188, 46), (40, 200, 64)]):
-            d.ellipse((60 + k * 20, 58, 71 + k * 20, 69), fill=c)
-        y = 96
-        d.text((64, y), "$ ", font=MONO, fill=MINT)
-        d.text((84, y), cmd[:chars], font=MONO, fill=FG)
-        cx = 84 + d.textlength(cmd[:chars], font=MONO)
-        for k in range(shown):
-            y += 30
-            d.text((64, y), checks[k][:6], font=MONO, fill=MINT)
-            d.text((64 + d.textlength(checks[k][:6], font=MONO), y), checks[k][6:], font=MONO, fill=FG)
-            cx = 64 + d.textlength(checks[k], font=MONO) + 6
-        if chars < len(cmd) or (n // 4) % 2 == 0:
-            d.rectangle((cx + 2, y + 2, cx + 11, y + 20), fill=MINT)
-        frames.append(im)
-    fade(frames)
-
-    # 2) golf: backswing, strike, the ball arcs onto the green and drops in the cup
+    # 1) golf: backswing, strike, the ball arcs onto the green and drops in the cup
     ground = 232
     gx, bx0, hole = 92, 118, 392
     N = 60
@@ -135,31 +123,84 @@ def extras():
         frames.append(im)
     fade(frames)
 
-    # 3) a best-of list: ranked rows slide in, then the stars pop
-    widths = [210, 170, 190, 140, 160]
-    stars = [5, 5, 4, 4, 3]
-    N = 56
+    # 2) the Golf page's score trend: strokes, so lower is better and lower on the chart; rounds plot left to right,
+    #    trending down, then the best one lights up
+    scores = [104, 101, 103, 98, 99, 95, 97, 93, 94, 90]
+    x0, x1, y_top, y_bot = 80, W - 80, 96, 236
+    lo, hi = 86, 108
+    pts = [(x0 + (x1 - x0) * i / (len(scores) - 1), y_top + (y_bot - y_top) * (hi - v) / (hi - lo))
+           for i, v in enumerate(scores)]
+    N = 54
     for t in range(N):
         im = Image.new("RGB", (W, H), BG)
         d = ImageDraw.Draw(im)
-        d.rounded_rectangle((64, 30, W - 64, H - 30), 14, fill=(12, 12, 14), outline=DIM, width=2)
-        d.text((88, 48), "BEST OF", font=MONO, fill=MINT)
-        d.line((88, 72, 88 + d.textlength("BEST OF", font=MONO), 72), fill=MINT, width=2)
-        for i in range(5):
-            start = 4 + i * 4
-            if t < start:
-                continue
-            e = min(1.0, (t - start) / 6)
-            e = 1 - (1 - e) ** 3
-            off = int((1 - e) * 120)
-            y = 90 + i * 32
-            d.text((88 + off, y), "%02d" % (i + 1), font=MONO, fill=MINT)
-            d.rounded_rectangle((122 + off, y + 5, 122 + off + widths[i] * 0.9, y + 15), 4, fill=(62, 62, 66) if i else FG)
-            for k in range(stars[i]):  # stars pop in after the rows land
-                pop = t - (26 + i * 3 + k)
-                if pop >= 0:
-                    sc = min(1.0, 0.4 + pop * 0.3)
-                    star(d, 338 + k * 14 + off, y + 10, 6 * sc, AMBER if i == 0 else (150, 148, 144))
+        card(d, "SCORE TREND")
+        for gy in (y_top, (y_top + y_bot) // 2, y_bot):  # faint grid
+            d.line((x0, gy, x1, gy), fill=(28, 28, 32), width=1)
+        drawn = ease(t / 34) * (len(pts) - 1)  # how far along the line has drawn
+        whole = int(drawn)
+        line = pts[: whole + 1]
+        if whole < len(pts) - 1:
+            f = drawn - whole
+            a, b = pts[whole], pts[whole + 1]
+            line = line + [(a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f)]
+        if len(line) > 1:
+            d.line(line, fill=MINT, width=3, joint="curve")
+        for k, (px, py) in enumerate(pts[: whole + 1]):
+            best = k == len(pts) - 1 and t >= 38
+            rr = 6 if best else 4
+            d.ellipse((px - rr - 2, py - rr - 2, px + rr + 2, py + rr + 2), fill=(12, 12, 14))  # surface ring
+            d.ellipse((px - rr, py - rr, px + rr, py + rr), fill=AMBER if best else MINT)
+        if t >= 38:  # "Best 90" callout
+            bx, by = pts[-1]
+            label = "Best 90"
+            tw = d.textlength(label, font=MONO)
+            d.rounded_rectangle((bx - tw - 26, by - 46, bx - 10, by - 18), 7, fill=(30, 30, 34))
+            d.text((bx - tw - 18, by - 43), label, font=MONO, fill=AMBER)
+        frames.append(im)
+    fade(frames)
+
+    # 3) Video Game Montage Maker: type a gamertag, three recent games get ticked, their clips drop into a timeline,
+    #    a render bar fills, and a play button pops
+    tag = "gamertag"
+    games = [((126, 92, 214), "RPG"), ((228, 96, 72), "RACE"), ((64, 168, 120), "GOLF")]
+    N = 112  # the play button holds a second before the loop
+    for t in range(N):
+        im = Image.new("RGB", (W, H), BG)
+        d = ImageDraw.Draw(im)
+        card(d, "MONTAGE MAKER")
+        # the gamertag field
+        d.rounded_rectangle((64, 86, W - 64, 116), 8, fill=(20, 20, 24), outline=DIM, width=1)
+        chars = min(len(tag), t // 2)
+        d.text((76, 91), tag[:chars], font=MONO, fill=FG)
+        if chars < len(tag) or (t // 4) % 2 == 0 and t < 30:
+            cx = 76 + d.textlength(tag[:chars], font=MONO) + 2
+            d.rectangle((cx, 92, cx + 8, 110), fill=MINT)
+        # three game tiles, ticked one by one, then sliding down into the timeline
+        for k, (col, name) in enumerate(games):
+            tx, ty = 64 + k * 122, 128
+            drop = ease((t - (46 + k * 5)) / 10)
+            x = tx + (64 + k * 92 - tx) * drop
+            y = ty + (196 - ty) * drop
+            w = 106 - 18 * drop
+            h = 52 - 22 * drop
+            d.rounded_rectangle((x, y, x + w, y + h), 6, fill=col)
+            if drop < 0.5:
+                d.text((x + 10, y + 8), name, font=MONO, fill=(255, 255, 255))
+                if t >= 22 + k * 7:  # ticked
+                    d.ellipse((x + w - 24, y + 6, x + w - 6, y + 24), fill=MINT)
+                    d.line((x + w - 20, y + 15, x + w - 16, y + 19, x + w - 10, y + 10), fill=BG, width=2)
+        # the timeline under them: clips land in it with cuts between, then the render bar fills
+        if t >= 44:
+            d.rounded_rectangle((60, 190, W - 60, 232), 8, outline=DIM, width=2)
+        if t >= 70:
+            u = ease((t - 70) / 16)
+            d.rounded_rectangle((64, 240, 64 + (W - 128) * u, 248), 4, fill=MINT)
+        if t >= 84:  # play button pops over the timeline
+            sc = min(1.0, (t - 84) / 4)
+            cx, cy, r = W - 92, 211, 15 * sc
+            d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=FG)
+            d.polygon([(cx - r * 0.35, cy - r * 0.5), (cx - r * 0.35, cy + r * 0.5), (cx + r * 0.55, cy)], fill=BG)
         frames.append(im)
     fade(frames)
 

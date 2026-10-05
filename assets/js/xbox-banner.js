@@ -1,6 +1,7 @@
 // Games page: an Xbox-style "Achievement unlocked" banner with Nick's total gamerscore and how much it went up
-// since the night before (Worker GET /xbox/gamerscore, saved by the nightly Xbox sync). The animation plays on
-// every page load (CSS, in site.css); the number counts up from last night's total. Hidden if it can't load.
+// in the last day (Worker GET /xbox/gamerscore: total checked every 4 hours, the gain once a day at midnight). The animation plays on
+// every page load (CSS, in site.css); the number counts up from the total a day ago. Hidden if it can't load.
+// Owner-mode Refresh (live.js) calls window.NMXboxBanner.reload(), which plays it again, counting up from the old total.
 // The whole banner links to Nick's achievements profile (data-profile on the script tag: TrueAchievements, which is
 // public, unlike xbox.com's profile, which asks visitors to sign in), in a new tab.
 (function () {
@@ -17,12 +18,21 @@
 
   function fmt(n) { return Number(n).toLocaleString("en-US"); }
 
-  function render(d) {
-    var gained = typeof d.gained === "number" ? d.gained : null; // null until there are two nights of snapshots
-    var gain = gained === null ? "" :
-      '<span class="xa-gain">' + (gained < 0 ? "−" + fmt(-gained) : "+" + fmt(gained)) + "G <span>in the last 24h</span></span>";
+  var shown = null; // the total on screen, for reload()
+
+  function render(d, fromTotal) {
+    var gained = typeof d.gained === "number" ? d.gained : null; // null until there are two snapshots
+    shown = d.total;
+    // the last day, 7 days and 30 days, taking turns in one spot every 3 seconds (stacked with reduced motion);
+    // each is left out while the Worker has no number for it
+    var windows = [[gained, "in the last 24h", "in the last 24 hours"], [d.gained7, "in the last 7 days"], [d.gained30, "in the last 30 days"]]
+      .filter(function (w) { return typeof w[0] === "number"; });
+    var cycle = !still && windows.length > 1;
+    var gain = windows.length ? '<span class="xa-gains' + (cycle ? " cycle" : "") + '">' + windows.map(function (w, k) {
+      return '<span class="xa-gain' + (cycle && k === 0 ? " on" : "") + '">' + (w[0] < 0 ? "−" + fmt(-w[0]) : "+" + fmt(w[0])) + "G <span>" + w[1] + "</span></span>";
+    }).join("") + "</span>" : "";
     var label = "Xbox gamerscore " + fmt(d.total) +
-      (gained === null ? "" : ", " + (gained < 0 ? "down " + fmt(-gained) : "up " + fmt(gained)) + " in the last 24 hours") +
+      windows.map(function (w) { return ", " + (w[0] < 0 ? "down " + fmt(-w[0]) : "up " + fmt(w[0])) + " " + (w[2] || w[1]); }).join("") +
       (PROFILE ? ". Opens Nick's achievements on TrueAchievements in a new tab" : "");
     var tag = PROFILE ? "a" : "div";
     root.innerHTML =
@@ -35,9 +45,10 @@
       "</" + tag + ">";
     root.firstChild.setAttribute("aria-label", label);
     root.classList.add("play");
+    if (cycle) cycleGains();
 
-    // Count up from last night's total to now
-    var from = gained > 0 ? d.total - gained : d.total;
+    // Count up from a day ago's total (or, on reload, the one that was showing) to now
+    var from = fromTotal != null ? fromTotal : gained > 0 ? d.total - gained : d.total;
     if (still || from === d.total) return;
     var out = root.querySelector(".xa-total b");
     out.textContent = fmt(from);
@@ -51,11 +62,48 @@
     }, COUNT_AT);
   }
 
-  fetch(API + "/xbox/gamerscore")
-    .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
-    .then(function (d) {
-      if (!(d && d.total >= 0)) throw new Error("no gamerscore");
-      render(d);
-    })
-    .catch(function () { root.remove(); });
+  // Every 3 seconds the shown gain slides up and out and the next slides in from below (CSS transitions on .on / .out),
+  // starting once the intro has shown the first one. Paused while the pointer or keyboard focus is on the banner.
+  var GAIN_MS = 3000, GAIN_START = 2400 + 3000;
+  var gainTimer = null;
+  function cycleGains() {
+    clearTimeout(gainTimer);
+    var toast = root.firstChild, k = 0;
+    var lines = root.querySelectorAll(".xa-gain");
+    function next() {
+      gainTimer = setTimeout(next, GAIN_MS);
+      if (toast.matches(":hover, :focus-visible")) return;
+      lines[k].classList.remove("on");
+      lines[k].classList.add("out");
+      var was = lines[k];
+      setTimeout(function () { was.classList.remove("out"); }, 500); // back below, ready to come round again
+      k = (k + 1) % lines.length;
+      lines[k].classList.add("on");
+    }
+    gainTimer = setTimeout(next, GAIN_START);
+  }
+
+  function load() {
+    return fetch(API + "/xbox/gamerscore", { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+      .then(function (d) {
+        if (!(d && d.total >= 0)) throw new Error("no gamerscore");
+        return d;
+      });
+  }
+
+  load().then(function (d) { render(d); }).catch(function () { root.remove(); });
+
+  window.NMXboxBanner = {
+    reload: function () {
+      var was = shown;
+      return load().then(function (d) {
+        if (!root.isConnected) return d;
+        root.classList.remove("play");
+        void root.offsetWidth; // restart the animation
+        render(d, was);
+        return d;
+      });
+    },
+  };
 })();

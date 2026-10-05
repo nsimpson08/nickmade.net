@@ -7,11 +7,26 @@
 //   ] },
 //
 // page    which part of the site it's about (gives the line its colored tag):
-//         "site", "home", "games", "movies", "music", "photography", or "extras"
+//         "site", "home", "games", "movies", "music", "photography", "play", or "extras"
 //         The changelog page groups a version's lines by page in that order, whatever order they're written in.
 // When to bump: 1.1, 1.2... for new features or sections; 2.0 for a big redesign.
 // New movies, games, or photos don't need a version (that's content; the home Lately strip covers it).
 window.CHANGELOG = [
+  {
+    version: "1.3",
+    date: "2026-10-04",
+    title: "The video store",
+    changes: [
+      { page: "site", text: "Small site improvements." },
+      { page: "games", text: "The gamerscore banner updates every 4 hours and cycles through what I've earned in the last day, week, and month." },
+      { page: "games", text: "Finish a game's achievements and its line in Recently Played turns gold." },
+      { page: "movies", text: "My disc library: every movie I own on 4K and Blu-ray, shelved like a video store. Browse the aisles, search, see Nick's Picks, or let it pick something for tonight." },
+      { page: "movies", text: "Flip a case over to see what's on that disc. Switch to Spines to scan the whole shelf by each movie's real title logo." },
+      { page: "photography", text: "A slideshow view, now the default: one big photo with a strip of thumbnails beside it. The column layouts are still one tap away." },
+      { page: "play", text: "A new Play page for the games I've made: Nick's Nine and Rapture: ADAM & Dice, with gameplay clips." },
+      { page: "extras", text: "The golf score chart is easier to read: each round is a dot, and the line shows my 5-round average." }
+    ]
+  },
   {
     version: "1.2",
     date: "2026-10-02",
