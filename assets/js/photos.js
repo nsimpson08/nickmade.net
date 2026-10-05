@@ -215,11 +215,13 @@
     sections.forEach(function (s) {
       groups.push({ title: s.title, id: s.id, idx: s.photos.map(function () { return k++; }) });
     });
+    // An SVG arrow (pointing right; flipped for Previous in site.css): a text arrow sat off center in the circle
+    var SS_ARROW = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
     ss.innerHTML =
       '<div class="ss-stage">' +
         '<a class="ss-main" href="#"><img alt="" sizes="(max-width: 760px) 100vw, 75vw"></a>' +
-        '<button type="button" class="ss-prev" aria-label="Previous photo">&larr;</button>' +
-        '<button type="button" class="ss-next" aria-label="Next photo">&rarr;</button>' +
+        '<button type="button" class="ss-prev" aria-label="Previous photo">' + SS_ARROW + "</button>" +
+        '<button type="button" class="ss-next" aria-label="Next photo">' + SS_ARROW + "</button>" +
         '<div class="ss-bar"><span class="ss-where"></span><a class="ss-full" target="_blank" rel="noopener"></a></div>' +
       "</div>" +
       '<div class="ss-thumbs" aria-label="All photos">' + groups.map(function (g) {
