@@ -413,6 +413,9 @@
     }
   });
   dialog.addEventListener("close", function () { if (opener) opener.focus({ preventScroll: true }); });
+  // Once the case has turned over, drop the 3D animation: Chrome can keep drawing the layer from its blurry mid-turn
+  // raster (the Nick's Pick ribbon's small rotated text showed it); without the class it repaints sharp
+  dialog.addEventListener("animationend", function (e) { if (e.target.classList.contains("lib-back")) dialog.classList.remove("flip"); });
 
   // A box set's films (tools/discs.py BOX_SETS). One that's also on the shelves by itself opens that disc.
   function setList(d) {

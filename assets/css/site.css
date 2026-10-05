@@ -1041,6 +1041,9 @@ body:has(.wall-ctl.floating) .home { padding-top: max(14vh, 96px); } /* room for
 html.wall-bg-on { --muted: #b9b7b1; --faint: #92908a; }
 html.wall-bg-on body { text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 1px rgba(0, 0, 0, 0.6); }
 html.wall-bg-on .wall:not(.wall-bg) { text-shadow: none; } /* the popup wall has its own caption backgrounds */
+/* and the Library's cases print their own labels on solid colour: the shadow only smeared them (the Nick's Pick
+   ribbon's dark letters looked blurry on its amber) */
+html.wall-bg-on :is(.sticker, .case-band, .case-art, .spine-cap, .spine.light) { text-shadow: none; } /* .case-art: the Criterion "C" */
 /* gradient-filled text (Home's "Made"): a shadow would paint over the see-through letters, so a glow behind instead */
 html.wall-bg-on .banner h1 .made { text-shadow: none; filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.85)); }
 html.wall-bg-on :is(.jump a, .wall-ctl, .open, .vote:not(.on), .archive-toggle, .layout-toggle, .tags li, .lib-aisles button:not([aria-pressed="true"]), .lib-formats button:not([aria-pressed="true"])) {
@@ -2337,7 +2340,7 @@ html.wall-bg-on .xbox-sync-btn { background-color: rgba(0, 0, 0, 0.55); }
   z-index: 20;
   margin: -24px -16px 8px;
   padding: 14px 16px 12px;
-  background: rgba(0, 0, 0, 0.92);
+  background: rgba(0, 0, 0, 0.87);
   border-bottom: 1px solid var(--line);
 }
 .lib-aisles { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
@@ -2554,6 +2557,7 @@ html.wall-bg-on .xbox-sync-btn { background-color: rgba(0, 0, 0, 0.55); }
   background: linear-gradient(180deg, #ffc76a, var(--amber) 55%, #d9962f);
   color: #241600;
   font-size: 5.4cqw;
+  -webkit-font-smoothing: antialiased;
   text-align: center;
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.4);
 }
