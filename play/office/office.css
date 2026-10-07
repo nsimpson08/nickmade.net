@@ -1,0 +1,255 @@
+/* Nick's Office (play/office/office.js): a full-window pixel-art room, the canvas scaled up with crisp pixels */
+:root {
+  --bg: #07070a;
+  --fg: #f2f1ec;
+  --muted: #a9a7a0;
+  --line: #24242a;
+  --coral: #ff7a59; /* the Play page's colour */
+  --display: "Unbounded", system-ui, sans-serif;
+  --body: "Space Grotesk", system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  display: flex;
+  flex-direction: column;
+  background: #34506f;
+  color: var(--fg);
+  font-family: var(--body);
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.office-top {
+  flex: none;
+  background: rgba(10, 16, 26, 0.55);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+  padding-top: max(10px, env(safe-area-inset-top));
+}
+.office-top h1 { flex: 1; margin: 0; font: 700 1rem/1.2 var(--display); letter-spacing: -0.01em; }
+.office-back, .office-sound {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.85rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+.office-back:hover, .office-sound:hover, .office-back:focus-visible, .office-sound:focus-visible { color: var(--coral); border-color: var(--coral); outline: none; }
+.office-sound { padding: 6px 9px; }
+.office-sound svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.office-sound[aria-pressed="true"] .off, .office-sound[aria-pressed="false"] .on { display: none; }
+
+.office-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  /* the checkered blue behind the room (resize() in office.js sizes the checks to the room's pixels) */
+  background-color: #34506f;
+  background-image: conic-gradient(#3a5578 25%, #34506f 0 50%, #3a5578 0 75%, #34506f 0);
+  background-size: var(--tile, 96px) var(--tile, 96px);
+  background-position: center;
+  touch-action: pan-y; /* sideways drags are ours (looking around); up and down still scroll on phones */
+  user-select: none;
+  -webkit-user-select: none;
+}
+#office {
+  /* centred in the stage at any size (zoomed in, bigger than the stage, a grid would stop centring it); office.js
+     adds the pan to this transform */
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  cursor: grab;
+}
+#office.dragging { cursor: grabbing; }
+#office.over { cursor: pointer; }
+
+.office-pan {
+  position: absolute;
+  top: 50%;
+  width: 44px;
+  height: 64px;
+  margin-top: -32px;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 2.2rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity .2s, background-color .2s;
+}
+.office-pan svg, .office-zoom svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.office-pan:hover, .office-pan:focus-visible { opacity: 1; background: rgba(0, 0, 0, 0.7); outline: none; }
+/* zoom in (phones mostly): twice the size, drag to look around */
+.office-zoom {
+  position: absolute;
+  z-index: 2;
+  left: 12px;
+  top: 12px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  color: var(--muted);
+  cursor: pointer;
+}
+.office-zoom svg { width: 20px; height: 20px; }
+.office-zoom:hover, .office-zoom:focus-visible, .office-zoom[aria-pressed="true"] { color: #fff; border-color: #fff; outline: none; }
+.office-pan.left { left: 12px; }
+.office-pan.right { right: 12px; }
+
+.office-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  margin: 0;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  color: var(--muted);
+  font-size: 0.8rem;
+  transform: translateX(-50%);
+  pointer-events: none;
+  transition: opacity .6s;
+  white-space: nowrap;
+}
+.office-hint.gone { opacity: 0; }
+@media not ((hover: hover) and (pointer: fine)) { .hint-wheel { display: none; } }
+
+/* the name of what's under the pointer (mouse only) */
+.office-tip {
+  position: absolute;
+  z-index: 3;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  font-size: 0.8rem;
+  pointer-events: none;
+  white-space: nowrap;
+  transform: translate(-50%, calc(-100% - 14px));
+}
+.office-tip[hidden] { display: none; }
+
+.office-card {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  bottom: 18px;
+  width: min(440px, calc(100% - 32px));
+  padding: 16px 18px 18px;
+  border: 2px solid #f2f1ec;
+  border-radius: 4px;
+  background: #101014;
+  box-shadow: 4px 4px 0 #000, 0 18px 40px rgba(0, 0, 0, 0.6);
+  transform: translateX(-50%);
+  animation: card-in .22s steps(4) both;
+}
+.office-card[hidden] { display: none; }
+@keyframes card-in { from { transform: translate(-50%, 16px); opacity: 0; } }
+.office-card h2 { margin: 0 28px 6px 0; font: 700 0.95rem/1.3 var(--display); color: var(--coral); }
+.office-card-text { margin: 0; font-size: 0.92rem; line-height: 1.5; color: var(--fg); }
+.office-card-note { margin: 4px 0 0; font-size: 0.72rem; color: var(--muted); opacity: 0.8; }
+.office-card-note[hidden] { display: none; }
+.office-card-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 7px 14px;
+  border: 2px solid var(--coral);
+  border-radius: 4px;
+  color: var(--coral);
+  font-weight: 500;
+  font-size: 0.88rem;
+  text-decoration: none;
+}
+.office-card-link[hidden] { display: none; }
+.office-card-link.second { margin-left: 8px; }
+.office-card-link:hover, .office-card-link:focus-visible { background: var(--coral); color: #160600; outline: none; }
+.office-card-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 1.4rem;
+  cursor: pointer;
+}
+.office-card-close:hover { color: #fff; }
+
+/* the list of everything (keyboard, screen readers, and anyone who'd rather pick from a list) */
+.office-list { position: absolute; z-index: 2; top: 12px; right: 12px; text-align: right; }
+.office-list-toggle {
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.office-list-toggle:hover, .office-list-toggle:focus-visible { color: #fff; outline: none; border-color: #fff; }
+.office-list ul {
+  max-height: min(60vh, 420px);
+  margin: 8px 0 0;
+  padding: 6px;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(10, 10, 14, 0.95);
+  text-align: left;
+}
+.office-list ul[hidden] { display: none; }
+.office-list li button {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+}
+.office-list li button:hover, .office-list li button:focus-visible { background: rgba(255, 255, 255, 0.08); outline: none; }
+
+@media (max-width: 600px) {
+  /* phones: the turn buttons sit low, either side of the hint, off the room */
+  .office-pan { top: auto; bottom: 56px; width: 52px; height: 44px; margin-top: 0; opacity: 0.85; }
+  .office-pan.left { left: 16px; }
+  .office-pan.right { right: 16px; }
+  .office-top h1 { font-size: 0.9rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .office-card { animation: none; }
+}

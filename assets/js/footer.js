@@ -2,8 +2,13 @@
 // The version is the newest entry in /changelog/log.js (load that first). Returning visitors who haven't seen
 // the newest version get a small pulsing dot beside it until they open the changelog. That's remembered in their
 // own browser only (localStorage "nm-seen-version"); first-time visitors start up to date, with no dot.
-// It also adds the "Back to top" button (below) to every page with this footer except Home and Photography.
+// It also adds the "Back to top" button (below) to every page with this footer except Home and Photography, and loads
+// back-close.js (the phone's Back button closes an open photo or dialog instead of leaving the page).
 (function () {
+  // Back closes the open photo/dialog/wall instead of leaving the page (assets/js/back-close.js)
+  var bc = document.createElement("script");
+  bc.src = "/assets/js/back-close.js";
+  document.head.appendChild(bc);
   var log = window.CHANGELOG || [];
   var latest = log[0] && log[0].version;
   var footer = document.getElementById("site-footer");

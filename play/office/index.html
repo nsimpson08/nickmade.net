@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Nick's Office · NickMade</title>
+  <meta name="description" content="Look around Nick's office in pixel art. Click the things in it: the TVs, the tapes, the lava lamp, the cat. Most of them lead somewhere on the site.">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500&family=Unbounded:wght@500;600;700;800&display=swap">
+  <link rel="stylesheet" href="office.css">
+</head>
+<body>
+  <!-- Nick's Office (Ver 1.4): Nick's real office as an isometric pixel-art diorama (from his photos and 360° panorama),
+       drawn in code by office.js. Turn the room (the arrows, the arrow keys, or a sideways drag); click things to make
+       them do something. Each has a little card, and most link to the part of the site they stand for. -->
+  <header class="office-top">
+    <a class="office-back" href="/play/"><span aria-hidden="true">&larr;</span> Play</a>
+    <h1>Nick’s Office</h1>
+    <button type="button" class="office-sound" aria-pressed="true" title="Sound on/off">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path class="on" d="M4 9h4l5-4v14l-5-4H4zM16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"/><path class="off" d="M4 9h4l5-4v14l-5-4H4zM16 9l6 6M22 9l-6 6"/></svg>
+      <span class="sr-only">Sound</span>
+    </button>
+  </header>
+
+  <main class="office-stage" aria-label="Nick's office: turn the room, click things">
+    <canvas id="office" width="320" height="200"></canvas>
+    <button type="button" class="office-pan left" aria-label="Turn the room left"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v5h5"/></svg></button>
+    <button type="button" class="office-pan right" aria-label="Turn the room right"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.4-5.7M20 4v5h-5"/></svg></button>
+    <button type="button" class="office-zoom" aria-pressed="false" aria-label="Zoom in"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5M8.5 11h5M11 8.5v5"/></svg></button>
+    <p class="office-hint">Turn the room with the arrows · <span class="hint-wheel">scroll to zoom · </span>click things</p>
+    <div class="office-tip" hidden></div>
+    <!-- the card for the last thing clicked -->
+    <section class="office-card" hidden aria-live="polite">
+      <button type="button" class="office-card-close" aria-label="Close">&times;</button>
+      <h2></h2>
+      <p class="office-card-text"></p>
+      <p class="office-card-note" hidden></p>
+      <a class="office-card-link" hidden></a>
+      <a class="office-card-link second" hidden></a>
+    </section>
+    <!-- everything clickable, for keyboards and screen readers (the canvas itself is a picture) -->
+    <nav class="office-list" aria-label="Things in the room">
+      <button type="button" class="office-list-toggle" aria-expanded="false">Everything in the room</button>
+      <ul hidden></ul>
+    </nav>
+  </main>
+
+  <script src="/assets/js/back-close.js"></script>
+  <script src="office.js" data-api="https://api.nickmade.net" data-api-local="http://localhost:8787"></script>
+</body>
+</html>

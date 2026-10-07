@@ -1,6 +1,7 @@
 // Live sections on the Movies and Games pages, backed by the nickmade-queue Worker (worker/):
 //   live: "queue"    In the Queue: visitor suggestions after yours, then a "+" card to suggest one (or a closed card when full)
-//   live: "watched"  Recently Watched/Played: what you log from the site with the date and a rating, newest first
+//   live: "watched"  Recently Watched/Played: what you log from the site with the date, a rating and (since 1.4) a short
+//                    review, newest first
 //   live: any other key: movies/games you add from the site, shown after the ones in list.js
 // Owner mode: open the page with ?admin and enter the ADMIN_TOKEN once; ?logout forgets it.
 // In owner mode the + cards are always there, your picks have no "Suggested by", and every site-added one gets a Remove button.
@@ -14,6 +15,7 @@
   var DID = PAGE === "games" ? "Played" : "Watched"; // "Watched Sep 4, 2026" / "Played Sep 4, 2026"
   var LOCK = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5" fill="currentColor"/><path d="M5 7V5a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
   var COMMENT_MAX = 200; // visitors' "Why should Nick watch it?" note (the Worker enforces the same limit)
+  var REVIEW_MAX = 280; // Nick's short review on a Recently Watched/Played card (Ver 1.4; the Worker's REVIEW_MAX)
   var PQ = "page=" + PAGE;
   if (!API) return;
 
@@ -167,6 +169,8 @@
     var fig = document.createElement("figure");
     fig.className = "poster suggested";
     fig.dataset.imdb = it.imdbId;
+    fig.dataset.filmTitle = it.title; // for film-dialog.js (not data-title: that marks list.js items for owner Remove)
+    if (it.year) fig.dataset.year = it.year;
     var credit = "";
     if (it.credit && it.credit.artist) {
       credit = '<div class="credit">Art by <a href="' + esc(it.credit.url) + '" target="_blank" rel="noopener">' + esc(it.credit.artist) + "</a></div>";
@@ -187,6 +191,10 @@
         ? ' <span class="year">Released: ' + esc(releasedOn(it.released)) + "</span>"
         : it.year ? ' <span class="year">' + esc(it.year) + "</span>" : "") + "</figcaption>" +
       (watched && it.rating ? '<div class="rating" aria-label="' + ratingText(it.rating) + '">' + stars(it.rating) + "</div>" : "") +
+      // Nick's short review (1.4), right under the stars: a few lines, the rest a click away (see clampReviews)
+      (watched && it.review ? '<p class="watched-review">' + esc(it.review) + "</p>" : "") +
+      // who Nick watched it with: owner mode only (the Worker only sends it to him)
+      (watched && ADMIN && it.watchedWith ? '<p class="watched-with" title="Only you see this">With ' + esc(it.watchedWith) + "</p>" : "") +
       credit +
       (it.suggestedBy ? '<div class="suggested-by">Suggested by ' + esc(it.suggestedBy) + "</div>" : "") +
       (it.comment
@@ -548,7 +556,7 @@
       .then(function (res) {
         if (!res.ok) throw { said: res.d.error || "Couldn't refresh from Xbox." };
         return Promise.all([
-          fetch(API + "/watched?" + PQ, { cache: "no-store" }).then(function (r) { return r.json(); }),
+          fetch(API + "/watched?" + PQ, { cache: "no-store", headers: authHeaders() }).then(function (r) { return r.json(); }),
           window.NMXboxBanner ? window.NMXboxBanner.reload().catch(function () {}) : null,
         ]).then(function (out) {
           renderWatched(out[0].items || [], out[0].archive);
@@ -676,11 +684,33 @@
     g.querySelectorAll(".poster").forEach(function (el) { el.remove(); });
     items.forEach(function (it) { g.appendChild(card(it, "watched")); });
     renderWatchedSlot();
+    clampReviews(g);
+  }
+  // A review longer than its few lines gets "More" (and "Less" once open)
+  function clampReviews(g) {
+    requestAnimationFrame(function () {
+      g.querySelectorAll(".watched-review").forEach(function (p) {
+        if (p.nextElementSibling && p.nextElementSibling.classList.contains("review-more")) return;
+        if (p.scrollHeight <= p.clientHeight + 2) return;
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "review-more";
+        b.textContent = "More";
+        b.setAttribute("aria-expanded", "false");
+        b.addEventListener("click", function () {
+          var open = !p.classList.contains("expanded");
+          p.classList.toggle("expanded", open);
+          b.textContent = open ? "Less" : "More";
+          b.setAttribute("aria-expanded", String(open));
+        });
+        p.after(b);
+      });
+    });
   }
 
   if (watchedSection) {
     ready
-      .then(function () { return fetch(API + "/watched?" + PQ); })
+      .then(function () { return fetch(API + "/watched?" + PQ, { headers: authHeaders() }); }) // (the owner's includes who he watched with)
       .then(function (r) { return r.json(); })
       .then(function (data) {
         var items = data.items || [];
@@ -714,6 +744,13 @@
       '<div class="rate" id="q-rating" role="slider" tabindex="0" aria-labelledby="q-rating-label" aria-valuemin="0" aria-valuemax="5" aria-valuenow="0" aria-valuetext="No rating">' +
         stars(0) + '<span class="rate-text">No rating</span>' +
       "</div>" +
+      // Nick's short review, logging or editing something watched/played (1.4)
+      '<label for="q-review">Short review <span class="optional">(optional)</span></label>' +
+      '<textarea id="q-review" maxlength="' + REVIEW_MAX + '" rows="3" placeholder="A line or two: what stuck with you?"></textarea>' +
+      '<p class="count" id="q-review-count" aria-live="polite"></p>' +
+      // who Nick watched it with (Movies, owner only; never shown to visitors: the Worker only sends it back to him)
+      '<label for="q-with">Watched with <span class="optional">(only you see this)</span></label>' +
+      '<input id="q-with" type="text" maxlength="120" autocomplete="off" placeholder="Who was there?">' +
       '<label for="q-name">Your name</label>' +
       '<input id="q-name" type="text" maxlength="40" autocomplete="nickname" placeholder="So Nick knows who it\'s from">' +
       // optional note shown on the card under "Suggested by"; visitors' suggestions only
@@ -755,6 +792,15 @@
     commentCount.textContent = left < 60 ? left + " characters left" : "";
   }
   commentInput.addEventListener("input", showCount);
+  var reviewInput = dialog.querySelector("#q-review");
+  var reviewLabel = dialog.querySelector('label[for="q-review"]');
+  var reviewCount = dialog.querySelector("#q-review-count");
+  var withInput = dialog.querySelector("#q-with"), withLabel = dialog.querySelector('label[for="q-with"]');
+  function showReviewCount() {
+    var left = REVIEW_MAX - reviewInput.value.length;
+    reviewCount.textContent = left < 80 ? left + " characters left" : "";
+  }
+  reviewInput.addEventListener("input", showReviewCount);
 
   // Poster preview: visitors get the official poster, which the search result already has. Nick's adds get a choice:
   // GET /poster (owner only) returns up to 3 fan-art posters and the official one; the big preview shows the picked
@@ -872,6 +918,9 @@
     setRating(0);
     commentInput.value = "";
     showCount();
+    reviewInput.value = "";
+    showReviewCount();
+    withInput.value = "";
     dialog.querySelector('input[name="q-who"][value="public"]').checked = true;
     hidePreview();
   }
@@ -892,6 +941,8 @@
     commentLabel.hidden = commentInput.hidden = commentCount.hidden = whoField.hidden = !!ADMIN || (mode !== "queue" && mode !== "mine");
     dateLabel.hidden = dateInput.hidden = !watching;
     rateLabel.hidden = rate.hidden = !watching;
+    reviewLabel.hidden = reviewInput.hidden = reviewCount.hidden = !watching;
+    withLabel.hidden = withInput.hidden = !(watching && ADMIN && PAGE === "movies");
     movie.readOnly = !!editing || !!mineEdit;
     if (mineEdit) {
       chosen = { id: it.imdbId };
@@ -908,6 +959,9 @@
       movie.value = it.title + (it.year ? " (" + it.year + ")" : "");
       dateInput.value = it.date;
       setRating(it.rating || 0);
+      reviewInput.value = it.review || "";
+      showReviewCount();
+      withInput.value = it.watchedWith || "";
     }
     if (watching && !dateInput.value) dateInput.value = today();
     heading.textContent = mineEdit ? "Edit your suggestion" : editing ? "Edit " + it.title : watching ? "Log a " + KIND : target ? "Add a " + KIND : ADMIN ? "Submit a " + KIND : "Suggest a " + KIND;
@@ -915,7 +969,7 @@
     hint.textContent = mineEdit
       ? "Change your name or your note. Picked the wrong " + KIND + "? Remove it from the card instead, and you'll get the spot back."
       : editing
-      ? "Change your rating or the date you " + DID.toLowerCase() + " it."
+      ? "Change your rating, your review, or the date you " + DID.toLowerCase() + " it."
       : target
       ? "Goes at the end of " + target.title + ". Poster art is picked automatically."
       : watching
@@ -1017,7 +1071,7 @@
       method: "POST",
       headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify(watching
-        ? { page: PAGE, imdbId: chosen.id, date: dateInput.value, rating: rating, poster: pickedPoster() }
+        ? { page: PAGE, imdbId: chosen.id, date: dateInput.value, rating: rating, poster: pickedPoster(), review: reviewInput.value.trim(), watchedWith: PAGE === "movies" ? withInput.value.trim() : undefined }
         : { page: PAGE, imdbId: chosen.id, name: ADMIN ? "" : nameInput.value.trim(), visitorId: VID, poster: pickedPoster(),
             comment: ADMIN ? "" : commentInput.value.trim(), commentPrivate: !ADMIN && commentPrivate() }),
     })
@@ -1123,7 +1177,7 @@
     fetch(API + "/watched/" + encodeURIComponent(editing.id) + "?" + PQ, {
       method: "PATCH",
       headers: authHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ date: dateInput.value, rating: rating }),
+      body: JSON.stringify({ date: dateInput.value, rating: rating, review: reviewInput.value.trim(), watchedWith: PAGE === "movies" ? withInput.value.trim() : undefined }),
     })
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
       .then(function (res) {

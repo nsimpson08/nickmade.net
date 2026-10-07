@@ -42,7 +42,7 @@
         }).join("") + "</div>"
       : '<div class="review pending"><p>Review coming soon.</p></div>';
 
-    return '<article class="entry" data-title="' + esc(it.title) + '">' +
+    return '<article class="entry" id="' + slug(it.title) + '" data-title="' + esc(it.title) + '"' + (it.year ? ' data-year="' + esc(it.year) + '"' : "") + (it.imdbId ? ' data-imdb="' + esc(it.imdbId) + '"' : "") + ">" + // id: links straight to it (#the-big-lebowski)
       '<figure class="poster">' + poster(it) + credit(it) + "</figure>" +
       '<div class="entry-body">' +
         "<h3>" + esc(it.title) + "</h3>" +
@@ -88,7 +88,7 @@
   }
 
   function gridItem(it, withPlayers) {
-    return '<figure class="poster" data-title="' + esc(it.title) + '">' + track(it, withPlayers) + poster(it) +
+    return '<figure class="poster" data-title="' + esc(it.title) + '"' + (it.year ? ' data-year="' + esc(it.year) + '"' : "") + (it.imdbId ? ' data-imdb="' + esc(it.imdbId) + '"' : "") + ">" + track(it, withPlayers) + poster(it) +
       '<figcaption><span class="title">' + esc(it.title) + "</span>" +
         (it.year ? ' <span class="year">' + esc(it.year) + "</span>" : "") +
       "</figcaption>" + credit(it) + trackCredit(it) + "</figure>";
@@ -171,7 +171,12 @@
     var panel = el.querySelector(".archive-panel");
     panel.innerHTML = all.length
       ? '<ol class="archive-list">' + all.map(function (it) {
-          return "<li><span class=\"t\">" + esc(it.title) + "</span>" + (it.year ? ' <span class="y">' + esc(it.year) + "</span>" : "") +
+          // each one opens its card on the Movies page (film-dialog.js), with Nick's rating and review in it
+          var data = it.title ? ' class="archive-item"' + (it.imdbId ? ' data-imdb="' + esc(it.imdbId) + '"' : "") + ' data-film-title="' + esc(it.title) + '"' +
+            (it.year ? ' data-year="' + esc(it.year) + '"' : "") + (it.image ? ' data-image="' + esc(it.image) + '"' : "") +
+            (it.rating ? ' data-rating="' + esc(it.rating) + '"' : "") + (it.review ? ' data-review="' + esc(it.review) + '"' : "") +
+            (it.watchedWith ? ' data-with="' + esc(it.watchedWith) + '"' : "") : ""; // (only the owner's Archive has it)
+          return "<li" + data + "><span class=\"t\">" + esc(it.title) + "</span>" + (it.year ? ' <span class="y">' + esc(it.year) + "</span>" : "") +
             (it.date ? ' <span class="d">' + esc(archiveDate(it.date)) + "</span>" : "") + "</li>";
         }).join("") + "</ol>"
       : '<p class="archive-empty">Nothing archived yet.</p>';
@@ -229,6 +234,18 @@
       if (!opening) el.querySelector(".cap-more").scrollIntoView({ block: "nearest" }); // don't leave you far below it
     });
   });
+
+  // a link straight to one review (/movies/#the-big-lebowski, from Nick's Office): centre it and give its poster the
+  // found glow, like the poster wall does
+  function openReviewFromHash() {
+    var id = decodeURIComponent(location.hash.slice(1)), el = id && document.getElementById(id);
+    if (!el || !el.classList.contains("entry")) return;
+    el.scrollIntoView({ block: "center" });
+    el.classList.remove("wall-found"); void el.offsetWidth; el.classList.add("wall-found");
+    setTimeout(function () { el.classList.remove("wall-found"); }, 2400);
+  }
+  if (location.hash) setTimeout(openReviewFromHash, 150); // after the browser's own jump, and the posters above settling
+  window.addEventListener("hashchange", openReviewFromHash);
 
   // for live.js
   window.NMArchive = {

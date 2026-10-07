@@ -109,14 +109,18 @@
     return h;
   }
 
-  var FORMAT = { "4k": "4K Ultra HD", bluray: "Blu-ray", dvd: "DVD" };
-  // DVDs stay on the shelves, but for now nothing says "DVD": no format chip, count, band, label, or add option
-  // (Nick, 2026-10-03). Their cases show the cover with no band. true brings it all back.
-  var SHOW_DVD = false;
+  var FORMAT = { "4k": "4K Ultra HD", bluray: "Blu-ray", dvd: "DVD", vhs: "VHS" };
+  var FORMATS = ["4k", "bluray", "dvd", "vhs"]; // best first: the order of the chips, counts and add options
+  // DVDs were on the shelves with nothing saying "DVD" in 1.3 (no format chip, count, band, label, or add option);
+  // since 1.4 they're shown like the rest, and VHS tapes joined them (Nick). false hides DVDs again.
+  var SHOW_DVD = true;
   function fmtName(f) { return f === "dvd" && !SHOW_DVD ? "" : FORMAT[f]; }
   // combo-pack editions name the DVD too ("Blu-ray + Blu-ray 3D + DVD + Digital Copy")
   function edition(d) { return SHOW_DVD ? d.edition || "" : String(d.edition || "").replace(/\s*\+\s*DVD\b|\bDVD\s*\+\s*/g, "").trim(); }
-  var BAND = { "4k": "<b>4K</b> Ultra HD", bluray: "Blu-ray", dvd: "DVD" };
+  var BAND = { "4k": "<b>4K</b> Ultra HD", bluray: "Blu-ray", dvd: "DVD", vhs: "<b>VHS</b>" };
+  // HDR on a 4K disc (d.hdr, from blu-ray.com: tools/hdr.py, or the Worker for discs added on the site), best first
+  var HDR = { dv: "Dolby Vision", "hdr10+": "HDR10+", hdr10: "HDR10" };
+  function hdrOf(d) { return Object.keys(HDR).filter(function (k) { return (d.hdr || []).indexOf(k) >= 0; }); }
   // genre aisles, in this order, if at least MIN_AISLE discs are in them. Just the classic video store six (Nick, 1.3:
   // 15 was too many for one row); every disc is still in All A–Z and search.
   var GENRES = ["Action", "Comedy", "Drama", "Horror", "Sci-Fi", "Thriller"];
@@ -190,8 +194,11 @@
         '<div class="lib-formats" role="group" aria-label="Format">' +
           '<button type="button" data-format="">All formats</button>' +
           '<button type="button" data-format="4k" class="f-4k">4K</button>' +
+          // Dolby Vision (Nick, 1.4): 4K discs with it, between 4K and Blu-ray
+          '<button type="button" data-format="dv" class="f-dv">Dolby Vision</button>' +
           '<button type="button" data-format="bluray" class="f-bluray">Blu-ray</button>' +
-          (SHOW_DVD && discs.some(function (d) { return d.format === "dvd"; }) ? '<button type="button" data-format="dvd" class="f-dvd">DVD</button>' : "") +
+          (SHOW_DVD ? '<button type="button" data-format="dvd" class="f-dvd">DVD</button>' : "") +
+          '<button type="button" data-format="vhs" class="f-vhs">VHS</button>' +
         "</div>" +
         // Covers (cases facing out) or Spines (cases on their side, many more to a shelf)
         '<div class="lib-view" role="group" aria-label="View">' +
@@ -213,14 +220,16 @@
   root.querySelector(".lib-aisles").addEventListener("click", function (e) {
     var b = e.target.closest("button");
     if (!b) return;
-    state.aisle = b.dataset.aisle;
+    // the same for the aisles: clicking the open one goes back to All A–Z
+    state.aisle = b.dataset.aisle === state.aisle && b.dataset.aisle !== "all" ? "all" : b.dataset.aisle;
     try { history.replaceState(null, "", state.aisle === "all" ? location.pathname : "#aisle=" + encodeURIComponent(state.aisle)); } catch (err) {}
     render();
   });
   root.querySelector(".lib-formats").addEventListener("click", function (e) {
     var b = e.target.closest("button");
     if (!b) return;
-    state.format = b.dataset.format;
+    // clicking the one that's on turns it off again (back to All formats)
+    state.format = b.dataset.format === state.format ? "" : b.dataset.format;
     render();
   });
   root.querySelector(".lib-view").addEventListener("click", function (e) {
@@ -241,7 +250,8 @@
   });
 
   function matches(d) {
-    if (state.format && d.format !== state.format) return false;
+    if (state.format === "dv") { if ((d.hdr || []).indexOf("dv") < 0) return false; }
+    else if (state.format && d.format !== state.format) return false;
     if (state.q) {
       var hay = norm([d.title, d.director, (d.starring || []).join(" "), d.edition, (d.films || []).join(" ")].join(" "));
       if (hay.indexOf(state.q) < 0) return false;
@@ -266,7 +276,9 @@
   function caseHtml(d, big) {
     var stickers = "";
     if (picks[norm(d.title)]) stickers += '<span class="sticker pick">Nick’s Pick</span>';
-    if (d.kind === "box") stickers += '<span class="sticker box">Box set' + (d.discs > 1 ? " · " + d.discs + " discs" : "") + "</span>";
+    // bottom right: a box set's sticker (the HDR isn't on the front: Nick, 1.4; it's on the back of the case and the
+    // Dolby Vision chip)
+    if (d.kind === "box") stickers += '<span class="case-tags"><span class="sticker box">Box set' + (d.discs > 1 ? " · " + d.discs + " discs" : "") + "</span></span>";
     // box set covers are store photos of the real front, format banner included (tools/discs.py)
     var retail = d.kind === "box" && d.cover;
     var noBand = !fmtName(d.format); // a DVD while they're hidden: the cover fills the case, like a box set's
@@ -306,11 +318,14 @@
     for (var i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) % 997;
     return h % 5;
   }
-  function spineSlot(d) {
+  function spineSlot(d, startsLetter) {
     var label = [d.title + (d.year ? " (" + d.year + ")" : ""), fmtName(d.format), edition(d)].filter(Boolean).join(", ");
     var wide = d.kind === "box" ? Math.min(10, d.discs || 3) : 0;
-    var cap = d.format === "4k" ? "4K" : d.format === "bluray" ? "BD" : SHOW_DVD ? "DVD" : "";
-    return '<li class="spine-slot">' +
+    var cap = d.format === "4k" ? "4K" : d.format === "bluray" ? "BD" : d.format === "vhs" ? "VHS" : SHOW_DVD ? "DVD" : "";
+    // A–Z in Spines (1.4): one continuous shelf; the first spine of each letter carries the letter above it (and the
+    // jump links' target)
+    return '<li class="spine-slot' + (startsLetter ? " letter-start" : "") + '">' +
+      (startsLetter ? '<span class="spine-letter" id="aisle-' + (startsLetter === "#" ? "0" : startsLetter) + '">' + esc(startsLetter) + "</span>" : "") +
       '<button type="button" class="slot-btn spine f-' + d.format + (picks[norm(d.title)] ? " picked" : "") + (d.criterion ? " criterion" : "") +
         (d.steelbook ? " steel" : "") + (d.spineLight ? " light" : "") + (d.logo ? " has-logo" : "") +
         '" data-id="' + esc(d.id) + '" aria-label="' + esc(label) + '" title="' + esc(label) + '"' +
@@ -334,7 +349,12 @@
 
   function render() {
     [].forEach.call(root.querySelectorAll("[data-aisle]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.aisle === state.aisle)); });
-    [].forEach.call(root.querySelectorAll("[data-format]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.format === state.format)); });
+    [].forEach.call(root.querySelectorAll("[data-format]"), function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.format === state.format));
+      // a format with nothing on the shelves yet (VHS until the first tape) has no chip
+      var f = b.dataset.format;
+      b.hidden = !!f && f !== state.format && !discs.some(function (d) { return f === "dv" ? (d.hdr || []).indexOf("dv") >= 0 : d.format === f; });
+    });
     [].forEach.call(root.querySelectorAll("[data-view]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.view === state.view)); });
     var list = visible();
     var aisle = aisles.filter(function (a) { return a.key === state.aisle; })[0];
@@ -352,7 +372,11 @@
       letters = groups.map(function (g) {
         return '<a href="#aisle-' + (g.L === "#" ? "0" : g.L) + '">' + g.L + "</a>";
       }).join("");
-      html = groups.map(function (g) { return aisleHtml(g.L, g.items, "aisle-" + (g.L === "#" ? "0" : g.L)); }).join("");
+      html = state.view === "spines"
+        ? '<section class="aisle aisle-flow"><ul class="shelf spines">' + groups.map(function (g) {
+            return g.items.map(function (d, i) { return spineSlot(d, i === 0 ? g.L : null); }).join("");
+          }).join("") + "</ul></section>"
+        : groups.map(function (g) { return aisleHtml(g.L, g.items, "aisle-" + (g.L === "#" ? "0" : g.L)); }).join("");
     } else if (state.aisle === "new" && !state.q) {
       var byMonth = [], idx = {};
       list.forEach(function (d) {
@@ -368,10 +392,10 @@
     var nav = root.querySelector(".lib-letters");
     nav.innerHTML = letters;
     nav.hidden = !letters;
-    var counts = { "4k": 0, bluray: 0, dvd: 0 };
+    var counts = { "4k": 0, bluray: 0, dvd: 0, vhs: 0 };
     discs.forEach(function (d) { counts[d.format]++; });
-    countEl.innerHTML = "<b>" + discs.length + "</b> discs on the shelves: " +
-      ["4k", "bluray", "dvd"].filter(function (f) { return counts[f] && fmtName(f); }).map(function (f) { return counts[f] + " " + FORMAT[f]; }).join(" · ") +
+    countEl.innerHTML = "<b>" + discs.length + "</b> on the shelves: " +
+      FORMATS.filter(function (f) { return counts[f] && fmtName(f); }).map(function (f) { return counts[f] + " " + FORMAT[f]; }).join(" · ") +
       (list.length !== discs.length && list.length ? '<span class="lib-showing"> · showing ' + list.length + "</span>" : "");
   }
 
@@ -389,6 +413,7 @@
   var opener = null;
   dialog.addEventListener("click", function (e) {
     if (e.target === dialog || e.target.closest(".close")) dialog.close();
+    if (window.NMTrailer && NMTrailer.click(e, dialog)) return;
     var more = e.target.closest(".lib-more");
     if (more) {
       var box = more.closest(".lib-about-box");
@@ -412,7 +437,18 @@
       if (list.length) openCase(list[Math.floor(Math.random() * list.length)], true);
     }
   });
-  dialog.addEventListener("close", function () { if (opener) opener.focus({ preventScroll: true }); });
+  dialog.addEventListener("close", function () {
+    if (window.NMTrailer) NMTrailer.stop(dialog); // no trailer playing on behind a closed case
+    if (opener) opener.focus({ preventScroll: true });
+  });
+  // the film's official trailer (trailer.js): looked up once the case is open, its button added when there is one
+  var films = {};
+  function addTrailer(d) {
+    if (!d.imdbId || !API || !window.NMTrailer) return;
+    var q = d.imdbId;
+    if (!films[q]) films[q] = fetch(API + "/library/film?imdb=" + encodeURIComponent(q)).then(function (r) { return r.json(); }).catch(function () { return {}; });
+    films[q].then(function (f) { if (dialog.open && dialog.dataset.disc === d.id && f.trailer) NMTrailer.addTo(dialog, f.trailer, d.title); });
+  }
   // Once the case has turned over, drop the 3D animation: Chrome can keep drawing the layer from its blurry mid-turn
   // raster (the Nick's Pick ribbon's small rotated text showed it); without the class it repaints sharp
   dialog.addEventListener("animationend", function (e) { if (e.target.classList.contains("lib-back")) dialog.classList.remove("flip"); });
@@ -430,8 +466,8 @@
     opener = from || root.querySelector(".lib-pick");
     var k = norm(d.title);
     var facts = [d.year, runtime(d.minutes), d.rated].filter(Boolean);
-    var disc = [fmtName(d.format), d.threeD ? "3D" : "", d.steelbook ? "Steelbook" : "", edition(d), d.discs > 1 ? d.discs + " discs" : "",
-      d.boxSet ? "From the " + d.boxSet.replace(/^The /, "") : ""].filter(Boolean); // boxSet: tools/discs.py BOX_SETS
+    var disc = [fmtName(d.format)].concat(hdrOf(d).map(function (k) { return HDR[k]; })).concat([d.threeD ? "3D" : "", d.steelbook ? "Steelbook" : "", edition(d), d.discs > 1 ? d.discs + " discs" : "",
+      d.boxSet ? "From the " + d.boxSet.replace(/^The /, "") : ""]).filter(Boolean); // boxSet: tools/discs.py BOX_SETS
     var paras = String(d.about || "").split(/\n\n/).filter(Boolean);
     var links = [];
     if (onMovies[k]) links.push('<a class="open" href="/movies/#' + slug(onMovies[k]) + '">On my Movies page · ' + esc(onMovies[k]) + "</a>");
@@ -469,6 +505,8 @@
         "</div>" +
       "</div>";
     if (!dialog.open) dialog.showModal();
+    dialog.dataset.disc = d.id;
+    addTrailer(d);
     // Show more only when the synopsis is actually cut short
     var aboutText = dialog.querySelector(".lib-about-text");
     if (aboutText && aboutText.scrollHeight > aboutText.clientHeight + 4) dialog.querySelector(".lib-more").hidden = false;
@@ -544,6 +582,15 @@
           '<button class="close" type="button" aria-label="Close">&times;</button>' +
           "<h2>Add a disc</h2>" +
           '<p class="hint">It goes on the shelves (and New Arrivals) right away.</p>' +
+          // Scan the barcode (1.4): the exact release, so the title, format, edition and HDR fill in themselves
+          '<div class="lib-scan">' +
+            '<button type="button" class="open lib-scan-btn" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V4h3M21 7V4h-3M3 17v3h3M21 17v3h-3M7 8v8M10 8v8M13 8v8M16 8v8"/></svg>Scan the barcode</button>' +
+            '<div class="lib-scan-cam" hidden><video muted playsinline></video><span class="lib-scan-line"></span>' +
+              '<button type="button" class="lib-scan-stop">Stop</button></div>' +
+            '<div class="lib-upc"><input id="lib-upc" type="text" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="or type the barcode numbers" aria-label="Barcode">' +
+              '<button type="button" class="open lib-upc-go">Look up</button></div>' +
+            '<p class="lib-scan-msg" role="status"></p>' +
+          "</div>" +
           '<div class="pick-preview" hidden><div class="pp-art"><img alt=""></div><div class="pp-what"></div></div>' +
           '<label for="lib-q">Movie or series</label>' +
           '<div class="combo"><input id="lib-q" type="text" autocomplete="off" placeholder="Start typing a title" role="combobox" aria-expanded="false" aria-controls="lib-results" aria-autocomplete="list">' +
@@ -552,6 +599,13 @@
             '<label><input type="radio" name="lib-format" value="4k">4K</label>' +
             '<label><input type="radio" name="lib-format" value="bluray">Blu-ray</label>' +
             (SHOW_DVD ? '<label><input type="radio" name="lib-format" value="dvd">DVD</label>' : "") +
+            '<label><input type="radio" name="lib-format" value="vhs">VHS</label>' +
+          "</fieldset>" +
+          // 4K only: ticked from blu-ray.com when a title (or an edition) is picked; untick or tick to correct it
+          '<fieldset class="who lib-hdr" hidden><legend>HDR <span class="optional lib-hdr-note"></span></legend>' +
+            '<label><input type="checkbox" name="hdr" value="dv">Dolby Vision</label>' +
+            '<label><input type="checkbox" name="hdr" value="hdr10+">HDR10+</label>' +
+            '<label><input type="checkbox" name="hdr" value="hdr10">HDR10</label>' +
           "</fieldset>" +
           '<fieldset class="who lib-extras"><legend>Extras</legend>' +
             '<label><input type="checkbox" name="steelbook">Steelbook</label>' +
@@ -573,6 +627,7 @@
       addDlg.addEventListener("click", function (e) { if (e.target === addDlg) addDlg.close(); });
       q.addEventListener("input", function () {
         picked = null;
+        scanned = null;
         addDlg.querySelector(".pick-preview").hidden = true;
         addDlg.querySelector(".lib-editions").hidden = true;
         check();
@@ -583,7 +638,11 @@
         var li = e.target.closest("[role=option]");
         if (li) pick(results[+li.dataset.i]);
       });
-      addDlg.querySelector("form").addEventListener("change", check);
+      addDlg.querySelector("form").addEventListener("change", function (e) {
+        if (e.target.name === "hdr") hdrTouched = true; // Nick's ticks win over a lookup still on its way
+        check();
+        if (e.target.name === "lib-format") findHdr();
+      });
       addDlg.querySelector(".lib-ed-list").addEventListener("click", function (e) {
         var b = e.target.closest("button[data-ed]");
         if (!b) return;
@@ -594,16 +653,29 @@
         if (!name.value.trim() && ed.title && !/^\d{4}\s/.test(ed.title)) name.value = ed.title.replace(/\s*\b(4K|UHD|Blu-?ray)\b\s*$/i, "");
         var f = ed.format && addDlg.querySelector('input[name="lib-format"][value="' + ed.format + '"]');
         if (f && !addDlg.querySelector('input[name="lib-format"]:checked')) f.checked = true;
+        if (ed.upc) hdrUpc = ed.upc; // that exact edition's HDR
         check();
+        findHdr();
       });
       addDlg.querySelector("form").addEventListener("submit", submitAdd);
+      addDlg.addEventListener("close", stopScan);
+      if ("BarcodeDetector" in window && navigator.mediaDevices) addDlg.querySelector(".lib-scan-btn").hidden = false;
+      addDlg.querySelector(".lib-scan-btn").addEventListener("click", startScan);
+      addDlg.querySelector(".lib-scan-stop").addEventListener("click", stopScan);
+      var upc = addDlg.querySelector("#lib-upc");
+      addDlg.querySelector(".lib-upc-go").addEventListener("click", function () { lookUpBarcode(upc.value); });
+      upc.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); lookUpBarcode(upc.value); } });
     }
     addDlg.querySelector("form").reset();
     picked = null;
+    hdrUpc = "";
+    hdrFor = "";
     addDlg.querySelector(".pick-preview").hidden = true;
     addDlg.querySelector("#lib-results").hidden = true;
     addDlg.querySelector(".lib-editions").hidden = true;
     addDlg.querySelector(".error").textContent = "";
+    addDlg.querySelector(".lib-scan-msg").textContent = "";
+    scanned = null;
     check();
     addDlg.showModal();
     addDlg.querySelector("#lib-q").focus();
@@ -641,8 +713,108 @@
     pv.querySelector("img").src = r.image ? r.image.replace(/\._V1_.*\.jpg$/, "._V1_UX200_.jpg") : "";
     pv.querySelector(".pp-what").innerHTML = "<b>" + esc(r.title) + "</b>" + (r.year ? "<span>" + r.year + "</span>" : "");
     pv.hidden = false;
+    hdrUpc = "";
     check();
     findEditions(r);
+    findHdr();
+  }
+
+  // A 4K disc's HDR from blu-ray.com (Worker GET /library/hdr): by the picked edition's barcode, else the title.
+  // Ticks the boxes; Nick can change them. Asked once per title + barcode.
+  var hdrUpc = "", hdrFor = "", hdrTouched = false, hdrSeq = 0;
+  function findHdr() {
+    var f = addDlg.querySelector('input[name="lib-format"]:checked');
+    var note = addDlg.querySelector(".lib-hdr-note");
+    if (!picked || !f || f.value !== "4k") return;
+    var key = picked.id + "|" + hdrUpc;
+    if (key === hdrFor) return;
+    hdrFor = key;
+    hdrTouched = false;
+    var seq = ++hdrSeq, r = picked;
+    note.textContent = "(checking blu-ray.com…)";
+    fetch(API + "/library/hdr?title=" + encodeURIComponent(r.title) + "&year=" + (r.year || "") + "&upc=" + encodeURIComponent(hdrUpc), { headers: authHeaders() })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (seq !== hdrSeq || picked !== r) return;
+        note.textContent = data.found ? "(from blu-ray.com)" : "(not found on blu-ray.com: tick what the case says)";
+        if (!data.found || hdrTouched) return;
+        [].forEach.call(addDlg.querySelectorAll('input[name="hdr"]'), function (c) { c.checked = (data.hdr || []).indexOf(c.value) >= 0; });
+      })
+      .catch(function () { if (seq === hdrSeq) note.textContent = "(couldn’t check: tick what the case says)"; });
+  }
+
+  // ---------- the barcode (1.4) ----------
+  // The camera (BarcodeDetector: Chrome on Android and Macs; not iPhones yet, where typing the numbers works) reads
+  // the barcode; the Worker finds that release on blu-ray.com (GET /library/barcode), and the dialog fills in.
+  var scanStream = null, scanTimer = null, scanned = null;
+  function startScan() {
+    var cam = addDlg.querySelector(".lib-scan-cam"), video = cam.querySelector("video"), msg = addDlg.querySelector(".lib-scan-msg");
+    var detector;
+    try { detector = new BarcodeDetector({ formats: ["upc_a", "ean_13", "ean_8", "upc_e"] }); } catch (e) { msg.textContent = "This browser can't read barcodes. Type the numbers instead."; return; }
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 } } }).then(function (stream) {
+      scanStream = stream;
+      video.srcObject = stream;
+      video.play();
+      cam.hidden = false;
+      addDlg.querySelector(".lib-scan-btn").hidden = true;
+      msg.textContent = "Point it at the barcode on the back of the case.";
+      (function look() {
+        detector.detect(video).then(function (codes) {
+          if (!scanStream) return;
+          var code = codes.length && codes[0].rawValue;
+          if (code) {
+            if (navigator.vibrate) navigator.vibrate(60);
+            stopScan();
+            addDlg.querySelector("#lib-upc").value = code;
+            lookUpBarcode(code);
+          } else scanTimer = setTimeout(look, 180);
+        }).catch(function () { if (scanStream) scanTimer = setTimeout(look, 300); });
+      })();
+    }).catch(function () { msg.textContent = "Couldn't use the camera. Allow it in the browser, or type the numbers."; });
+  }
+  function stopScan() {
+    clearTimeout(scanTimer);
+    if (scanStream) scanStream.getTracks().forEach(function (t) { t.stop(); });
+    scanStream = null;
+    if (!addDlg) return;
+    addDlg.querySelector(".lib-scan-cam").hidden = true;
+    addDlg.querySelector(".lib-scan-btn").hidden = !("BarcodeDetector" in window && navigator.mediaDevices);
+  }
+  function lookUpBarcode(raw) {
+    var code = String(raw || "").replace(/\D/g, ""), msg = addDlg.querySelector(".lib-scan-msg");
+    if (!code) return;
+    msg.textContent = "Looking up " + code + "…";
+    fetch(API + "/library/barcode?upc=" + code, { headers: authHeaders() })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.error && !d.found) { msg.textContent = d.error; return; }
+        if (!d.found || !d.imdbId) { msg.textContent = "Not found on blu-ray.com (VHS tapes never are). Search by title below."; return; }
+        // the title for the preview: IMDb's own search result for it (its poster), else just the name
+        return fetch(API + "/library/search?q=" + encodeURIComponent(d.title), { headers: authHeaders() })
+          .then(function (r) { return r.json(); })
+          .catch(function () { return {}; })
+          .then(function (res) {
+            var r = (res.results || []).filter(function (x) { return x.id === d.imdbId; })[0] ||
+              { id: d.imdbId, title: d.title, year: d.year, image: null };
+            scanned = d;
+            pick(r);
+            var form = addDlg.querySelector("form");
+            var f = form.querySelector('input[name="lib-format"][value="' + d.format + '"]');
+            if (f) f.checked = true;
+            form.querySelector("#lib-edition").value = d.edition || "";
+            form.steelbook.checked = !!d.steelbook;
+            form.criterion.checked = !!d.criterion;
+            // its HDR came with it: no second lookup
+            hdrUpc = d.upc;
+            hdrFor = r.id + "|" + d.upc;
+            hdrSeq++;
+            [].forEach.call(form.querySelectorAll('input[name="hdr"]'), function (c) { c.checked = (d.hdr || []).indexOf(c.value) >= 0; });
+            addDlg.querySelector(".lib-hdr-note").textContent = "(from blu-ray.com)";
+            msg.textContent = "Found: " + d.title + (d.year ? " (" + d.year + ")" : "") + ", " + FORMAT[d.format] + (d.edition ? ", " + d.edition : "") + ".";
+            check();
+          });
+      })
+      .catch(function () { msg.textContent = "Couldn't reach the server. Try again in a bit."; });
   }
 
   // TheDiscDb's editions of the picked film (Worker GET /library/editions); none found keeps the section hidden
@@ -663,6 +835,9 @@
             "<span>" + [e.year, e.format ? FORMAT[e.format] : "", e.features.length + " extras"].filter(Boolean).join(" · ") + "</span></button>";
         }).join("");
         box.hidden = false;
+        // a scanned barcode that TheDiscDb knows: that edition, picked (its extras fill in)
+        var same = scanned && editionsFound.map(function (e) { return e.upc; }).indexOf(scanned.upc);
+        if (same >= 0) list.querySelector('button[data-ed="' + same + '"]').click();
       })
       .catch(function () {});
   }
@@ -675,6 +850,7 @@
       return d.format === f.value && (d.imdbId === picked.id || norm(d.title) === norm(picked.title) && (!d.year || d.year === picked.year));
     });
     err.textContent = dupe ? "Already on the shelves in " + FORMAT[f.value] + "." : "";
+    addDlg.querySelector(".lib-hdr").hidden = !(f && f.value === "4k"); // HDR is a 4K thing
     addDlg.querySelector(".submit").disabled = !(picked && f) || dupe;
   }
 
@@ -698,6 +874,7 @@
         threeD: form.threeD.checked,
         criterion: form.criterion.checked,
         features: form.querySelector("#lib-features").value,
+        hdr: f.value === "4k" ? [].map.call(form.querySelectorAll('input[name="hdr"]:checked'), function (c) { return c.value; }) : [],
       }),
     })
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
@@ -745,7 +922,27 @@
   else if (params.has("admin")) login();
 
   render();
-  loadMovies().then(render); // stickers and review links once the Movies list is in
+  // A link to one disc (1.4, e.g. from Nick's Office): /movies/library/#disc=<its id> opens its case
+  var openedFromLink = false;
+  function openFromHash() {
+    var m = /[#&]disc=([^&]+)/.exec(location.hash);
+    if (!m || openedFromLink && !openFromHash.again) return false;
+    var id = decodeURIComponent(m[1]), d = discs.filter(function (x) { return x.id === id; })[0];
+    if (!d) return false;
+    openedFromLink = true;
+    // the page goes down to it on its shelf (glowing, like a new arrival) behind the open case
+    var b = shelves.querySelector('.slot-btn[data-id="' + id + '"]');
+    if (b) {
+      b.scrollIntoView({ block: "center" });
+      b.classList.add("just-added");
+      setTimeout(function () { b.classList.remove("just-added"); }, 4000);
+    }
+    openCase(d, false, b);
+    return true;
+  }
+  openFromHash();
+  window.addEventListener("hashchange", function () { openFromHash.again = true; openFromHash(); });
+  loadMovies().then(function () { render(); if (dialog.open) return; openFromHash(); }); // stickers and review links once the Movies list is in
   fetch(API + "/library")
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (data) {
@@ -755,6 +952,7 @@
       rebuild();
       render();
       colourSiteDiscs();
+      if (!openedFromLink) openFromHash(); // a disc added on the site
     })
     .catch(function () { /* the Worker is down: just discs.js */ });
 })();

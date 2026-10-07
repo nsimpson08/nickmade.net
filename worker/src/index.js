@@ -2,6 +2,7 @@ import { golfRoute } from "./golf.js";
 import { musicRoute, MUSIC_SCOPES } from "./music.js";
 import { votesRoute } from "./votes.js";
 import { libraryRoute } from "./library.js";
+import { photosRoute } from "./photos.js";
 
 // nickmade-queue: the live sections of the Movies and Games pages: visitor suggestions for "In the Queue",
 // Nick's "Recently Watched"/"Recently Played" lists, and Nick's site-added picks for other sections.
@@ -18,8 +19,9 @@ import { libraryRoute } from "./library.js";
 //   DELETE /queue/:imdbId       remove a submission: Nick (Authorization: Bearer ADMIN_TOKEN), or the visitor who suggested
 //                               it (?visitorId=), which also gives them that suggestion back
 //   GET    /watched             Recently Watched, newest first (8), and its archive: { items, archive }
-//   POST   /watched             { imdbId, date: "YYYY-MM-DD", rating: 0.5-5 in halves, optional } (admin) -> adds a movie; also drops it from the queue
-//   PATCH  /watched/:id         { rating, date } (admin) -> change the rating and/or date watched
+//   POST   /watched             { imdbId, date: "YYYY-MM-DD", rating: 0.5-5 in halves, optional, review: optional, up to
+//                               REVIEW_MAX chars } (admin) -> adds a movie; also drops it from the queue
+//   PATCH  /watched/:id         { rating, date, review } (admin) -> change the rating, date watched and/or review ("" clears it)
 //   DELETE /watched/:id         remove one (admin)
 //   GET    /lists?page=movies   Nick's site-added picks for each live section (newest first) and the list.js items he
 //                               removed on the site: { lists: { <key>: [items] }, hidden: { <key>: [titles] } }
@@ -32,6 +34,7 @@ import { libraryRoute } from "./library.js";
 //   GET    /xbox/gamerscore     Nick's total gamerscore and how much it went up in the last 24 hours (Games banner)
 //                               (or refreshes their Xbox stats if already there), poster from PosterSpy or the Xbox store
 //   GET    /library ...         Movies > Library: discs Nick adds on the site (see library.js)
+//   GET    /photos ...          Photography: photos Nick adds on the site, stored in R2 (see photos.js)
 //   GET    /spotify/top?playlist=<id>  the first song on a public Spotify playlist (home page "Lately" strip)
 //   GET    /spotify/now         what Nick is playing on Spotify now, or his last played song (home "Lately" strip)
 //   GET    /spotify/recent      his last 10 songs (now playing first, marked live) for the Music page
@@ -65,6 +68,12 @@ function blockedWords(text) {
   return normalize(text).split(" ").some((word) => !ALLOWED_WORDS.has(word) && BLOCKED.some((w) => word.startsWith(w)));
 }
 const COMMENT_MAX = 200; // visitors' optional "Why should Nick watch it?" note
+const REVIEW_MAX = 280; // Nick's short review under a Recently Watched/Played card (Ver 1.4)
+function cleanReview(r) { return String(r == null ? "" : r).replace(/\s+/g, " ").trim().slice(0, REVIEW_MAX); }
+// Who Nick watched a movie with (Recently Watched, Movies only, Ver 1.4): private, only ever sent back to the owner
+const WITH_MAX = 120;
+function cleanWith(w) { return String(w == null ? "" : w).replace(/\s+/g, " ").trim().slice(0, WITH_MAX); }
+function withoutPrivate(it) { if (!it.watchedWith) return it; const { watchedWith, ...rest } = it; return rest; }
 const MOVIE_TYPES = new Set(["movie", "tvMovie", "video"]);
 const GAME_TYPES = new Set(["videoGame"]);
 const PAGES = { movies: "movie", games: "game" }; // page -> kind of title it lists
@@ -78,7 +87,7 @@ function queueKey(page) {
 function watchedKey(page) {
   return page === "movies" ? "watched" : "watched:" + page;
 }
-const IMG_HOSTS = ["m.media-amazon.com", "alternativemovieposters.com", "store-images.s-microsoft.com", "media.posterspy.com"];
+const IMG_HOSTS = ["m.media-amazon.com", "alternativemovieposters.com", "store-images.s-microsoft.com", "media.posterspy.com", "image.tmdb.org"];
 const XBOX_RECENT = 30; // how many recent Xbox games /xbox/recent lists
 const GAMERSCORE_KEY = "xbox:gamerscore";
 const GAMERSCORE_NIGHTS = 60;
@@ -133,9 +142,10 @@ export default {
       if (url.pathname === "/watched" && request.method === "GET") {
         const wpage = pageOf(url.searchParams.get("page"));
         await fitWatched(env, wpage);
+        const owner = isAdmin(request, env); // only the owner gets who he watched each one with
         return json({
-          items: sortWatched(await getList(env, watchedKey(wpage))).slice(0, SECTION_MAX),
-          archive: sortWatched(await getList(env, watchedKey(wpage) + "-archive")).map(archived),
+          items: sortWatched(await getList(env, watchedKey(wpage))).slice(0, SECTION_MAX).map((it) => (owner ? it : withoutPrivate(it))),
+          archive: sortWatched(await getList(env, watchedKey(wpage) + "-archive")).map((it) => archived(it, owner)),
         }, 200, cors);
       }
       if (url.pathname === "/watched" && request.method === "POST") return await addWatched(request, env, cors);
@@ -151,6 +161,10 @@ export default {
       }
       if (url.pathname === "/library" || url.pathname.startsWith("/library/")) {
         const res = await libraryRoute(request, url, env, cors, { json, isAdmin });
+        if (res) return res;
+      }
+      if (url.pathname === "/photos" || url.pathname.startsWith("/photos/")) {
+        const res = await photosRoute(request, url, env, cors, { json, isAdmin });
         if (res) return res;
       }
       if (url.pathname.startsWith("/music/")) {
@@ -615,11 +629,15 @@ function sortWatched(items) {
   return items.slice().sort((a, b) => (b.date + b.createdAt).localeCompare(a.date + a.createdAt));
 }
 
-// What an Archive lists: just enough to name it
-function archived(it) {
+// What an Archive lists: enough to name it, and (on the Movies page) to open its card with Nick's review in it
+function archived(it, owner) {
   const out = { title: it.title, year: it.year || null };
+  if (owner && it.watchedWith) out.watchedWith = it.watchedWith; // private: the owner only
+  if (it.imdbId) out.imdbId = it.imdbId;
+  if (it.image) out.image = it.image;
   if (it.date) out.date = it.date;
   if (it.rating) out.rating = it.rating;
+  if (it.review) out.review = it.review;
   if (it.archivedAt) out.archivedAt = it.archivedAt;
   return out;
 }
@@ -673,6 +691,10 @@ async function addWatched(request, env, cors) {
   const movie = await lookupMovie(imdbId, noun, { poster: cleanPoster(body.poster) });
   if (!movie) return json({ error: "Couldn't find that " + noun + "." }, 404, cors);
   const item = { ...movie, id: imdbId + "-" + date, date, rating, createdAt: new Date().toISOString() };
+  const review = cleanReview(body.review);
+  if (review) item.review = review;
+  const withWho = page === "movies" ? cleanWith(body.watchedWith) : "";
+  if (withWho) item.watchedWith = withWho;
 
   const items = (await getList(env, watchedKey(page))).filter((it) => it.id !== item.id);
   items.push(item);
@@ -712,6 +734,14 @@ async function editWatched(request, url, env, cors) {
 
   item.rating = toRating(body.rating);
   item.date = date;
+  if (body.review !== undefined) { // left out: unchanged; "" removes it
+    const review = cleanReview(body.review);
+    if (review) item.review = review; else delete item.review;
+  }
+  if (body.watchedWith !== undefined && page === "movies") { // the same: left out unchanged, "" removes it
+    const withWho = cleanWith(body.watchedWith);
+    if (withWho) item.watchedWith = withWho; else delete item.watchedWith;
+  }
   item.id = item.imdbId + "-" + date;
   // A new date could collide with another viewing of the same movie; keep the edited one
   const kept = items.filter((it) => it === item || it.id !== item.id);

@@ -140,6 +140,7 @@
   ];
   // Play: each game's clip and 5 stills taken from it (play/wall/<game>-1.jpg ... -5.jpg)
   var GAMES = [
+    { slug: "office", title: "Nick\u2019s Office" }, // 1.4, first on the page
     { slug: "nicks-nine", title: "Nick's Nine" },
     { slug: "rapture", title: "Rapture: ADAM & Dice" },
   ];
@@ -226,8 +227,17 @@
       playlistCovers().then(function (albums) {
         return albums.map(function (a) { return { src: a.image, title: a.album, artist: a.artist, section: "Music", href: "/music/", ratio: 1 }; });
       }),
-      loadData("/photography/photos.js", "PHOTOS").then(function (photos) {
-        return (photos || []).map(function (ph) {
+      // photos.js plus the ones added on the site, minus the ones removed there (Worker GET /photos, 1.4)
+      Promise.all([
+        loadData("/photography/photos.js", "PHOTOS"),
+        API ? fetch(API + "/photos").then(function (r) { return r.ok ? r.json() : {}; }).catch(function () { return {}; }) : {},
+      ]).then(function (got) {
+        var gone = {};
+        (got[1].hidden || []).forEach(function (n) { gone[n] = true; });
+        var photos = (got[1].items || []).concat((got[0] || []).filter(function (ph) {
+          return !gone[String(ph.src).split("/").pop().replace(/\.[a-z]+$/i, "")];
+        }));
+        return photos.map(function (ph) {
           var small = ph.sizes && ph.sizes.length ? ph.sizes[0].src : ph.src;
           return { src: absolute(small, "/photography/"), title: "Photography", section: "", href: "/photography/", ratio: 2 / 3 };
         });
@@ -250,8 +260,10 @@
 
   // Everything the wall shows on this page (a promise: Music, Extras and Home fetch theirs)
   function collectAll() {
+    // Photography draws its photos once the ones added on the site are in (photos.js NMPhotosReady)
+    if (PHOTOS) return (window.NMPhotosReady || Promise.resolve()).then(collectPhotos);
     return HOME ? collectHome() : MUSIC ? collectMusic() : EXTRAS ? collectExtras() : PLAY ? Promise.resolve(collectPlay())
-      : Promise.resolve(PHOTOS ? collectPhotos() : LIBRARY ? (window.NMLibrary ? window.NMLibrary.wallItems() : []) : collect());
+      : Promise.resolve(LIBRARY ? (window.NMLibrary ? window.NMLibrary.wallItems() : []) : collect());
   }
 
   // The wall's copy of an image: the 400px WebP from tools/thumbs.py for the site's own posters, photos and courses;
@@ -261,6 +273,8 @@
     if (m) return m[1] + "thumbs/" + m[2] + ".webp";
     m = /^(.*\/photography\/)sizes\/([^/?#]+)-\d+\.jpg$/i.exec(src);
     if (m) return m[1] + "thumbs/" + m[2] + ".webp";
+    m = /^(.*\/site\/[a-z]+-\d{8}-[0-9a-f]{6})-\d+\.jpg$/.exec(src); // a photo added on the site (1.4): its own thumb
+    if (m) return m[1] + "-thumb.webp";
     m = /^(.*\/img\?u=)(.+)$/.exec(src);
     if (m) {
       var u = decodeURIComponent(m[2]);

@@ -32,4 +32,11 @@ crons = ["0 */4 * * *", "0 5 * * *", "0 6 * * *"]
 binding = "QUEUE"
 id = "5bfd7017fdc24cef93ca0afbfe6094ee"
 
+# Photos Nick adds on the Photography page in owner mode (Ver 1.4; see src/photos.js): the bucket tools/photos.py
+# uploads full-size photos to, served at https://photos.nickmade.net/ (PHOTO_URL; locally worker/.dev.vars points it
+# at this Worker's /photos/file/)
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "nickmade-photos"
+
 # Secrets (not stored here): npx wrangler secret put ADMIN_TOKEN  /  SALT  /  OPENXBL_API_KEY  /  SPOTIFY_CLIENT_SECRET

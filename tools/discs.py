@@ -75,7 +75,14 @@ BOX_SETS = {
 # Sets shelved as their films instead (Nick, 2026-10-03): the set is left out and each IMDb id becomes its own disc in
 # the set's format, with the set's added date. Facts come from IMDb and the blurb from Wikipedia, as for discs added on
 # the site (worker/src/library.js).
-SPLIT_SETS = {"Wyatt Earp / The Assassination of Jesse James": ["tt0111756", "tt0443680"]}
+SPLIT_SETS = {
+    "Wyatt Earp / The Assassination of Jesse James": ["tt0111756", "tt0443680"],
+    # (Nick, 1.4) each film on the shelf by itself, noted as from the set
+    "The Hunger Games: Complete 4-Film Collection": ["tt1392170", "tt1951264", "tt1951265", "tt1951266"],
+}
+SPLIT_NOTED = {"The Hunger Games: Complete 4-Film Collection"}  # split sets whose films say "From the ..." on the case
+# ...and shelve under one name, so they sit together in release order (ties sort by year)
+SPLIT_SORT = {"The Hunger Games: Complete 4-Film Collection": "Hunger Games, The"}
 # Films shelved together under another name, in release order: every film in that box set sorts as this (Nick,
 # 2026-10-03: the Daniel Craig Bond films go under "#" as 007)
 SHELVE_AS = {"The Daniel Craig Collection": "007"}
@@ -566,6 +573,10 @@ def main():
                  "director": f["director"], "starring": f["starring"], "tagline": "", "about": about_text,
                  "aboutUrl": about_url, "studio": f["studio"], "steelbook": False, "criterion": False, "threeD": False,
                  "added": box["added"], "imdbId": tt, "_barcode": ""}
+            if name in SPLIT_NOTED:
+                d["boxSet"] = name
+            if name in SPLIT_SORT:
+                d["sort"] = SPLIT_SORT[name]
             discs.append(d)
             print("  split %s: %s (%s)" % (name, f["title"], f["year"]))
 
@@ -666,6 +677,13 @@ def main():
     # Spines (logo + cover colour); --logos N limits new TMDB lookups (a test run)
     lim = next((int(a.split("=", 1)[1]) for a in sys.argv if a.startswith("--logos=")), None)
     spines(discs, lim)
+
+    # HDR (Ver 1.4): what tools/hdr.py found on blu-ray.com, by disc id ("dv", "hdr10+", "hdr10")
+    hdr_file = os.path.join(ROOT, "movies", "library", "hdr.json")
+    found = json.load(open(hdr_file)) if os.path.exists(hdr_file) else {}
+    for d in discs:
+        if found.get(d["id"]):
+            d["hdr"] = found[d["id"]]
 
     for d in discs:
         d.pop("_barcode", None)

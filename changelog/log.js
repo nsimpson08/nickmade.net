@@ -13,6 +13,21 @@
 // New movies, games, or photos don't need a version (that's content; the home Lately strip covers it).
 window.CHANGELOG = [
   {
+    version: "1.4",
+    date: "2026-10-06",
+    title: "Office space",
+    changes: [
+      { page: "site", text: "Small site improvements." },
+      { page: "site", text: "Short reviews from me, right under the stars in Recently Watched and Recently Played." },
+      { page: "movies", text: "Every movie on this page now opens like a case from my library: the tagline, what it's about, the cast, IMDb, and the official trailer." },
+      { page: "movies", text: "The disc library now allows my DVDs and VHS tapes too. Now to go through and add them all!" },
+      { page: "movies", text: "Every 4K disc shows whether it's Dolby Vision, HDR10+, or HDR10, and Dolby Vision gets its own filter." },
+      { page: "movies", text: "Spines is now one long shelf from A to Z, and every case can play the movie's trailer." },
+      { page: "photography", text: "New photos are marked Fresh for their first week." },
+      { page: "play", text: "Nick's Office: a pixel-art copy of my real office. Turn the room, zoom in, and click everything. The TVs, the cats, the speaker, and the window all do something, and most of it leads somewhere on the site." }
+    ]
+  },
+  {
     version: "1.3",
     date: "2026-10-04",
     title: "The video store",

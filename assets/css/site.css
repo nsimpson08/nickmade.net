@@ -1043,7 +1043,7 @@ html.wall-bg-on body { text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 1px rgba(0
 html.wall-bg-on .wall:not(.wall-bg) { text-shadow: none; } /* the popup wall has its own caption backgrounds */
 /* and the Library's cases print their own labels on solid colour: the shadow only smeared them (the Nick's Pick
    ribbon's dark letters looked blurry on its amber) */
-html.wall-bg-on :is(.sticker, .case-band, .case-art, .spine-cap, .spine.light) { text-shadow: none; } /* .case-art: the Criterion "C" */
+html.wall-bg-on :is(.sticker, .case-band, .case-art, .spine-cap, .spine.light, .spine-letter) { text-shadow: none; } /* .case-art: the Criterion "C" */
 /* gradient-filled text (Home's "Made"): a shadow would paint over the see-through letters, so a glow behind instead */
 html.wall-bg-on .banner h1 .made { text-shadow: none; filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.85)); }
 html.wall-bg-on :is(.jump a, .wall-ctl, .open, .vote:not(.on), .archive-toggle, .layout-toggle, .tags li, .lib-aisles button:not([aria-pressed="true"]), .lib-formats button:not([aria-pressed="true"])) {
@@ -1451,6 +1451,33 @@ button.queue-slot:hover .plus { transform: rotate(90deg); }
   font-size: 0.78rem;
   color: var(--accent);
 }
+/* Nick's short review under the stars on a Recently Watched/Played card (1.4, live.js): 2 lines, the rest behind "More" */
+.poster.suggested .watched-review {
+  margin: 6px 0 4px;
+  padding-left: 9px;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--fg);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+.poster.suggested .watched-review.expanded { display: block; -webkit-line-clamp: unset; line-clamp: none; }
+.poster.suggested .review-more {
+  margin: 2px 0 0 11px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.poster.suggested .review-more:hover, .poster.suggested .review-more:focus-visible { text-decoration: underline; outline: none; }
 .stars {
   position: relative;
   display: inline-block;
@@ -2137,7 +2164,7 @@ html.wall-bg-on .xbox-sync-btn { background-color: rgba(0, 0, 0, 0.55); }
 /* each group (Category, Layout) with a small label above it; a thin line between them */
 .bar-group { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .bar-group + .bar-group::before { content: ""; position: absolute; left: -15px; bottom: 8px; height: 30px; width: 1px; background: var(--line); }
-.bar-label { font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); }
+.bar-label { font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fg); }
 @media (max-width: 560px) { .bar-group + .bar-group::before { display: none; } } /* stacked: no line needed */
 .photo-section { scroll-margin-top: 24px; }
 .photo-section .subhead { margin: 0 16px 32px; justify-content: center; font-size: clamp(1.45rem, 4.4vw, 2.2rem); } /* bigger than other pages' (Nick, 1.3) */
@@ -2364,10 +2391,13 @@ html.wall-bg-on .xbox-sync-btn { background-color: rgba(0, 0, 0, 0.55); }
 .lib-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-top: 10px; }
 .lib-formats { display: flex; gap: 6px; }
 .lib-formats button { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; font-size: 0.78rem; }
+.lib-formats button[hidden] { display: none; } /* a format with nothing on the shelves (library.js render) */
 .lib-formats button[class^="f-"]::before { content: ""; width: 8px; height: 8px; border-radius: 2px; }
 .lib-formats .f-4k::before { background: #f2f2f2; box-shadow: inset 0 -3px 0 #111; }
 .lib-formats .f-bluray::before { background: #1f78e6; }
 .lib-formats .f-dvd::before { background: #8a8a8a; }
+.lib-formats .f-vhs::before { background: #f2f2f2; box-shadow: inset 0 0 0 2px #111; }
+.lib-formats .f-dv::before { background: linear-gradient(135deg, #ff3c78, #ffb400, #3ce6c8, #3c8cff); }
 .lib-search { flex: 1 1 220px; }
 .lib-search input {
   width: 100%;
@@ -2482,6 +2512,9 @@ html.wall-bg-on .xbox-sync-btn { background-color: rgba(0, 0, 0, 0.55); }
 .case.f-4k .case-band { background: #070707; border-bottom: 1px solid #2a2a2a; font-family: var(--display); font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; }
 .case.f-4k .case-band b { font-weight: 800; letter-spacing: 0; }
 .case.f-dvd .case-band { background: linear-gradient(180deg, #2a2a2a, #161616); font-style: italic; font-weight: 800; letter-spacing: 0.06em; color: #e6e6e6; }
+/* VHS (1.4): a rental-store black band with the letters boxed in white, like the tape logo */
+.case.f-vhs .case-band { background: #0b0b0b; border-bottom: 1px solid #262626; }
+.case.f-vhs .case-band b { padding: 0.12em 0.4em 0.08em; border-radius: 0.15em; background: #f2f2f2; color: #0b0b0b; font: 800 0.95em/1 var(--display); letter-spacing: 0.12em; }
 .case-band i { padding: 0.1em 0.35em; border: 1px solid currentColor; border-radius: 0.25em; font-style: normal; font-size: 0.8em; }
 .case-art { position: relative; flex: none; aspect-ratio: 2 / 3; }
 .case-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; } /* so a poster not quite 2:3 can't stretch the case */
@@ -2561,7 +2594,9 @@ html.wall-bg-on .xbox-sync-btn { background-color: rgba(0, 0, 0, 0.55); }
   text-align: center;
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.4);
 }
-.sticker.box { bottom: 5%; right: 5%; background: rgba(0, 0, 0, 0.82); border: 1px solid rgba(255, 255, 255, 0.22); }
+.sticker.box { position: static; background: rgba(0, 0, 0, 0.82); border: 1px solid rgba(255, 255, 255, 0.22); }
+/* bottom right of the cover (library.js caseHtml): a box set's sticker */
+.case-tags { position: absolute; z-index: 2; right: 5%; bottom: 5%; }
 
 /* the back of the case */
 .lib-dialog {
@@ -2575,6 +2610,16 @@ html.wall-bg-on .xbox-sync-btn { background-color: rgba(0, 0, 0, 0.55); }
   overflow: hidden;
 }
 .lib-dialog::backdrop { background: rgba(0, 0, 0, 0.75); }
+/* while a case (or any dialog) is open, the page behind stays put: on phones a scroll that reached the end of the case
+   used to carry on and scroll the page under it */
+html:has(dialog[open]) { overflow: hidden; }
+.lib-back { overscroll-behavior: contain; }
+/* its scrollbar (a trailer open can make the case taller than the window): never sideways, and thin and dark where
+   the system draws classic scrollbars (a Mac set to always show them painted two grey bars round the case) */
+.lib-back { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.18) transparent; }
+.lib-back::-webkit-scrollbar { width: 8px; height: 0; }
+.lib-back::-webkit-scrollbar-track { background: transparent; }
+.lib-back::-webkit-scrollbar-thumb { border-radius: 8px; background: rgba(255, 255, 255, 0.18); }
 .lib-back {
   position: relative;
   display: grid;
@@ -2582,7 +2627,7 @@ html.wall-bg-on .xbox-sync-btn { background-color: rgba(0, 0, 0, 0.55); }
   gap: 32px;
   max-height: calc(100dvh - 50px);
   padding: 32px;
-  overflow: auto;
+  overflow: hidden auto; /* up and down only */
 }
 .lib-front { position: sticky; top: 0; align-self: start; }
 .lib-dialog .close {
@@ -2601,6 +2646,20 @@ html.wall-bg-on .xbox-sync-btn { background-color: rgba(0, 0, 0, 0.55); }
   cursor: pointer;
 }
 .lib-dialog .close:hover, .lib-dialog .close:focus-visible { border-color: var(--accent); color: var(--accent); outline: none; }
+/* the X drawn as two lines, dead centre (the × character sits off-centre in most fonts) */
+.lib-dialog .close { padding: 0; font-size: 0; }
+.lib-dialog .close::before, .lib-dialog .close::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 14px;
+  height: 1.5px;
+  border-radius: 1px;
+  background: currentColor;
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+.lib-dialog .close::after { transform: translate(-50%, -50%) rotate(-45deg); }
 .lib-info { min-width: 0; padding-right: 24px; }
 .lib-info h2 { margin: 0 0 6px; font-family: var(--display); font-weight: 600; font-size: clamp(1.3rem, 3vw, 1.7rem); line-height: 1.15; letter-spacing: -0.02em; }
 .lib-tonight { margin: 0 0 8px; font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--amber); }
@@ -2616,6 +2675,30 @@ html.wall-bg-on .xbox-sync-btn { background-color: rgba(0, 0, 0, 0.55); }
 .lib-credits dd { margin: 0; }
 .lib-links { display: flex; flex-wrap: wrap; gap: 10px; margin: 22px 0 0; }
 .lib-dialog .lib-links .open { margin: 0; } /* the dialog sits outside .library, on body */
+/* the Movies page's poster details (film-dialog.js): the poster on the left in place of the case */
+.film-dialog .film-poster { display: block; width: 100%; border-radius: 6px; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5); }
+.film-loading { margin: 16px 0 0; font-size: 0.9rem; color: var(--muted); }
+/* Nick's own rating and short review in a film's card */
+.film-mine { margin: 16px 0 4px; padding: 12px 14px; border-left: 3px solid var(--amber); border-radius: 4px; background: rgba(255, 255, 255, 0.04); }
+.film-mine-head { margin: 0 0 4px; font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.film-mine-stars { margin-left: 6px; font-size: 0.95rem; letter-spacing: 0.05em; vertical-align: -1px; text-transform: none; color: color-mix(in srgb, var(--amber) 55%, transparent); } /* the empty outlines */
+.film-mine-stars .on { color: var(--amber); }
+.film-mine p:last-child { margin: 0; font-size: 0.92rem; line-height: 1.55; color: var(--fg); }
+.film-mine p.film-with { margin-top: 8px; font-size: 0.82rem; color: var(--muted); }
+/* who Nick watched it with: owner mode only */
+.watched-with { margin: 4px 0 0; font-size: 0.78rem; color: var(--muted); }
+.watched-with::before { content: "🔒 "; font-size: 0.7rem; }
+/* the Recently Watched Archive's rows open their cards */
+#entries .archive-item { cursor: pointer; border-radius: 6px; }
+#entries .archive-item:hover .t, #entries .archive-item:focus-visible .t { color: var(--accent); }
+#entries .archive-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#entries .poster .art[role="button"], #entries .entry .art[role="button"] { cursor: pointer; }
+#entries .poster .art[role="button"]:focus-visible, #entries .entry .art[role="button"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+/* the official trailer in a case (trailer.js): YouTube's player, 16:9, under the title and its year line */
+.trailer { position: relative; margin: 14px 0 4px; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; background: #000; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); }
+.trailer iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.trailer-btn { display: inline-flex; align-items: center; gap: 6px; }
+.trailer-btn svg { width: 14px; height: 14px; fill: currentColor; }
 .lib-links button.open { background: transparent; color: var(--fg); font: inherit; font-size: 0.9rem; cursor: pointer; }
 @media (prefers-reduced-motion: no-preference) {
   .lib-dialog.flip .lib-back { animation: lib-flip .55s cubic-bezier(.2, .8, .2, 1); }
@@ -2771,7 +2854,7 @@ html.photo-slides .slideshow {
 .ss-full:hover { color: var(--accent); }
 /* the thumbnails: their own scrolling column */
 .ss-thumbs { min-height: 0; overflow-y: auto; padding: 2px 4px 2px 0; scrollbar-width: thin; scrollbar-color: #2a2a30 transparent; }
-.ss-sec { margin: 12px 0 6px; font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
+.ss-sec { margin: 14px 0 8px; font-size: 0.8rem; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: var(--fg); }
 .ss-group:first-child .ss-sec { margin-top: 0; }
 .ss-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; }
 .ss-thumb { display: block; aspect-ratio: 1; padding: 0; border: 0; border-radius: 5px; overflow: hidden; background: var(--panel); cursor: pointer; opacity: 0.55; outline: 2px solid transparent; outline-offset: -2px; transition: opacity .2s, outline-color .2s; }
@@ -2803,6 +2886,20 @@ html.wall-bg-on .lib-view { background-color: rgba(0, 0, 0, 0.55); }
 /* a bookshelf: spines stand side by side, each on its piece of shelf edge, so a row reads as one shelf */
 .shelf.spines { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 30px 0; padding: 0 6px; }
 .spine-slot { display: flex; flex-direction: column; }
+/* A–Z in Spines: one continuous shelf, each letter's first spine with the letter above it (library.js) */
+.aisle-flow .shelf.spines { gap: 40px 0; padding-top: 26px; }
+.spine-slot.letter-start { position: relative; margin-left: 10px; }
+.spine-letter {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: -4px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--accent);
+  color: #000;
+  font: 800 0.75rem/1.2 var(--display);
+  scroll-margin-top: 190px;
+}
 .spine-slot .ledge { margin: 0; }
 .spine {
   --h: 240px;
@@ -2844,7 +2941,7 @@ html.wall-bg-on .lib-view { background-color: rgba(0, 0, 0, 0.55); }
   line-height: 1;
   text-align: center;
 }
-.spine.f-4k .spine-cap { background: #f2f2f2; color: #0a0a0a; }
+.spine.f-4k .spine-cap { background: #0a0a0a; color: #f2f2f2; box-shadow: inset 0 -1px 0 #2a2a2e; } /* black with white letters (Nick, 1.4) */
 .spine.f-bluray .spine-cap { background: linear-gradient(180deg, #4ba3ff, #1f78e6); font-style: italic; }
 .spine-title {
   flex: 1;
@@ -2881,9 +2978,19 @@ html.wall-bg-on .lib-view { background-color: rgba(0, 0, 0, 0.55); }
 .lib-credit { margin: 56px 0 0; font-size: 0.72rem; color: var(--faint); text-align: center; }
 .lib-credit a { color: var(--muted); }
 /* the same borders as the covers: steelbook silver, Criterion maroon, a pick's amber (later wins) */
-.spine.steel { box-shadow: inset 0 0 0 2px #b9bec6, 0 2px 0 rgba(0, 0, 0, 0.6), 0 10px 14px -8px rgba(0, 0, 0, 0.85); }
-.spine.criterion { box-shadow: inset 0 0 0 2px #a3243a, 0 2px 0 rgba(0, 0, 0, 0.6), 0 10px 14px -8px rgba(0, 0, 0, 0.85); }
-.spine.picked { box-shadow: inset 0 0 0 2px var(--amber), 0 2px 0 rgba(0, 0, 0, 0.6), 0 10px 14px -8px rgba(0, 0, 0, 0.85); }
+/* the borders (steelbook silver, Criterion maroon, Nick's Pick amber, which wins) go all the way round, over the
+   format cap at the top too (Nick, 1.4): drawn on a layer above everything in the spine */
+.spine.steel::after, .spine.criterion::after, .spine.picked::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.spine.steel::after { box-shadow: inset 0 0 0 2px #b9bec6; }
+.spine.criterion::after { box-shadow: inset 0 0 0 2px #a3243a; }
+.spine.picked::after { box-shadow: inset 0 0 0 2px var(--amber); }
 .slot-btn.spine.just-added { animation: lead-glow 2.4s ease-out; }
 @media (max-width: 640px) {
   .shelf.spines { gap: 24px 0; padding: 0; }
@@ -2919,3 +3026,110 @@ html.wall-bg-on .lib-view { background-color: rgba(0, 0, 0, 0.55); }
 .lib-ed-list button:hover { border-color: #3a3a40; }
 .lib-ed-list button[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, #000); }
 .lib-add textarea { font-size: 0.85rem; }
+
+/* ---------- Photography: photos added on the site (Ver 1.4, photo-upload.js) ---------- */
+.photo-add-btn span { font-weight: 700; }
+.photo-add .photo-pick {
+  display: grid;
+  place-items: center;
+  min-height: 160px;
+  margin: 14px 0 4px;
+  border: 1px dashed #3a3a40;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.02);
+}
+.photo-add .photo-pick:hover, .photo-add .photo-pick:focus-within { border-color: var(--accent); }
+.photo-pick-empty { display: grid; gap: 4px; text-align: center; }
+.photo-pick-empty b { color: var(--accent); font-weight: 500; }
+.photo-pick-empty small { color: var(--faint); font-size: 0.78rem; }
+.photo-pick img { display: block; max-width: 100%; max-height: 300px; object-fit: contain; }
+.photo-pick [hidden] { display: none; }
+.photo-info { margin: 8px 0 0; font-size: 0.78rem; color: var(--muted); }
+.photo-remove {
+  padding: 4px 10px;
+  border: 1px solid #5a2a2a;
+  border-radius: 999px;
+  background: transparent;
+  color: #ff8a8a;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.photo-remove:hover { border-color: #ff8a8a; }
+.photo-remove[hidden] { display: none; }
+
+/* Fresh: the newest photo added to a section, for a week or until the next one (photos.js) */
+.fresh-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px 3px 7px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #001220;
+  font: 700 0.68rem/1 var(--body);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-shadow: none;
+}
+.fresh-tag::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: fresh-pulse 1.6s ease-in-out infinite; }
+.photo.fresh { position: relative; }
+.photo.fresh .fresh-tag { position: absolute; z-index: 1; top: 10px; left: 10px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5); }
+.photo.fresh img { box-shadow: 0 0 0 2px var(--accent); }
+.ss-where .fresh-tag { margin: 0 2px; vertical-align: 1px; }
+.ss-ago { color: var(--faint); }
+.ss-thumb.fresh { position: relative; }
+.ss-thumb.fresh::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px #000;
+  animation: fresh-pulse 1.6s ease-in-out infinite;
+}
+.fresh-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: 2px;
+  animation: fresh-pulse 1.6s ease-in-out infinite;
+}
+@keyframes fresh-pulse { 50% { opacity: 0.35; } }
+/* the first time it's shown, it comes up like a print in the developer tray: pale and soft, then the full photo */
+img.developing { animation: develop 2.6s cubic-bezier(0.3, 0, 0.2, 1) both; }
+@keyframes develop {
+  0% { filter: brightness(1.9) contrast(0.45) saturate(0) blur(6px); }
+  45% { filter: brightness(1.3) contrast(0.75) saturate(0.4) sepia(0.35) blur(1.5px); }
+  100% { filter: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fresh-tag::before, .ss-thumb.fresh::after, .fresh-dot { animation: none; }
+}
+
+/* ---------- Library: the add dialog's barcode scanner (Ver 1.4, library.js) ---------- */
+.lib-scan { margin: 14px 0 6px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255, 255, 255, 0.02); }
+.lib-scan-btn { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.lib-scan-btn[hidden] { display: none; }
+.lib-scan-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+.lib-scan-cam { position: relative; margin-bottom: 10px; border-radius: 10px; overflow: hidden; background: #000; aspect-ratio: 4 / 3; }
+.lib-scan-cam[hidden] { display: none; }
+.lib-scan-cam video { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* a red line across the middle, like a store scanner's */
+.lib-scan-line { position: absolute; left: 12%; right: 12%; top: 50%; height: 2px; background: #ff3b3b; box-shadow: 0 0 10px #ff3b3b; animation: scan-sweep 1.6s ease-in-out infinite alternate; }
+@keyframes scan-sweep { from { transform: translateY(-40px); } to { transform: translateY(40px); } }
+.lib-scan-stop { position: absolute; right: 10px; bottom: 10px; padding: 6px 14px; border: 1px solid rgba(255, 255, 255, 0.4); border-radius: 999px; background: rgba(0, 0, 0, 0.6); color: #fff; font: inherit; font-size: 0.8rem; cursor: pointer; }
+.lib-upc { display: flex; align-items: center; gap: 8px; }
+.queue-dialog .lib-upc input { flex: 1; min-width: 0; margin: 0; letter-spacing: 0.06em; }
+.lib-upc .open { flex: none; }
+.lib-scan-msg { margin: 8px 0 0; font-size: 0.8rem; color: var(--muted); }
+.lib-scan-msg:empty { display: none; }
+@media (prefers-reduced-motion: reduce) { .lib-scan-line { animation: none; } }
