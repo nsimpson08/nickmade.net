@@ -207,27 +207,17 @@ async function stillsRoute(request, url, env, cors, h) {
 // suggestion search, the closest title and year). -> { imdbId, title, year, minutes, rated, genres, director,
 // starring, tagline and trailer (TMDB), about, aboutUrl }. Cached for a month.
 async function filmRoute(request, url, env, cors, h) {
-  let imdb = (url.searchParams.get("imdb") || "").trim();
+  const imdb = (url.searchParams.get("imdb") || "").trim();
   const title = (url.searchParams.get("title") || "").trim().slice(0, 120), year = parseInt(url.searchParams.get("year"), 10) || null;
   if (!/^tt\d{5,10}$/.test(imdb) && !title) return h.json({ error: "Expected an IMDb id or a title." }, 400, cors);
-  const cache = caches.default, key = new Request("https://film.nickmade.net/v3/" + (imdb || encodeURIComponent(title.toLowerCase() + "|" + (year || ""))));
+  const cache = caches.default, key = new Request("https://film.nickmade.net/v4/" + (imdb || encodeURIComponent(title.toLowerCase() + "|" + (year || ""))));
   const hit = await cache.match(key);
   if (hit) return h.json(await hit.json(), 200, cors);
   try {
-    if (!/^tt\d{5,10}$/.test(imdb)) {
-      const res = await fetch("https://v3.sg.media-imdb.com/suggestion/x/" + encodeURIComponent(title.toLowerCase().slice(0, 60)) + ".json");
-      const found = ((await res.json()).d || []).filter((r) => /^tt\d+$/.test(r.id) && /^(movie|tvMovie|video|tvSeries|tvMiniSeries)$/.test(r.qid));
-      const same = (r) => plain(r.l) === plain(title);
-      const pick = found.find((r) => same(r) && (!year || Math.abs((r.y || 0) - year) <= 1)) || found.find(same) || found[0];
-      if (!pick) return h.json({ error: "Couldn't find it on IMDb." }, 404, cors);
-      imdb = pick.id;
-    }
-    const [facts, wiki, extra] = await Promise.all([imdbTitle(imdb), wikipedia(imdb).catch(() => null), tmdbExtras(imdb, env).catch(() => ({}))]);
-    const body = {
-      imdbId: imdb, title: facts.title, year: facts.year, minutes: facts.minutes, rated: facts.rated, genres: facts.genres,
-      tagline: extra.tagline || "", trailer: extra.trailer || "",
-      director: facts.director, starring: facts.starring, about: wiki ? wiki.text : "", aboutUrl: wiki ? wiki.url : "",
-    };
+    const film = await tmdbFilm(env, /^tt\d{5,10}$/.test(imdb) ? { imdb } : { title, year });
+    if (!film) return h.json({ error: "Couldn't find it." }, 404, cors);
+    const wiki = film.imdbId ? await wikipedia(film.imdbId).catch(() => null) : null;
+    const body = { ...film, about: wiki ? wiki.text : "", aboutUrl: wiki ? wiki.url : "" };
     await cache.put(key, new Response(JSON.stringify(body), { headers: { "Cache-Control": "max-age=2592000" } }));
     return h.json(body, 200, cors);
   } catch (e) {
@@ -235,20 +225,66 @@ async function filmRoute(request, url, env, cors, h) {
   }
 }
 
-// From TMDB: the film's tagline ("The Dead Are Alive.") and its official trailer's YouTube id (the cases' Trailer
-// button plays it in YouTube's embedded player): an official English "Trailer" first, else any trailer, else a teaser
-async function tmdbExtras(imdbId, env) {
-  if (!env.TMDB_API_KEY) return {};
+// A film's details from TMDB (the poster cards on the Movies page, the trailers in the Library's cases): found by IMDb
+// id, or by title and year (TMDB's search); one request brings its credits, US ratings, videos and IMDb id. (These came
+// from IMDb's own API at first, but it refuses Cloudflare's servers: 429.) -> { imdbId, title, year, minutes, rated,
+// genres, director, starring, tagline, trailer } or null
+async function tmdbFilm(env, { imdb, title, year }) {
+  if (!env.TMDB_API_KEY) throw new Error("No TMDB key");
   const api = (path) => fetch("https://api.themoviedb.org/3" + path + (path.includes("?") ? "&" : "?") + "api_key=" + env.TMDB_API_KEY)
-    .then((r) => (r.ok ? r.json() : {}));
-  const found = await api("/find/" + imdbId + "?external_source=imdb_id");
-  const movie = found.movie_results && found.movie_results[0], show = found.tv_results && found.tv_results[0];
-  if (!movie && !show) return {};
-  const d = await api((movie ? "/movie/" + movie.id : "/tv/" + show.id) + "?append_to_response=videos");
-  const vids = ((d.videos && d.videos.results) || []).filter((v) => v.site === "YouTube" && /^[\w-]{11}$/.test(v.key));
-  const rank = (v) => (v.type === "Trailer" ? 0 : v.type === "Teaser" ? 2 : 4) + (v.official ? 0 : 1) + (v.iso_639_1 === "en" ? 0 : 0.5);
-  const best = vids.filter((v) => v.type === "Trailer" || v.type === "Teaser").sort((a, b) => rank(a) - rank(b) || String(a.published_at).localeCompare(String(b.published_at)))[0];
-  return { tagline: String(d.tagline || "").trim(), trailer: best ? best.key : "" };
+    .then((r) => { if (!r.ok) throw new Error("TMDB didn't answer (" + r.status + ")"); return r.json(); });
+  let kind = "movie", id = null;
+  if (imdb) {
+    const found = await api("/find/" + imdb + "?external_source=imdb_id");
+    if (found.movie_results && found.movie_results[0]) id = found.movie_results[0].id;
+    else if (found.tv_results && found.tv_results[0]) { kind = "tv"; id = found.tv_results[0].id; }
+  } else {
+    const same = (r) => plain(r.title || r.name || "") === plain(title);
+    const yr = (r) => parseInt(String(r.release_date || r.first_air_date || "").slice(0, 4), 10) || 0;
+    const movies = (await api("/search/movie?query=" + encodeURIComponent(title) + (year ? "&year=" + year : ""))).results || [];
+    let pick = movies.find((r) => same(r) && (!year || Math.abs(yr(r) - year) <= 1)) || movies.find(same) || movies[0];
+    if (!pick) {
+      const shows = (await api("/search/tv?query=" + encodeURIComponent(title))).results || [];
+      pick = shows.find(same) || shows[0];
+      if (pick) kind = "tv";
+    }
+    if (pick) id = pick.id;
+  }
+  if (!id) return null;
+  const d = await api("/" + kind + "/" + id + "?append_to_response=credits,videos,external_ids," + (kind === "movie" ? "release_dates" : "content_ratings"));
+  const us = (list) => (list || []).find((r) => r.iso_3166_1 === "US");
+  let rated = "";
+  if (kind === "movie") {
+    const dates = (us(d.release_dates && d.release_dates.results) || {}).release_dates || [];
+    const cert = dates.filter((r) => r.certification).sort((a, b) => (a.type === 3 ? -1 : 0) - (b.type === 3 ? -1 : 0))[0]; // theatrical first
+    rated = cert ? cert.certification : "";
+  } else rated = (us(d.content_ratings && d.content_ratings.results) || {}).rating || "";
+  const crew = (d.credits && d.credits.crew) || [];
+  const directors = kind === "movie" ? crew.filter((c) => c.job === "Director").map((c) => c.name) : (d.created_by || []).map((c) => c.name);
+  return {
+    imdbId: (d.external_ids && d.external_ids.imdb_id) || imdb || "",
+    title: d.title || d.name || title || "",
+    year: parseInt(String(d.release_date || d.first_air_date || "").slice(0, 4), 10) || year || null,
+    minutes: d.runtime || (d.episode_run_time && d.episode_run_time[0]) || null,
+    rated,
+    genres: (d.genres || []).map((g) => g.name),
+    director: directors.slice(0, 2).join(", "),
+    starring: ((d.credits && d.credits.cast) || []).sort((a, b) => a.order - b.order).slice(0, 4).map((c) => c.name),
+    tagline: String(d.tagline || "").trim(),
+    trailer: pickTrailer((d.videos && d.videos.results) || []),
+    // for Add a disc
+    series: kind === "tv",
+    studio: d.production_companies && d.production_companies[0] ? d.production_companies[0].name : "",
+    image: d.poster_path ? "https://image.tmdb.org/t/p/w500" + d.poster_path : "",
+  };
+}
+
+// The official trailer's YouTube id: an official English "Trailer" first, else any trailer, else a teaser, or ""
+function pickTrailer(videos) {
+  const vids = videos.filter((v) => v.site === "YouTube" && /^[\w-]{11}$/.test(v.key) && (v.type === "Trailer" || v.type === "Teaser"));
+  const rank = (v) => (v.type === "Trailer" ? 0 : 2) + (v.official ? 0 : 1) + (v.iso_639_1 === "en" ? 0 : 0.5);
+  const best = vids.sort((a, b) => rank(a) - rank(b) || String(a.published_at).localeCompare(String(b.published_at)))[0];
+  return best ? best.key : "";
 }
 
 // The film's Wikipedia summary: Wikidata item with this IMDb id (P345) -> its English article -> the summary
@@ -285,8 +321,10 @@ async function add(request, env, cors, h) {
   const items = await list(env, ITEMS);
   if (items.some((d) => d.imdbId === imdbId && d.format === format)) return h.json({ error: "That one's already on the shelves." }, 409, cors);
 
-  let t;
-  try { t = await imdbTitle(imdbId); } catch (e) { return h.json({ error: "Couldn't get that title from IMDb. Try again in a bit." }, 502, cors); }
+  // its facts from TMDB (IMDb's own API refuses Cloudflare's servers), IMDb's only if TMDB doesn't know it
+  let t = null;
+  try { t = await tmdbFilm(env, { imdb: imdbId }); } catch (e) { /* try IMDb */ }
+  if (!t) { try { t = await imdbTitle(imdbId); } catch (e) { return h.json({ error: "Couldn't get that title's details. Try again in a bit." }, 502, cors); } }
   let wiki = null;
   try { wiki = await wikipedia(imdbId); } catch (e) { /* no blurb, the rest still works */ }
   let logo = "";
@@ -318,8 +356,8 @@ async function add(request, env, cors, h) {
     hdr: format === "4k" && Array.isArray(body.hdr) ? HDR_KINDS.filter((k) => body.hdr.includes(k)) : [],
     added: new Intl.DateTimeFormat("en-CA", { timeZone: env.TIMEZONE || "America/Chicago" }).format(new Date()),
     imdbId,
-    // IMDb posters resize on the fly; 400px wide like the imported covers
-    cover: t.image ? t.image.replace(/\._V1_.*\.jpg$/, "._V1_UX400_.jpg").replace(/(@)\.jpg$/, "$1._V1_UX400_.jpg") : "",
+    // TMDB's poster at 500px wide; or an IMDb poster, which resizes on the fly (400px wide like the imported covers)
+    cover: !t.image ? "" : /image\.tmdb\.org/.test(t.image) ? t.image : t.image.replace(/\._V1_.*\.jpg$/, "._V1_UX400_.jpg").replace(/(@)\.jpg$/, "$1._V1_UX400_.jpg"),
     logo, // the spine's colour is measured from the cover in the browser (library.js), since a Worker can't decode images
     site: true,
   };
