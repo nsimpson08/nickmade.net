@@ -137,6 +137,7 @@ body {
 }
 .office-hint.gone { opacity: 0; }
 @media not ((hover: hover) and (pointer: fine)) { .hint-wheel { display: none; } }
+@media not (pointer: coarse) { .hint-pinch { display: none; } }
 
 /* the name of what's under the pointer (mouse only) */
 .office-tip {

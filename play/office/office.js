@@ -1441,7 +1441,8 @@
   document.querySelector(".office-pan.right").addEventListener("click", function () { turn(1); });
   var zoomBtn = document.querySelector(".office-zoom");
   zoomBtn.addEventListener("click", function () {
-    zoomTarget = zoomTarget > 1 ? 1 : 1.5; zoomAt = null; // a fixed zoom: in to 1.5x, or (zoomed in any way) back out
+    // a fixed zoom: in to 1.5x (2.5x on phones, where the room is small), or (zoomed in any way) back out
+    zoomTarget = zoomTarget > 1 ? 1 : matchMedia("(pointer: coarse)").matches ? 2.5 : 1.5; zoomAt = null;
     if (zoomTarget === 1) panX = panY = 0;
     easeZoom();
   });
@@ -1460,6 +1461,7 @@
     if (zoom <= 1.001) panX = panY = 0;
     clampPan();
     zoomBtn.setAttribute("aria-pressed", String(zoom > 1.01));
+    stage.style.touchAction = zoom > 1.01 ? "none" : ""; // zoomed in, a finger looks around every way; out, it scrolls the page
   }
   function easeZoom() {
     if (zoomRaf) return;
@@ -1479,6 +1481,51 @@
     hideHint();
     easeZoom();
   }, { passive: false });
+
+  // two fingers pinch to zoom (phones and tablets), towards the point between them, and pan as they move. Watched in
+  // the capture phase so the second finger never reaches the canvas as a drag or a click.
+  var touches = {}, pinch = null;
+  function twoFingers() {
+    var ids = Object.keys(touches);
+    if (ids.length < 2) return null;
+    var a = touches[ids[0]], b = touches[ids[1]];
+    return { d: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+  }
+  stage.addEventListener("pointerdown", function (e) {
+    if (e.pointerType !== "touch") return;
+    touches[e.pointerId] = { x: e.clientX, y: e.clientY };
+    var f = twoFingers();
+    if (!f || pinch) return;
+    pinch = { d: f.d, z: zoom, x: f.x, y: f.y };
+    if (zoomRaf) { cancelAnimationFrame(zoomRaf); zoomRaf = 0; }
+    dragging = false; moved = Infinity; // no drag, and no click when the fingers lift
+    hover = null; tip.hidden = true;
+    hideHint();
+  }, true);
+  stage.addEventListener("pointermove", function (e) {
+    if (!touches[e.pointerId]) return;
+    touches[e.pointerId] = { x: e.clientX, y: e.clientY };
+    var f = pinch && twoFingers();
+    if (!f) return;
+    zoomTarget = Math.max(1, Math.min(ZOOM_MAX, pinch.z * f.d / pinch.d));
+    zoomAt = null;
+    setZoom(zoomTarget, f);
+    panX += f.x - pinch.x; panY += f.y - pinch.y; pinch.x = f.x; pinch.y = f.y;
+    clampPan();
+  }, true);
+  function liftFinger(e) {
+    delete touches[e.pointerId];
+    if (!pinch) return;
+    var f = twoFingers();
+    if (f) { pinch = { d: f.d, z: zoom, x: f.x, y: f.y }; return; } // a third finger was down: carry on with the other two
+    pinch = null;
+  }
+  stage.addEventListener("pointerup", liftFinger, true);
+  stage.addEventListener("pointercancel", liftFinger, true);
+  // keep the browser's own pinch (and Safari's page zoom) out of it while two fingers are on the room
+  stage.addEventListener("touchmove", function (e) { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+  stage.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+
   document.addEventListener("keydown", function (e) {
     if (e.key === "ArrowLeft") { e.preventDefault(); turn(-1); }
     else if (e.key === "ArrowRight") { e.preventDefault(); turn(1); }
@@ -1493,6 +1540,7 @@
     return x >= 0 && y >= 0 && x < CW && y < CH ? thingOfPixel(y * CW + x) : null;
   }
   canvas.addEventListener("pointerdown", function (e) {
+    if (pinch) return; // the second finger of a pinch
     dragging = true; moved = 0; turned = false;
     downX = lastX = e.clientX; downY = lastY = e.clientY;
     canvas.setPointerCapture(e.pointerId);

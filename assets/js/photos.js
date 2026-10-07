@@ -282,15 +282,20 @@
         var t = e.target.closest(".ss-thumb");
         if (t) slideTo(+t.dataset.index);
       });
-      // swipe on touch screens
-      var x0 = null;
+      // swipe on touch screens: one finger, mostly sideways (scrolling the page past the photo with a thumb that drifts
+      // a little isn't a swipe, nor is a pinch)
+      var x0 = null, y0 = 0;
       var stage = ss.querySelector(".ss-stage");
-      stage.addEventListener("touchstart", function (e) { x0 = e.touches[0].clientX; }, { passive: true });
+      stage.addEventListener("touchstart", function (e) {
+        x0 = e.touches.length === 1 ? e.touches[0].clientX : null;
+        y0 = e.touches[0].clientY;
+      }, { passive: true });
+      stage.addEventListener("touchcancel", function () { x0 = null; });
       stage.addEventListener("touchend", function (e) {
-        if (x0 === null) return;
-        var dx = e.changedTouches[0].clientX - x0;
+        if (x0 === null || e.touches.length) { x0 = null; return; }
+        var dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
         x0 = null;
-        if (Math.abs(dx) > 40) slideTo(ssAt + (dx < 0 ? 1 : -1));
+        if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 2) slideTo(ssAt + (dx < 0 ? 1 : -1));
       });
       slideTo(ssAt);
     }
