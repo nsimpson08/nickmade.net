@@ -9,7 +9,8 @@
 //                                    found } (by barcode when there is one, else by title and year; tools/hdr.py does
 //                                    the same for the imported discs)
 //   GET    /library/barcode?upc=     (admin) a scanned or typed barcode -> that exact release on blu-ray.com: { found,
-//                                    imdbId, title, year, format, edition, steelbook, criterion, hdr, upc }
+//                                    imdbId, title, year, format, edition, steelbook, criterion, hdr, upc }; not there
+//                                    (VHS tapes), UPCitemdb's product name: the same plus source: "upcitemdb", product
 //   POST   /library                  (admin) { imdbId, format: "4k"|"bluray"|"dvd"|"vhs", edition?, steelbook?, threeD?,
 //                                    criterion?, features?, hdr? } -> adds a disc (same shape as discs.js) and returns it
 //                                    (features: "On this disc", from an edition picked in the dialog or typed, one per line;
@@ -398,7 +399,7 @@ async function bluray(url, form) {
       body: form ? new URLSearchParams(form).toString() : undefined,
     });
     const text = await res.text();
-    if (text.trim() !== "Error42") return text;
+    if (text.trim().toLowerCase() !== "error42") return text; // (it says "Error42" or "error42")
     await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
   }
   throw new Error("blu-ray.com is busy");
@@ -409,7 +410,8 @@ async function blurayFind(keyword, section) {
   const body = await bluray("https://www.blu-ray.com/search/quicksearch.php",
     { section: section || "4kbluraymovies", userid: "-1", country: "US", keyword });
   const names = [...body.matchAll(/id="match\d+">[\s\S]*?&nbsp;([\s\S]*?)<\/li>/g)].map((m) => m[1].replace(/<[^>]+>/g, "").trim());
-  const urls = [...body.matchAll(/'(https:\/\/www\.blu-ray\.com\/movies\/[^']+)'/g)].map((m) => m[1]);
+  // Blu-rays and 4Ks live under /movies/, DVDs under /dvd/
+  const urls = [...body.matchAll(/'(https:\/\/www\.blu-ray\.com\/(?:movies|dvd)\/[^']+)'/g)].map((m) => m[1]);
   return urls.map((url, i) => ({ name: names[i] || "", url }));
 }
 
@@ -463,9 +465,40 @@ function validBarcode(code) {
   const sum = digits.reverse().reduce((t, d, i) => t + d * (i % 2 ? 1 : 3), 0);
   return (10 - (sum % 10)) % 10 === check;
 }
+// Not on blu-ray.com (every VHS tape, and some DVDs): UPCitemdb's free lookup (no key, about 100 a day) knows most retail
+// barcodes, by a seller's product name ("The Big Lebowski VHS Jeff Bridges John Goodman 1998 Tested"). The name up to
+// its first format word (or bracket) is the title, any year in it the year, and TMDB finds the film from those. Names
+// are messy, so the dialog asks Nick to check it's the right film.
+const FORMAT_WORDS = /\b(vhs|dvd|blu-?ray|4k|uhd|ultra hd|widescreen|full ?screen|special edition|collector'?s|digital)\b|[([{]| - /i;
+async function upcItem(env, upc) {
+  const none = { found: false, upc };
+  let item;
+  try {
+    const res = await fetch("https://api.upcitemdb.com/prod/trial/lookup?upc=" + upc, { headers: { Accept: "application/json" } });
+    if (res.status === 429) return { ...none, error: "Too many barcode lookups today. Search by title below." };
+    item = ((await res.json()).items || [])[0];
+  } catch (e) { return none; }
+  if (!item || !item.title) return none;
+  const name = String(item.title).replace(/\s+/g, " ").trim();
+  const words = name + " " + (item.category || "") + " " + (item.description || "").slice(0, 200);
+  const format = /\bvhs\b/i.test(words) ? "vhs" : /\b(4k|uhd|ultra hd)\b/i.test(words) ? "4k" : /\bblu-?ray\b/i.test(words) ? "bluray" : /\bdvd\b/i.test(words) ? "dvd" : "";
+  const cut = FORMAT_WORDS.exec(name);
+  const title = (cut ? name.slice(0, cut.index) : name).replace(/[\s,:;-]+$/, "").trim();
+  const y = /\b(19[2-9]\d|20[0-3]\d)\b/.exec(name);
+  if (!title) return none;
+  let film = null;
+  try { film = await tmdbFilm(env, { title, year: y ? +y[1] : null }); } catch (e) { /* not found */ }
+  if (!film || !film.imdbId) return none;
+  return {
+    found: true, upc, source: "upcitemdb", product: name,
+    imdbId: film.imdbId, title: film.title || title, year: film.year || (y ? +y[1] : null),
+    format, edition: "", steelbook: /steel ?book/i.test(name), criterion: /criterion/i.test(name), hdr: [],
+  };
+}
+
 // The barcode finds that exact release on blu-ray.com (4K and Blu-ray in one search, DVDs in another): its page has
 // the IMDb id, the format (in its address), the edition ("Dune 4K Blu-ray (Best Buy Exclusive SteelBook)") and the HDR.
-// VHS tapes aren't on blu-ray.com: those are searched by title.
+// VHS tapes aren't on blu-ray.com: those (and anything else it doesn't have) go to UPCitemdb (upcItem).
 async function barcodeRoute(request, url, env, cors, h) {
   if (!h.isAdmin(request, env)) return h.json({ error: "Unauthorized" }, 401, cors);
   const upc = (url.searchParams.get("upc") || "").replace(/\D/g, "");
@@ -473,7 +506,7 @@ async function barcodeRoute(request, url, env, cors, h) {
   try {
     let hits = await blurayFind(upc, "all");
     if (!hits.length) hits = await blurayFind(upc, "dvdmovies");
-    if (!hits.length) return h.json({ found: false, upc }, 200, cors);
+    if (!hits.length) return h.json(await upcItem(env, upc), 200, cors);
     const page = await bluray(hits[0].url);
     const imdb = /imdb\.com\/title\/(tt\d+)/.exec(page);
     const head = (/<title>([\s\S]*?)<\/title>/.exec(page) || [])[1] || "";
@@ -484,10 +517,18 @@ async function barcodeRoute(request, url, env, cors, h) {
     // the edition, minus what the case and the page say anyway ("4K Ultra HD + Blu-ray", "Blu-ray + Digital Copy")
     const edition = String(m[3] || "").split(/\s*\+\s*/).filter((p) => !/^(4K Ultra HD|Blu-ray|Blu-ray 3D|DVD|Digital( Copy| Code| HD)?|UltraViolet)$/i.test(p)).join(" + ");
     const year = (/\((\d{4})\)/.exec(hits[0].name) || [])[1];
+    // a page without an IMDb link (older DVDs, mostly): TMDB finds the film by its title and year
+    let imdbId = imdb ? imdb[1] : "";
+    if (!imdbId && (m[1] || hits[0].name)) {
+      try {
+        const t = await tmdbFilm(env, { title: (m[1] || hits[0].name).replace(/\s*\(\d{4}\)\s*$/, ""), year: year ? +year : null });
+        if (t && t.imdbId) imdbId = t.imdbId;
+      } catch (e) { /* no IMDb id: the dialog says so */ }
+    }
     return h.json({
       found: true,
       upc,
-      imdbId: imdb ? imdb[1] : "",
+      imdbId,
       title: m[1] || hits[0].name,
       year: year ? +year : null,
       format,

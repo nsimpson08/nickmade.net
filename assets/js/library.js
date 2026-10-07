@@ -788,7 +788,8 @@
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (d.error && !d.found) { msg.textContent = d.error; return; }
-        if (!d.found || !d.imdbId) { msg.textContent = "Not found on blu-ray.com (VHS tapes never are). Search by title below."; return; }
+        if (!d.found || !d.imdbId) { msg.textContent = "Couldn't find that barcode. Search by title below."; return; }
+        var guessed = d.source === "upcitemdb"; // from a seller's product name (VHS tapes, mostly): worth a look
         // the title for the preview: IMDb's own search result for it (its poster), else just the name
         return fetch(API + "/library/search?q=" + encodeURIComponent(d.title), { headers: authHeaders() })
           .then(function (r) { return r.json(); })
@@ -809,8 +810,9 @@
             hdrFor = r.id + "|" + d.upc;
             hdrSeq++;
             [].forEach.call(form.querySelectorAll('input[name="hdr"]'), function (c) { c.checked = (d.hdr || []).indexOf(c.value) >= 0; });
-            addDlg.querySelector(".lib-hdr-note").textContent = "(from blu-ray.com)";
-            msg.textContent = "Found: " + d.title + (d.year ? " (" + d.year + ")" : "") + ", " + FORMAT[d.format] + (d.edition ? ", " + d.edition : "") + ".";
+            addDlg.querySelector(".lib-hdr-note").textContent = guessed ? "" : "(from blu-ray.com)";
+            msg.textContent = "Found: " + d.title + (d.year ? " (" + d.year + ")" : "") + (FORMAT[d.format] ? ", " + FORMAT[d.format] : "") +
+              (d.edition ? ", " + d.edition : "") + "." + (guessed ? " (From “" + d.product + "”: check it’s the right film.)" : "");
             check();
           });
       })
