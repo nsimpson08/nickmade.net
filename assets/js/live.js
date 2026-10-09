@@ -78,6 +78,20 @@
     bar.innerHTML = "<span>Owner mode</span> <a href=\"?logout\">Log out</a>";
     var head = document.querySelector(".page-head");
     head.parentNode.insertBefore(bar, head.nextSibling);
+    // Nick's own links for this page, kept in the Worker (GET /owner/links), so they're never in the site's code
+    fetch(API + "/owner/links?" + PQ, { headers: authHeaders() })
+      .then(function (r) { return r.ok ? r.json() : { links: [] }; })
+      .then(function (d) {
+        (d.links || []).forEach(function (l) {
+          var a = document.createElement("a");
+          a.href = l.href;
+          a.textContent = l.label;
+          a.target = "_blank";
+          a.rel = "noopener noreferrer";
+          bar.insertBefore(a, bar.lastElementChild);
+        });
+      })
+      .catch(function () {});
   }
 
   function login() {

@@ -15,6 +15,7 @@ import { photosRoute } from "./photos.js";
 //                               with Authorization: Bearer ADMIN_TOKEN it's Nick's own pick:
 //                               no name, no per-visitor limit, allowed past the cap
 //   GET    /admin/check         200 if the Authorization token is the admin token
+//   GET    /owner/links?page=   (admin) Nick's own links for that page's owner bar: { links: [{ label, href }] }
 //   PATCH  /queue/:imdbId       { page, visitorId, name, comment, commentPrivate } -> a visitor edits their own suggestion
 //   DELETE /queue/:imdbId       remove a submission: Nick (Authorization: Bearer ADMIN_TOKEN), or the visitor who suggested
 //                               it (?visitorId=), which also gives them that suggestion back
@@ -51,6 +52,7 @@ import { photosRoute } from "./photos.js";
 //   queue / queue:games            JSON array of queue submissions
 //   watched / watched:games        JSON array of Recently Watched / Recently Played
 //   lists:<page>                   JSON object { <section key>: [items] } for the other live sections
+//   owner:links                    JSON array [{ label, href, page }] for /owner/links, set by hand with wrangler kv
 //   visitor:<hash> / visitor:games:<hash>  number of queue submissions from that visitor (browser id or hashed IP)
 //   spotify:refresh / spotify:access / spotify:now / spotify:state:<x>  Spotify login and a 1-minute cache
 //   spotify:scope                  the permissions granted at the last connect; music:* keys are in music.js
@@ -134,6 +136,12 @@ export default {
       if (url.pathname === "/queue" && request.method === "POST") return await addToQueue(request, env, cors);
       if (url.pathname === "/admin/check" && request.method === "GET") {
         return isAdmin(request, env) ? json({ ok: true }, 200, cors) : json({ error: "Wrong password." }, 401, cors);
+      }
+      if (url.pathname === "/owner/links" && request.method === "GET") {
+        if (!isAdmin(request, env)) return json({ error: "Unauthorized" }, 401, cors);
+        const page = pageOf(url.searchParams.get("page"));
+        const links = JSON.parse((await env.QUEUE.get("owner:links")) || "[]").filter((l) => (l.page || "movies") === page);
+        return json({ links: links.map((l) => ({ label: l.label, href: l.href })) }, 200, cors);
       }
       if (url.pathname.startsWith("/queue/") && request.method === "DELETE") return await removeFromQueue(request, url, env, cors);
       if (url.pathname.startsWith("/queue/") && request.method === "PATCH") return await editSuggestion(request, url, env, cors);
