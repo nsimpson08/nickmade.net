@@ -1451,6 +1451,10 @@ button.queue-slot:hover .plus { transform: rotate(90deg); }
   font-size: 0.78rem;
   color: var(--accent);
 }
+/* where Nick watched it, under the date (Movies' Recently Watched, live.js WHERE): a house or a ticket */
+.poster.suggested .watched-where { display: flex; align-items: center; gap: 5px; margin-top: 3px; font-size: 0.78rem; color: var(--muted); }
+.watched-where svg, .queue-dialog .where svg { width: 15px; height: 15px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.queue-dialog .where label { gap: 6px; }
 /* Nick's short review under the stars on a Recently Watched/Played card (1.4, live.js): 2 lines, the rest behind "More" */
 .poster.suggested .watched-review {
   margin: 6px 0 4px;
@@ -2684,6 +2688,8 @@ html:has(dialog[open]) { overflow: hidden; }
 .film-mine-stars { margin-left: 6px; font-size: 0.95rem; letter-spacing: 0.05em; vertical-align: -1px; text-transform: none; color: color-mix(in srgb, var(--amber) 55%, transparent); } /* the empty outlines */
 .film-mine-stars .on { color: var(--amber); }
 .film-mine p:last-child { margin: 0; font-size: 0.92rem; line-height: 1.55; color: var(--fg); }
+.film-mine p.film-where { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 0.82rem; color: var(--muted); }
+.film-where svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
 .film-mine p.film-with { margin-top: 8px; font-size: 0.82rem; color: var(--muted); }
 /* who Nick watched it with: owner mode only */
 .watched-with { margin: 4px 0 0; font-size: 0.78rem; color: var(--muted); }

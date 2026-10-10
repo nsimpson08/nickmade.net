@@ -175,6 +175,7 @@
           var data = it.title ? ' class="archive-item"' + (it.imdbId ? ' data-imdb="' + esc(it.imdbId) + '"' : "") + ' data-film-title="' + esc(it.title) + '"' +
             (it.year ? ' data-year="' + esc(it.year) + '"' : "") + (it.image ? ' data-image="' + esc(it.image) + '"' : "") +
             (it.rating ? ' data-rating="' + esc(it.rating) + '"' : "") + (it.review ? ' data-review="' + esc(it.review) + '"' : "") +
+            (it.where ? ' data-where="' + esc(it.where) + '"' : "") +
             (it.watchedWith ? ' data-with="' + esc(it.watchedWith) + '"' : "") : ""; // (only the owner's Archive has it)
           return "<li" + data + "><span class=\"t\">" + esc(it.title) + "</span>" + (it.year ? ' <span class="y">' + esc(it.year) + "</span>" : "") +
             (it.date ? ' <span class="d">' + esc(archiveDate(it.date)) + "</span>" : "") + "</li>";

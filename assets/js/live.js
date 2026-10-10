@@ -175,6 +175,17 @@
     return isNaN(d) ? "" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   }
 
+  // Where Nick watched a movie (Movies' Recently Watched, 2026-10-10): a little house or a cinema ticket under the date
+  var WHERE = {
+    home: { label: "At home", icon: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 7.2 8 2.6l5.5 4.6"/><path d="M4 6.1v7.3h3V10h2v3.4h3V6.1"/></svg>' },
+    theater: { label: "In theaters", icon: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.8 4.5h12.4v2.1a1.4 1.4 0 0 0 0 2.8v2.1H1.8V9.4a1.4 1.4 0 0 0 0-2.8z"/><path d="M10.6 5.3v.9M10.6 7.5v.9M10.6 9.7v.9"/></svg>' },
+  };
+  window.NMWhere = WHERE; // film-dialog.js shows it in the case too
+  function whereLine(w) {
+    var o = WHERE[w];
+    return o ? '<div class="watched-where" data-where="' + w + '">' + o.icon + "<span>" + o.label + "</span></div>" : "";
+  }
+
   // kind: "queue" (default), "watched", or "list" (then l is the live section it belongs to)
   function card(it, kind, l) {
     var watched = kind === "watched";
@@ -223,6 +234,7 @@
           "</div>"
         : "") +
       (watched && it.date ? '<div class="watched-on">' + (it.xbox ? "Last played" : DID) + " " + esc(watchedOn(it.date)) + "</div>" : "") +
+      (watched && PAGE === "movies" ? whereLine(it.where) : "") +
       (ADMIN ? '<div class="owner-actions">' + (watched ? '<button class="edit" type="button">Edit</button>' : "") +
         '<button class="remove" type="button">Remove</button></div>'
         : yours ? '<div class="owner-actions mine-actions"><span>Your suggestion</span><button class="edit" type="button">Edit</button>' +
@@ -763,6 +775,11 @@
       '<textarea id="q-review" maxlength="' + REVIEW_MAX + '" rows="3" placeholder="A line or two: what stuck with you?"></textarea>' +
       '<p class="count" id="q-review-count" aria-live="polite"></p>' +
       // who Nick watched it with (Movies, owner only; never shown to visitors: the Worker only sends it back to him)
+      // where Nick watched it (Movies, owner only to set; shown on the card to everyone). Click a picked one again to clear it
+      '<fieldset class="who where" id="q-where"><legend>Where?</legend>' +
+        '<label><input type="radio" name="q-where" value="home">' + WHERE.home.icon + " Home</label>" +
+        '<label><input type="radio" name="q-where" value="theater">' + WHERE.theater.icon + " Theater</label>" +
+      "</fieldset>" +
       '<label for="q-with">Watched with <span class="optional">(only you see this)</span></label>' +
       '<input id="q-with" type="text" maxlength="120" autocomplete="off" placeholder="Who was there?">' +
       '<label for="q-name">Your name</label>' +
@@ -810,6 +827,15 @@
   var reviewLabel = dialog.querySelector('label[for="q-review"]');
   var reviewCount = dialog.querySelector("#q-review-count");
   var withInput = dialog.querySelector("#q-with"), withLabel = dialog.querySelector('label[for="q-with"]');
+  var whereField = dialog.querySelector("#q-where");
+  function whereValue() { var c = whereField.querySelector("input:checked"); return c ? c.value : ""; }
+  function setWhere(w) { whereField.querySelectorAll("input").forEach(function (i) { i.checked = i.value === w; }); }
+  // radios can't be unpicked, so a click on the picked one clears it ("not said")
+  whereField.addEventListener("click", function (e) {
+    var input = e.target.closest("label") && e.target.closest("label").querySelector("input");
+    if (!input || e.target === input) return;
+    if (input.checked) { e.preventDefault(); input.checked = false; }
+  });
   function showReviewCount() {
     var left = REVIEW_MAX - reviewInput.value.length;
     reviewCount.textContent = left < 80 ? left + " characters left" : "";
@@ -935,6 +961,7 @@
     reviewInput.value = "";
     showReviewCount();
     withInput.value = "";
+    setWhere("");
     dialog.querySelector('input[name="q-who"][value="public"]').checked = true;
     hidePreview();
   }
@@ -956,7 +983,7 @@
     dateLabel.hidden = dateInput.hidden = !watching;
     rateLabel.hidden = rate.hidden = !watching;
     reviewLabel.hidden = reviewInput.hidden = reviewCount.hidden = !watching;
-    withLabel.hidden = withInput.hidden = !(watching && ADMIN && PAGE === "movies");
+    withLabel.hidden = withInput.hidden = whereField.hidden = !(watching && ADMIN && PAGE === "movies");
     movie.readOnly = !!editing || !!mineEdit;
     if (mineEdit) {
       chosen = { id: it.imdbId };
@@ -976,6 +1003,7 @@
       reviewInput.value = it.review || "";
       showReviewCount();
       withInput.value = it.watchedWith || "";
+      setWhere(it.where || "");
     }
     if (watching && !dateInput.value) dateInput.value = today();
     heading.textContent = mineEdit ? "Edit your suggestion" : editing ? "Edit " + it.title : watching ? "Log a " + KIND : target ? "Add a " + KIND : ADMIN ? "Submit a " + KIND : "Suggest a " + KIND;
@@ -1085,7 +1113,8 @@
       method: "POST",
       headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify(watching
-        ? { page: PAGE, imdbId: chosen.id, date: dateInput.value, rating: rating, poster: pickedPoster(), review: reviewInput.value.trim(), watchedWith: PAGE === "movies" ? withInput.value.trim() : undefined }
+        ? { page: PAGE, imdbId: chosen.id, date: dateInput.value, rating: rating, poster: pickedPoster(), review: reviewInput.value.trim(), watchedWith: PAGE === "movies" ? withInput.value.trim() : undefined,
+            where: PAGE === "movies" ? whereValue() : undefined }
         : { page: PAGE, imdbId: chosen.id, name: ADMIN ? "" : nameInput.value.trim(), visitorId: VID, poster: pickedPoster(),
             comment: ADMIN ? "" : commentInput.value.trim(), commentPrivate: !ADMIN && commentPrivate() }),
     })
@@ -1191,7 +1220,8 @@
     fetch(API + "/watched/" + encodeURIComponent(editing.id) + "?" + PQ, {
       method: "PATCH",
       headers: authHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ date: dateInput.value, rating: rating, review: reviewInput.value.trim(), watchedWith: PAGE === "movies" ? withInput.value.trim() : undefined }),
+      body: JSON.stringify({ date: dateInput.value, rating: rating, review: reviewInput.value.trim(), watchedWith: PAGE === "movies" ? withInput.value.trim() : undefined,
+        where: PAGE === "movies" ? whereValue() : undefined }),
     })
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
       .then(function (res) {

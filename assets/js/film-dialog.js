@@ -61,7 +61,7 @@
       var rt = row.dataset.filmTitle, rr = document.getElementById(slug(rt));
       return {
         fig: row, title: rt, year: row.dataset.year || "", imdb: row.dataset.imdb || "", image: posterSrc(row.dataset.image),
-        rating: row.dataset.rating || "", mine: row.dataset.review || "", with: row.dataset.with || "",
+        rating: row.dataset.rating || "", mine: row.dataset.review || "", with: row.dataset.with || "", where: row.dataset.where || "",
         review: rr && rr.classList.contains("entry") ? rr.id : "",
       };
     }
@@ -76,6 +76,7 @@
       rating: ratingEl ? ((ratingEl.getAttribute("aria-label") || "").match(/^[\d.]+/) || [""])[0] : "", // "4.5 out of 5 stars"
       mine: mineEl ? mineEl.textContent.trim() : "",
       with: (fig.querySelector(".watched-with") || { textContent: "" }).textContent.replace(/^With /, "").trim(), // owner mode only
+      where: (fig.querySelector(".watched-where") || { dataset: {} }).dataset.where || "", // home or theater
       fig: fig, title: title.trim(), year: year, imdb: fig.dataset.imdb || "",
       image: img ? img.currentSrc || img.src : "",
       review: review && review.classList.contains("entry") && review !== fig ? review.id : "",
@@ -83,6 +84,7 @@
   }
 
   function render(f, d) {
+    var where = window.NMWhere && NMWhere[f.where]; // where Nick watched it (live.js)
     var facts = [d && d.year || f.year, d && runtime(d.minutes), d && d.rated].filter(Boolean);
     var paras = String(d && d.about || "").split(/\n\n/).filter(Boolean);
     var links = [];
@@ -99,9 +101,10 @@
           return i === facts.length - 1 && d && d.rated && x === d.rated ? '<span class="rated">' + esc(x) + "</span>" : esc(x);
         }).join(" · ") + "</p>" : "") +
         // Nick's own rating and short review (Recently Watched and its Archive)
-        (f.rating || f.mine || f.with ? '<div class="film-mine"><p class="film-mine-head">My take' +
+        (f.rating || f.mine || f.with || where ? '<div class="film-mine"><p class="film-mine-head">My take' +
           (/^[\d.]+$/.test(f.rating) ? " " + stars(f.rating) : "") + "</p>" +
           (f.mine ? "<p>" + esc(f.mine) + "</p>" : "") +
+          (where ? '<p class="film-where">' + where.icon + "<span>" + where.label + "</span></p>" : "") +
           (f.with ? '<p class="film-with" title="Only you see this">Watched with ' + esc(f.with) + "</p>" : "") + "</div>" : "") +
         (d && d.tagline ? '<p class="lib-tagline">' + esc(d.tagline) + "</p>" : "") +
         (!d ? '<p class="film-loading">Loading…</p>' : d.error ? '<p class="film-loading">Couldn’t load the details right now.</p>' : "") +
