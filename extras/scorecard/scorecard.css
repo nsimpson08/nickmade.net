@@ -157,7 +157,7 @@ a { color: inherit; }
 .sc-hole {
   flex: 1; min-height: 0; overflow-y: auto; padding: 14px 16px 10px;
   display: flex; flex-direction: column; gap: 14px;
-  touch-action: pan-y; transition: transform 0.22s ease, opacity 0.22s ease;
+  touch-action: pan-y pinch-zoom; transition: transform 0.22s ease, opacity 0.22s ease; /* pinch stays possible, so a zoomed page can always be zoomed back out */
 }
 .sc-hole-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
 .sc-hole-no span { display: block; font-size: 0.78rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
@@ -221,7 +221,20 @@ a { color: inherit; }
 }
 .sc-sheet-body .sc-ghost { justify-content: center; background: transparent; border: 1px solid var(--line); }
 .danger { color: var(--warn); }
-.sc-sheet-card { display: grid; gap: 10px; padding: 12px 10px calc(14px + env(safe-area-inset-bottom)); }
+/* the card full screen (scorecard.js viewer()): it zooms itself, so the page never does */
+.sc-viewer {
+  width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0;
+  background: #0b0b0c; color: #ecebe7; display: flex; flex-direction: column;
+}
+.sc-viewer:not([open]) { display: none; }
+.sc-viewer::backdrop { background: #000; }
+.sc-viewer-bar {
+  flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: calc(8px + env(safe-area-inset-top)) 12px 8px 16px; font-size: 0.85rem; color: #9d9b95;
+}
+.sc-viewer-done { min-height: 48px; padding: 0 20px; border: 0; border-radius: 14px; background: #7ee0b5; color: #062218; font-weight: 700; }
+.sc-viewer-stage { position: relative; flex: 1; overflow: hidden; touch-action: none; }
+.sc-viewer-stage canvas { position: absolute; transform-origin: 0 0; border-radius: 6px; }
 
 /* ---------- finish ---------- */
 .sc-sum-head { display: flex; align-items: baseline; gap: 12px; margin-top: 18px; }
@@ -234,7 +247,8 @@ a { color: inherit; }
 .sc-stat span { display: block; font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
 .sc-stat b { display: block; margin-top: 2px; font: 700 1.6rem/1.15 var(--display); }
 .sc-stat small { display: block; font-size: 0.8rem; color: var(--muted); }
-.sc-cardwrap { margin-top: 16px; border-radius: 10px; overflow: hidden; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); }
+.sc-cardwrap { position: relative; display: block; width: 100%; margin-top: 16px; padding: 0; border: 0; border-radius: 10px; overflow: hidden; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); background: none; cursor: zoom-in; }
+.sc-cardwrap span { position: absolute; right: 8px; bottom: 8px; padding: 3px 9px; border-radius: 999px; background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 0.75rem; }
 .sc-card { display: block; width: 100%; height: auto; }
 .sc-actions { display: flex; gap: 8px; }
 .sc-actions .sc-go { flex: 1; }
