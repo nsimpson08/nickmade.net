@@ -2,18 +2,16 @@
 // encodes): the room's 320x200 canvas, exactly, frame by frame. The page runs on a fake clock (requestAnimationFrame
 // and performance.now are replaced), so every video frame is two steps of its 60 fps loop, however long a capture takes.
 // Things are clicked through its test hook, window.NMOffice: The Dude, the SNES, the cat, the VW bus say their lines,
-// the room turns, the window takes it to night.
+// the room turns once, the window takes it to night.
 // Usage: node record_play.js <work folder>   (needs puppeteer-core, and the site on localhost:8000)
 // Writes <work>/play-raw/NNNN.png (320x200).
 const fs = require("fs"), path = require("path");
 const puppeteer = require("puppeteer-core");
 const OUT = path.join(process.argv[2] || "clip-work", "play-raw");
 // [video frame, what happens]
-const SCRIPT = [  // 3 seconds, the same as each of the other games get in the tile
-  [0, "night:0"], [4, "hover:dude"], [6, "click:dude"],
-  [28, "turn:1"], [31, "click:cat"],
-  [50, "turn:2"], [51, "night:1"], [55, "click:snes"],
-  [72, "turn:3"], [74, "click:vw"],
+const SCRIPT = [  // 3 seconds, the same as each of the other games get in the tile; two views of the room at most
+  [0, "night:0"], [4, "hover:dude"], [6, "click:dude"], [24, "click:cat"],
+  [45, "turn:2"], [46, "night:1"], [52, "click:snes"], [68, "click:vw"],
 ];
 const FRAMES = 90;
 
