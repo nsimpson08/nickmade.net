@@ -180,7 +180,7 @@ export default {
         if (res) return res;
       }
       if (url.pathname.startsWith("/scorecard/")) {
-        const res = await scorecardRoute(request, url, env, cors, { json, isAdmin });
+        const res = await scorecardRoute(request, url, env, cors, { json, isAdmin, sha256 });
         if (res) return res;
       }
       if (url.pathname.startsWith("/music/")) {
@@ -211,7 +211,7 @@ function corsHeaders(origin, env) {
   const ok = allowed.includes(origin) || /^http:\/\/localhost(:\d+)?$/.test(origin);
   return {
     "Access-Control-Allow-Origin": ok ? origin : allowed[0] || "*",
-    "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS", // PUT: Scorecard rounds
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Vary": "Origin",
   };

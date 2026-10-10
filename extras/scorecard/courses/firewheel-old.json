@@ -197,11 +197,6 @@
   "url": "https://www.golffirewheel.com/wp-content/uploads/sites/8098/2021/04/oldcoursescorecard930px.jpeg",
   "page": "https://www.golffirewheel.com/old-course/"
  },
- "checked": {
-  "version": 1,
-  "at": "2026-10-10",
-  "how": "Copied by hand from the Old Course card on the course website (posted 2021); every row adds up to the card's own Out, In and Tot. OpenGolfAPI's single 'Firewheel Golf Park' entry is a different course (par 72), so this file stands on its own. Nick confirms it on his first round."
- },
  "card": {
   "w": 1250,
   "bg": "#ffffff",
@@ -357,5 +352,10 @@
    }
   ],
   "teeLabel": "inline"
+ },
+ "copied": {
+  "version": 1,
+  "at": "2026-10-10",
+  "how": "Copied by hand from the Old Course card on the course website (posted 2021); every row adds up to the card's own Out, In and Tot. OpenGolfAPI's single 'Firewheel Golf Park' entry is a different course (par 72), so this file stands on its own. Nick confirms it on his first round."
  }
 }

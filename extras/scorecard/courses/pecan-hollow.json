@@ -233,11 +233,6 @@
   "url": "https://www.pecanhollowgc.com/wp-content/uploads/sites/7942/2024/06/2024-06-11-09-25.pdf",
   "page": "https://www.pecanhollowgc.com/golf-course-2/course-details-2/"
  },
- "checked": {
-  "version": 1,
-  "at": "2026-10-10",
-  "how": "Copied by hand from the course's June 2024 card; every row adds up to the card's own Out, In and Tot. Nick confirms it against the clubhouse card on his first round."
- },
  "card": {
   "w": 1250,
   "bg": [
@@ -369,5 +364,10 @@
    }
   ],
   "teeLabel": "stack"
+ },
+ "copied": {
+  "version": 1,
+  "at": "2026-10-10",
+  "how": "Copied by hand from the course's June 2024 card; every row adds up to the card's own Out, In and Tot. Nick confirms it against the clubhouse card on his first round."
  }
 }

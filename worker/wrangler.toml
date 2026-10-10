@@ -43,3 +43,11 @@ binding = "PHOTOS"
 bucket_name = "nickmade-photos"
 
 # Secrets (not stored here): npx wrangler secret put ADMIN_TOKEN  /  SALT  /  OPENXBL_API_KEY  /  SPOTIFY_CLIENT_SECRET
+
+# Extras > Scorecard's rounds, players and course files (src/scorecard.js): a D1 (SQLite) database.
+# Created with: npx wrangler d1 create nickmade-golf. Tables are in migrations/; apply new ones with
+#   npx wrangler d1 migrations apply nickmade-golf --remote   (and --local for localhost)
+[[d1_databases]]
+binding = "GOLF"
+database_name = "nickmade-golf"
+database_id = "8df64932-30bf-4909-8ee8-b67757dd4e69"

@@ -1,5 +1,11 @@
 // Renders extras/golf/scores.js (window.GOLF) into the Golf page: a score grid per source, then What's In The Bag.
+// "On the course" is Nick's real rounds from the Scorecard (extras/scorecard/, Worker GET /scorecard/feed: the
+// finished rounds he marked "Show on my Golf page"); the page draws first and again when they arrive. While the
+// Scorecard is owner only, the feed only answers Nick (owner mode), so visitors see "Coming soon" there.
 (function () {
+  var script = document.currentScript;
+  var local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+  var API = (local ? script.dataset.apiLocal : script.dataset.api) || "";
   var root = document.getElementById("golf");
   var data = window.GOLF || {};
   // Trackman rounds come from extras/golf/trackman.js (tools/import_trackman.py), plus any typed into scores.js
@@ -9,7 +15,7 @@
   var SOURCES = [
     { key: "trackman", title: "Trackman", sub: "Simulator" },
     { key: "xgolf", title: "X-Golf", sub: "Simulator" },
-    { key: "birdies", title: "18Birdies", sub: "On the course" }
+    { key: "course", title: "On the course", sub: "Scorecard" }
   ];
 
   function esc(s) {
@@ -95,42 +101,49 @@
     "</article>";
   }
 
-  var sections = SOURCES.map(function (s) {
-    var rounds = (data[s.key] || []).slice().sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
-    rounds.forEach(function (r, i) { r._id = "round-" + s.key + "-" + i; r._source = s.title; }); // the chart links to these
-    return '<section class="subsection" id="' + slug(s.title) + '">' + head(s.title, s.sub) +
-      (rounds.length
-        ? summary(rounds, data[s.key + "Stats"]) + '<div class="rounds">' + rounds.map(card).join("") + "</div>"
+  // the whole page; drawn again when the Scorecard's rounds arrive
+  function render() {
+    var sections = SOURCES.map(function (s) {
+      var rounds = (data[s.key] || []).slice().sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
+      rounds.forEach(function (r, i) { r._id = "round-" + s.key + "-" + i; r._source = s.title; }); // the chart links to these
+      return '<section class="subsection" id="' + slug(s.title) + '">' + head(s.title, s.sub) +
+        (rounds.length
+          ? summary(rounds, data[s.key + "Stats"]) + '<div class="rounds">' + rounds.map(card).join("") + "</div>"
+          : '<p class="empty">Coming soon.</p>') +
+      "</section>";
+    });
+
+    var bag = data.bag || [];
+    sections.push('<section class="subsection" id="whats-in-the-bag">' + head("What's In The Bag", "") +
+      (bag.length
+        ? '<ul class="bag">' + bag.map(function (c) {
+            // photo and model name link to the product page when there is one
+            var open = c.url ? '<a href="' + esc(c.url) + '" target="_blank" rel="noopener">' : "";
+            var close = c.url ? "</a>" : "";
+            return "<li>" +
+              '<span class="club-img">' + (c.image ? open + '<img src="' + esc(c.image) + '" alt="' + esc(c.model) + '" loading="lazy">' + close : "") + "</span>" +
+              '<span class="club-type">' + esc(c.club) + "</span>" +
+              '<span class="club-name">' + (c.url ? '<a class="club-link" href="' + esc(c.url) + '" target="_blank" rel="noopener">' + esc(c.model) + "</a>" : esc(c.model)) +
+                (c.details ? '<span class="club-details">' + esc(c.details) + "</span>" : "") + "</span>" +
+              '<span class="club-spec">' + esc(c.loft || "") + "</span></li>";
+          }).join("") + "</ul>"
         : '<p class="empty">Coming soon.</p>') +
-    "</section>";
-  });
+    "</section>");
 
-  var bag = data.bag || [];
-  sections.push('<section class="subsection" id="whats-in-the-bag">' + head("What's In The Bag", "") +
-    (bag.length
-      ? '<ul class="bag">' + bag.map(function (c) {
-          // photo and model name link to the product page when there is one
-          var open = c.url ? '<a href="' + esc(c.url) + '" target="_blank" rel="noopener">' : "";
-          var close = c.url ? "</a>" : "";
-          return "<li>" +
-            '<span class="club-img">' + (c.image ? open + '<img src="' + esc(c.image) + '" alt="' + esc(c.model) + '" loading="lazy">' + close : "") + "</span>" +
-            '<span class="club-type">' + esc(c.club) + "</span>" +
-            '<span class="club-name">' + (c.url ? '<a class="club-link" href="' + esc(c.url) + '" target="_blank" rel="noopener">' + esc(c.model) + "</a>" : esc(c.model)) +
-              (c.details ? '<span class="club-details">' + esc(c.details) + "</span>" : "") + "</span>" +
-            '<span class="club-spec">' + esc(c.loft || "") + "</span></li>";
-        }).join("") + "</ul>"
-      : '<p class="empty">Coming soon.</p>') +
-  "</section>");
+    sections.unshift('<section class="subsection" id="score-trend">' + head("Score Trend", "18-hole rounds") +
+      '<div class="trend" id="trend-chart"></div></section>');
 
-  sections.unshift('<section class="subsection" id="score-trend">' + head("Score Trend", "18-hole rounds") +
-    '<div class="trend" id="trend-chart"></div></section>');
+    var jump = '<nav class="jump" aria-label="Sections">' +
+      '<a href="#score-trend">Score Trend</a>' +
+      SOURCES.map(function (s) { return '<a href="#' + slug(s.title) + '">' + esc(s.title) + "</a>"; }).join("") +
+      '<a href="#whats-in-the-bag">What\'s In The Bag</a></nav>';
 
-  var jump = '<nav class="jump" aria-label="Sections">' +
-    '<a href="#score-trend">Score Trend</a>' +
-    SOURCES.map(function (s) { return '<a href="#' + slug(s.title) + '">' + esc(s.title) + "</a>"; }).join("") +
-    '<a href="#whats-in-the-bag">What\'s In The Bag</a></nav>';
-
-  root.innerHTML = jump + sections.join("");
+    root.innerHTML = jump + sections.join("");
+    chartBox = document.getElementById("trend-chart");
+    series = buildSeries();
+    all = [].concat.apply([], series.map(function (x) { return x.pts; }));
+    drawChart();
+  }
 
   // ---------- Score Trend chart: 18-hole Trackman and X-Golf scores over time ----------
   // One strokes axis fitted to the scores. Each round is a dot (with a surface ring); the line is each source's rolling
@@ -140,18 +153,20 @@
   // Colors validated for the dark surface (dataviz validate_palette: lightness, chroma, CVD, contrast).
   var SERIES = [
     { key: "trackman", name: "Trackman", color: "#c97f1c" },
-    { key: "xgolf", name: "X-Golf", color: "#3b8fd9" }
+    { key: "xgolf", name: "X-Golf", color: "#3b8fd9" },
+    { key: "course", name: "On the course", color: "#3fae6a" }
   ];
   var DAY = 864e5;
   var NS = "http://www.w3.org/2000/svg";
-  var chartBox = document.getElementById("trend-chart");
-  var series = SERIES.map(function (s) {
-    var pts = (data[s.key] || []).filter(function (r) { return (r.holes || 18) === 18 && r.score && r.date; })
-      .map(function (r) { return { t: new Date(r.date + "T00:00:00").getTime(), r: r, s: s }; })
-      .sort(function (a, b) { return a.t - b.t; });
-    return { s: s, pts: pts };
-  }).filter(function (x) { return x.pts.length; });
-  var all = [].concat.apply([], series.map(function (x) { return x.pts; }));
+  var chartBox = null, series = [], all = [];
+  function buildSeries() {
+    return SERIES.map(function (s) {
+      var pts = (data[s.key] || []).filter(function (r) { return (r.holes || 18) === 18 && r.score && r.date; })
+        .map(function (r) { return { t: new Date(r.date + "T00:00:00").getTime(), r: r, s: s }; })
+        .sort(function (a, b) { return a.t - b.t; });
+      return { s: s, pts: pts };
+    }).filter(function (x) { return x.pts.length; });
+  }
 
   function el(name, attrs, parent) {
     var e = document.createElementNS(NS, name);
@@ -369,10 +384,27 @@
     });
   }
 
-  drawChart();
+  render();
   var lastW = chartBox ? chartBox.clientWidth : 0, timer;
   window.addEventListener("resize", function () {
     clearTimeout(timer);
     timer = setTimeout(function () { if (chartBox && chartBox.clientWidth !== lastW) { lastW = chartBox.clientWidth; drawChart(); } }, 150);
   });
+
+  // Nick's real-course rounds from the Scorecard
+  var token = null;
+  try { token = localStorage.getItem("nm-admin-token"); } catch (e) {}
+  if (API) {
+    fetch(API + "/scorecard/feed", { headers: token ? { Authorization: "Bearer " + token } : {} })
+      .then(function (r) { return r.ok ? r.json() : { rounds: [] }; })
+      .then(function (d) {
+        if (!d.rounds || !d.rounds.length) return;
+        data.course = d.rounds;
+        render();
+        lastW = chartBox ? chartBox.clientWidth : 0;
+        var target = location.hash && document.getElementById(location.hash.slice(1));
+        if (target) target.scrollIntoView();
+      })
+      .catch(function () {});
+  }
 })();

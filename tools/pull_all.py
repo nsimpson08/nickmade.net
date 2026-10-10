@@ -11,9 +11,11 @@ Saves backups/full-YYYY-MM-DD-HHMM/ (backups/ is git-ignored, so none of it is e
             gamerscore history, everything. Skipped: Spotify's sign-in tokens (secrets; reconnect with
             tools/spotify_connect.py instead) and the short-lived caches.
   photos/   the files of every photo added from your phone (Photography, owner mode), from photos.nickmade.net
+  golf.sql  the Scorecard's database (D1 nickmade-golf): every round and hole, player, recovery code (hashed) and
+            approved course file, as SQL inserts
 
 --local then loads that copy into the local Worker's storage (worker/.wrangler/state, what localhost uses), so
-localhost shows exactly what the live site does. It replaces the local test data: local entries the live site doesn't
+localhost shows exactly what the live site does (the Scorecard's local database too: its rows are replaced). It replaces the local test data: local entries the live site doesn't
 have are deleted (the skipped Spotify keys are left alone). It never writes to the live site.
 
 It only reads the live site. Nothing there changes, and a push never sends any of this back. (tools/pull_live.py is the
@@ -65,6 +67,44 @@ def load_local(kv, folder):
     print("Localhost now matches: wrote %d entries, deleted %d local-only ones" % (len(entries), len(gone)))
 
 
+GOLF_TABLES = ["round_holes", "rounds", "course_records", "courses", "player_keys", "players"]  # children first
+
+
+def backup_golf(folder):
+    """The Scorecard's database: every row as SQL inserts (the tables themselves are in worker/migrations/)."""
+    path = os.path.join(folder, "golf.sql")
+    out = subprocess.run(["npx", "wrangler", "d1", "export", "nickmade-golf", "--remote", "--no-schema", "--output", path],
+                         cwd=WORKER, capture_output=True, text=True)
+    if out.returncode:
+        print("  (couldn't export the Scorecard database: %s)" % (out.stderr.strip().splitlines() or ["?"])[-1])
+        return None
+    with open(path) as f:
+        rows = sum(1 for line in f if ours(line))
+    print("Saved the Scorecard database (%d rows) to %s" % (rows, os.path.relpath(path, ROOT)))
+    return path
+
+
+def ours(line):
+    """A row of the Scorecard's own tables (the export also has D1's migration bookkeeping, which isn't ours to load)."""
+    return any(line.startswith('INSERT INTO "%s" ' % t) for t in GOLF_TABLES)
+
+
+def load_golf_local(path):
+    """Replace the local Scorecard database's rows with the backup's."""
+    clear = "; ".join("DELETE FROM " + t for t in GOLF_TABLES) + ";"
+    rows = path + ".rows.sql"
+    with open(path) as f, open(rows, "w") as out:
+        out.write("PRAGMA defer_foreign_keys=TRUE;\n")
+        out.writelines(line for line in f if ours(line))
+    for args in (["--command", clear], ["--file", rows]):
+        out = subprocess.run(["npx", "wrangler", "d1", "execute", "nickmade-golf", "--local", "--yes"] + args,
+                             cwd=WORKER, capture_output=True, text=True)
+        if out.returncode:
+            sys.exit("wrangler d1 failed: " + (out.stderr.strip().splitlines() or ["?"])[-1])
+    os.remove(rows)
+    print("Localhost's Scorecard database now matches too")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--local", action="store_true", help="then load the copy into the local Worker (localhost)")
@@ -106,8 +146,11 @@ def main():
         print("\rSaved %d photo files to %s" % (len(urls), os.path.relpath(folder, ROOT) + "/photos/"))
     else:
         print("No photos added from the phone yet.")
+    golf = backup_golf(folder)
     if args.local:
         load_local(kv, folder)
+        if golf:
+            load_golf_local(golf)
 
 
 if __name__ == "__main__":

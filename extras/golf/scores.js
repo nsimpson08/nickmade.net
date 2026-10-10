@@ -57,7 +57,8 @@ window.GOLF = {
       ["Avg. putts per hole", "1.69"], ["Avg. putts per round", "30.33"]
     ]
   },
-  // 18Birdies: coming soon (add rounds here and the section fills in)
+  // Real-course rounds come from the Scorecard (extras/scorecard/) on their own: the Golf page's "On the course"
+  // section reads them from the Worker. (birdies held 18Birdies rounds typed in by hand; Lately still reads it.)
   birdies: [],
   // All TaylorMade. club, model, loft, and details (shaft, length, grip, ...)
   bag: [

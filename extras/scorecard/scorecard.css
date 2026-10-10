@@ -263,6 +263,26 @@ a { color: inherit; }
 .sc-ghin-grid small { display: block; font-size: 0.68rem; color: var(--muted); }
 .sc-ghin-grid b { font-size: 1.05rem; }
 
+/* ---------- phase 2: sync dot, "save as the card" / "Golf page" toggles, moving phones ---------- */
+.sc-sync { display: inline-block; width: 8px; height: 8px; margin-left: 4px; border-radius: 50%; vertical-align: 1px; background: var(--faint); }
+.sc-sync.ok { background: var(--accent); }
+.sc-sync.wait { background: var(--over); }
+.sc-sub .sc-sync { margin-left: 8px; }
+.sc-approve {
+  display: flex; align-items: flex-start; gap: 12px; margin-top: 16px; padding: 14px; border: 1px solid var(--line); border-radius: 14px;
+  background: var(--panel); cursor: pointer; font-size: 0.95rem; line-height: 1.35;
+}
+.sc-approve[hidden] { display: none; }
+.sc-approve input { flex: none; width: 24px; height: 24px; margin: 0; accent-color: var(--accent); }
+.sc-approve small { display: block; margin-top: 4px; font-size: 0.8rem; color: var(--muted); }
+.sc-site { margin-top: 12px; }
+.sc-move { margin-top: 28px; }
+.sc-move > p { margin: 0 14px 10px; }
+.sc-move-row { display: flex; align-items: center; gap: 8px; margin: 0 12px 10px; }
+.sc-move-row .sc-in { flex: 1; height: 48px; text-transform: uppercase; letter-spacing: 0.08em; }
+.sc-code { font: 700 1.15rem/1 var(--display); letter-spacing: 0.06em; }
+.sc-move .sc-error { margin: 0 14px 12px; }
+
 /* ---------- closed / login ---------- */
 .sc-closed { padding: 60px 20px; }
 .sc-closed h1 { font: 700 1.6rem/1.2 var(--display); margin: 0 0 8px; }

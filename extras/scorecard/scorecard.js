@@ -1,4 +1,4 @@
-// Scorecard (Extras > Scorecard, phase 1 of SCORECARD-PLAN.md): Nick's score tracker for real golf courses.
+// Scorecard (Extras > Scorecard, phases 1-2 of SCORECARD-PLAN.md): Nick's score tracker for real golf courses.
 // One screen per hole: score (one tap for par), putts, fairway (left / hit / right), green in regulation (worked out
 // from score and putts, tap to override) and penalties. Swipe for the next hole. Every tap is saved in this browser
 // straight away (localStorage), so a reload, a dead signal or a phone restart loses nothing; sw.js keeps the page
@@ -6,20 +6,28 @@
 // as an image or shared, and CSV / JSON / GHIN-ready exports.
 //
 // OWNER ONLY until the Worker's SCORECARD_PUBLIC is "1": GET /scorecard/status decides (offline, the last answer).
-// Courses: Nick's hand-made files (courses/*.json, copied from each course's own card), or any course from
-// OpenGolfAPI through the Worker (/scorecard/courses/...), checked against the real card before the round starts.
+// Courses: a course's approved file from the Worker (GET /scorecard/courses/:id: checked once, then reused with no
+// lookups), else Nick's hand-made files (courses/*.json, copied from each course's own card), else OpenGolfAPI through
+// the Worker, checked against the real card before the round starts and then approved as the course's file.
+// Sync (phase 2): rounds are saved to the Worker's database whenever there's signal (PUT /scorecard/rounds/:id, only
+// what changed since the last save), so they follow Nick to any device in owner mode; a visitor moves phones with a
+// recovery code. His finished rounds marked "Show on my Golf page" feed the Golf page and the home Lately strip.
 //
 // localStorage: nm-scorecard-round   the round being played
-//               nm-scorecard-rounds  finished rounds, newest first (the last 50)
+//               nm-scorecard-rounds  finished rounds, newest first (the last 50); each has ackAt, the last change
+//                                    the server has (updatedAt > ackAt = still to send)
 //               nm-scorecard-prefs   { sun, wake, name, tees: { courseId: teeKey }, recent: [{ id, name, place }] }
-//               nm-scorecard-course:<id>  an OpenGolfAPI course as Nick last checked it (reused next time)
+//               nm-scorecard-course:<id>  a course as last loaded or checked here (for offline)
+//               nm-scorecard-deleted   round ids deleted here, still to delete on the server
+//               nm-scorecard-approvals course files approved here, still to send
 //               nm-scorecard-ok      whether this browser may see the page (for opening it offline)
 (function () {
   var script = document.currentScript;
   var local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
   var API = (local ? script.dataset.apiLocal : script.dataset.api) || "";
   var app = document.getElementById("app");
-  var K = { round: "nm-scorecard-round", rounds: "nm-scorecard-rounds", prefs: "nm-scorecard-prefs", course: "nm-scorecard-course:", ok: "nm-scorecard-ok" };
+  var K = { round: "nm-scorecard-round", rounds: "nm-scorecard-rounds", prefs: "nm-scorecard-prefs", course: "nm-scorecard-course:", ok: "nm-scorecard-ok",
+    del: "nm-scorecard-deleted", approve: "nm-scorecard-approvals" };
   var KEEP = 50;
   var NAMES = { "-3": "Albatross", "-2": "Eagle", "-1": "Birdie", "0": "Par", "1": "Bogey", "2": "Double", "3": "Triple" };
 
@@ -55,11 +63,34 @@
     ADMIN = localStorage.getItem("nm-admin-token");
   } catch (e) {}
   function auth(h) { h = h || {}; if (ADMIN) h.Authorization = "Bearer " + ADMIN; return h; }
-  function api(path) {
-    return fetch(API + path, { headers: auth() }).then(function (r) {
-      return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || "Something went wrong."); return d; });
-    });
+  // a call to the Worker; errors carry the HTTP status (0: no signal)
+  function api(path, opts) {
+    opts = opts || {};
+    return fetch(API + path, { method: opts.method || "GET", headers: auth(opts.body ? { "Content-Type": "application/json" } : {}),
+      body: opts.body ? JSON.stringify(opts.body) : undefined })
+      .catch(function () { var e = new Error("No signal."); e.status = 0; throw e; })
+      .then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (d) {
+          if (!r.ok) { var e = new Error(d.error || "Something went wrong."); e.status = r.status; throw e; }
+          return d;
+        });
+      });
   }
+
+  // The site's browser id (the same one live.js makes for the queues): a visitor's rounds are theirs by it
+  function visitorId() {
+    var id = null;
+    try { id = localStorage.getItem("nm-visitor"); } catch (e) {}
+    if (!id) {
+      var m = document.cookie.match(/(?:^|; )nm_visitor=([^;]+)/);
+      id = m ? m[1] : uuid();
+      try { localStorage.setItem("nm-visitor", id); } catch (e) {}
+    }
+    document.cookie = "nm_visitor=" + id + "; max-age=31536000; path=/; SameSite=Lax";
+    return id;
+  }
+  var VID = visitorId();
+  var OWNER = !!ADMIN; // the Worker's answer replaces this guess (offline, having the token is enough)
 
   var prefs = load(K.prefs, {});
   prefs.tees = prefs.tees || {};
@@ -70,13 +101,15 @@
   var round = load(K.round, null); // the round being played, if any
   var undo = [];                    // this session's changes, newest last: { n, before }
   var wake = null;                  // the screen wake lock while a hole is showing
+  var ready = false;                // the gate has let us in (sync waits for it)
+  function today() { var d = new Date(); return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); }
 
   // ---------- the gate: owner only until the Worker says it's public ----------
 
   function gate() {
     return fetch(API + "/scorecard/status", { headers: auth() })
       .then(function (r) { return r.json(); })
-      .then(function (d) { var ok = !!(d.public || d.owner); save(K.ok, ok); return ok; })
+      .then(function (d) { var ok = !!(d.public || d.owner); OWNER = !!d.owner; save(K.ok, ok); return ok; })
       .catch(function () { return !!load(K.ok, false); }); // no signal: whatever it said last time
   }
 
@@ -108,7 +141,11 @@
       if (!ok) return params.has("admin") ? login() : closed();
       if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function () {});
       if (!prefs.name && ADMIN) { prefs.name = "Nick"; savePrefs(); }
+      ready = true;
       if (round && !round.finishedAt) holeScreen(); else home();
+      queueSync(400);
+      window.addEventListener("online", function () { queueSync(0); });
+      setInterval(function () { if (navigator.onLine !== false) queueSync(0); }, 60000);
     });
   }
 
@@ -120,15 +157,25 @@
     return fetch("courses/index.json").then(function (r) { return r.json(); })
       .then(function (d) { mine = d.courses || []; return mine; }).catch(function () { return []; });
   }
+  var filed = null; // the approved course files on the server: [{ id, name, place, version, ownerChecked }]
+  function fileList() {
+    if (filed) return Promise.resolve(filed);
+    return api("/scorecard/courses").then(function (d) { filed = d.courses || []; return filed; }).catch(function () { return []; });
+  }
+  // A course's numbers: its approved file on the server (checked once, then reused with no lookups); with no signal,
+  // the copy kept on this phone; with no file yet, the copy checked here, else Nick's hand-made file or OpenGolfAPI
   function loadCourse(id) {
-    if (id.indexOf("api:") === 0) {
-      var kept = load(K.course + id, null); // checked by Nick before: reuse it as is
-      if (kept) return Promise.resolve(kept);
-      return api("/scorecard/courses/api/" + encodeURIComponent(id.slice(4)));
-    }
-    return fetch("courses/" + encodeURIComponent(id) + ".json").then(function (r) {
-      if (!r.ok) throw new Error("Couldn't load that course.");
-      return r.json();
+    return api("/scorecard/courses/" + encodeURIComponent(id)).then(function (c) {
+      save(K.course + id, c);
+      return c;
+    }, function (err) {
+      var kept = load(K.course + id, null);
+      if (kept) return kept;
+      if (id.indexOf("api:") === 0) return api("/scorecard/courses/api/" + encodeURIComponent(id.slice(4)));
+      return fetch("courses/" + encodeURIComponent(id) + ".json").then(function (r) {
+        if (!r.ok) throw new Error(err.status === 0 ? "No signal, and this course isn't saved on this phone yet." : "Couldn't load that course.");
+        return r.json();
+      });
     });
   }
   function yardsOf(t) { return t.total || t.yards.reduce(function (a, v) { return a + (v || 0); }, 0); }
@@ -152,20 +199,28 @@
 
   function home() {
     releaseWake();
-    var past = load(K.rounds, []);
     app.innerHTML = bar('<a class="sc-icon sc-back" href="/extras/" aria-label="Back to Extras">&larr;</a>', "Scorecard", sunBtn) +
       '<section class="sc-pad">' +
         '<h2 class="sc-h">New round</h2>' +
         '<div class="sc-search"><input id="sc-q" type="search" autocomplete="off" placeholder="Search for a course" aria-label="Search for a course"></div>' +
         '<ul class="sc-list sc-results" hidden></ul>' +
         '<h3 class="sc-sub">Your courses</h3><ul class="sc-list sc-mine"><li class="sc-muted">Loading…</li></ul>' +
-        (past.length ? '<h3 class="sc-sub">Past rounds</h3><ul class="sc-list sc-past">' + past.map(pastRow).join("") + "</ul>" : "") +
+        '<div class="sc-past-wrap"></div>' +
+        (OWNER ? "" : '<details class="sc-check sc-move"><summary>Moving to another phone?</summary>' +
+          '<p class="sc-muted small">Get a code here and type it into the Scorecard on your other phone. Your rounds will be on both.</p>' +
+          '<div class="sc-move-row"><button type="button" class="sc-ghost" data-act="code">Get my code</button><b class="sc-code"></b></div>' +
+          '<div class="sc-move-row"><input id="sc-claim" class="sc-in" placeholder="ABCD-EFGH-JKMN" autocapitalize="characters" autocomplete="off" aria-label="Code from your other phone">' +
+          '<button type="button" class="sc-ghost" data-act="claim">Use code</button></div><p class="sc-error" role="alert"></p></details>') +
       "</section>";
-    myCourses().then(function (list) {
-      var rec = prefs.recent.filter(function (r) { return !list.some(function (m) { return m.id === r.id; }); });
-      var all = list.map(function (c) { return courseRow(c, true); }).concat(rec.map(function (c) { return courseRow(c, false); }));
-      app.querySelector(".sc-mine").innerHTML = all.join("") || '<li class="sc-muted">Search for a course to start.</li>';
+    Promise.all([myCourses(), fileList()]).then(function (res) {
+      var list = res[0], files = res[1];
+      var known = function (id) { return list.some(function (m) { return m.id === id; }); };
+      var rows = list.map(function (c) { return courseRow(c, "✓ Card"); });
+      files.forEach(function (f) { if (!known(f.id)) rows.push(courseRow(f, f.ownerChecked ? "✓ Card" : "✓ Checked")); });
+      prefs.recent.forEach(function (r) { if (!known(r.id) && !files.some(function (f) { return f.id === r.id; })) rows.push(courseRow(r, "")); });
+      app.querySelector(".sc-mine").innerHTML = rows.join("") || '<li class="sc-muted">Search for a course to start.</li>';
     });
+    pastRounds();
     var q = app.querySelector("#sc-q"), out = app.querySelector(".sc-results"), timer = null, seq = 0;
     q.addEventListener("input", function () {
       clearTimeout(timer);
@@ -181,42 +236,78 @@
         .then(function (res) {
           if (my !== seq) return;
           var own = res[0], found = res[1];
-          var rows = own.filter(function (c) { return (c.name + " " + c.place).toLowerCase().indexOf(lower) >= 0; }).map(function (c) { return courseRow(c, true); });
+          var rows = own.filter(function (c) { return (c.name + " " + c.place).toLowerCase().indexOf(lower) >= 0; }).map(function (c) { return courseRow(c, "✓ Card"); });
           (found.courses || []).forEach(function (c) {
             var file = own.filter(function (m) { return m.apiId === c.apiId; })[0];
             if (file) return; // Nick's own file for it is already listed
             var near = own.filter(function (m) { return m.nearApiId === c.apiId; })[0];
             rows.push(courseRow({ id: "api:" + c.apiId, name: c.name, place: c.place + (c.par ? " · par " + c.par : ""),
-              note: near ? "A different course from " + near.name : "" }, false));
+              note: near ? "A different course from " + near.name : "" }, (filed || []).some(function (f) { return f.id === "api:" + c.apiId; }) ? "✓ Checked" : ""));
           });
           out.innerHTML = rows.join("") || '<li class="sc-muted">' + esc(found.error || "No courses found.") + "</li>";
         });
     }
   }
 
-  function courseRow(c, checked) {
+  function courseRow(c, badge) {
     return '<li><button class="sc-row-btn" type="button" data-course="' + esc(c.id) + '"><span class="sc-row-main"><b>' + esc(c.name) + "</b>" +
       '<span class="sc-row-sub">' + esc(c.place || "") + (c.note ? " · " + esc(c.note) : "") + "</span></span>" +
-      (checked ? '<span class="sc-badge" title="Copied from the course\'s own card">✓ Card</span>' : "") + "</button></li>";
+      (badge ? '<span class="sc-badge" title="This course\'s card has been checked">' + esc(badge) + "</span>" : "") + "</button></li>";
   }
 
+  // one row for a round kept here (r.course) or only on the server (a summary from GET /scorecard/rounds)
   function pastRow(r) {
-    var s = stats(r);
-    return '<li><button class="sc-row-btn" type="button" data-past="' + esc(r.id) + '"><span class="sc-row-main"><b>' + esc(r.course.name) + "</b>" +
-      '<span class="sc-row-sub">' + esc(fmtDate(r.date)) + " · " + esc(teeOf(r.course, r.tee).name) + (r.holes.length === 9 ? " · 9 holes" : "") + "</span></span>" +
+    var local = !!r.course, s = local ? stats(r) : { done: r.done, strokes: r.strokes, toPar: r.strokes - r.par };
+    var name = local ? r.course.name : r.courseName, tee = local ? teeOf(r.course, r.tee).name : r.teeName;
+    var open = !r.finishedAt;
+    return '<li><button class="sc-row-btn" type="button" ' + (local ? "data-past" : "data-remote") + '="' + esc(r.id) + '"><span class="sc-row-main"><b>' + esc(name) + "</b>" +
+      '<span class="sc-row-sub">' + esc(fmtDate(r.date || r.day)) + " · " + esc(tee || "") + (r.holes.length === 9 ? " · 9 holes" : "") +
+        (open ? " · in progress" : "") + (local ? "" : " · on another phone") + "</span></span>" +
       '<span class="sc-row-score"><b>' + (s.done ? s.strokes : "–") + "</b><span>" + (s.done ? toPar(s.toPar) : "") + "</span></span></button></li>";
+  }
+
+  // Past rounds: the ones on this phone straight away, then the server's list folded in: rounds from another device
+  // appear (tap to bring them here), and rounds deleted on another device go from here too
+  function pastRounds() {
+    var wrap = app.querySelector(".sc-past-wrap");
+    if (!wrap) return;
+    function draw(list) {
+      list.sort(function (a, b) { return String(b.date || b.day).localeCompare(String(a.date || a.day)); });
+      wrap.innerHTML = list.length ? '<h3 class="sc-sub">Past rounds <i class="sc-sync" aria-hidden="true"></i></h3><ul class="sc-list sc-past">' + list.map(pastRow).join("") + "</ul>" : "";
+      dot();
+    }
+    var mineHere = load(K.rounds, []);
+    draw(mineHere.slice());
+    api("/scorecard/rounds?visitorId=" + encodeURIComponent(VID)).then(function (d) {
+      var server = d.rounds || [], ids = {}, gone = load(K.del, []);
+      server.forEach(function (r) { ids[r.id] = true; });
+      var here = load(K.rounds, []);
+      // saved before, now missing from the server: deleted on another phone
+      var kept = server.length < 200 ? here.filter(function (r) { return ids[r.id] || !r.ackAt; }) : here;
+      if (kept.length !== here.length) save(K.rounds, kept);
+      var have = {};
+      kept.forEach(function (r) { have[r.id] = true; });
+      if (round) have[round.id] = true;
+      var remote = server.filter(function (r) { return !have[r.id] && gone.indexOf(r.id) < 0; });
+      if (app.querySelector(".sc-past-wrap") === wrap) draw(kept.concat(remote));
+    }).catch(function () {});
   }
 
   // ---------- setup: tee, holes, and a look at the numbers before teeing off ----------
 
-  var draft = null, setupTee = null, setupNine = "18";
+  var draft = null, setupTee = null, setupNine = "18", original = "";
+  function numbers(c) { return JSON.stringify([c.par, c.hcp, c.hcpWomen || null, c.tees.map(function (t) { return t.yards; })]); }
 
   function setup(course) {
     draft = copy(course);
+    original = numbers(draft);
     setupTee = defaultTee(draft);
     setupNine = "18";
-    var src = draft.source || {};
-    var trust = src.kind === "website"
+    var src = draft.source || {}, chk = draft.checked;
+    var trust = chk
+      ? '<p class="sc-trust ok">✓ Card checked ' + (chk.owner ? (OWNER ? "by you" : "by Nick") : "by a player") + " on " + esc(fmtDate(chk.at)) +
+        (chk.version > 1 ? " (version " + chk.version + ")" : "") + ". It's ready as is.</p>"
+      : src.kind === "website"
       ? '<p class="sc-trust ok">✓ Copied from ' + esc(src.name || "the course's card") + (src.dated ? " (" + esc(monthYear(src.dated)) + ")" : "") + ". Still check it against the card in the clubhouse.</p>"
       : src.kind === "checked"
       ? '<p class="sc-trust ok">✓ Checked by you on ' + esc(fmtDate(src.at)) + ".</p>"
@@ -229,8 +320,9 @@
           [["18", "18"], ["front", "Front 9"], ["back", "Back 9"]].map(function (o) {
             return '<button type="button" role="radio" data-nine="' + o[0] + '" aria-checked="' + (o[0] === setupNine) + '">' + o[1] + "</button>";
           }).join("") + "</div>" : "") +
-        '<details class="sc-check"' + (src.kind === "api" ? " open" : "") + "><summary>Check the card</summary>" +
+        '<details class="sc-check"' + (src.kind === "api" && !chk ? " open" : "") + "><summary>" + (chk ? "Something's different? Check the card" : "Check the card") + "</summary>" +
           '<p class="sc-muted small">Tap a par to change it. Yardage is for the tee you picked.</p><div class="sc-table"></div></details>' +
+        '<label class="sc-approve" hidden><input type="checkbox" id="sc-approve" checked><span></span></label>' +
         '<button class="sc-go" type="button" data-act="start">Start round</button>' +
         (draft.credit ? '<p class="sc-credit">' + esc(draft.credit) + "</p>" : "") +
       "</section>";
@@ -260,23 +352,36 @@
     if (dup) warn += '<p class="sc-warn">A handicap is used twice: each one should appear once.</p>';
     app.querySelector(".sc-table").innerHTML = '<div class="sc-tr sc-th"><span>Hole</span><span>Par</span><span>Yds</span><span>Hcp</span></div>' + rows +
       '<div class="sc-tr sc-tt"><span>Total</span><span>' + par + "</span><span>" + fmtYds(sum || tee.total) + "</span><span></span></div>" + warn;
+    approveBox();
+  }
+
+  // "Save as this course's card": offered when the course has no checked file yet, or (Nick) when he's changed
+  // numbers in a checked one. A visitor can't replace a checked file; their changes stay with their own round.
+  function approveBox() {
+    var box = app.querySelector(".sc-approve");
+    if (!box) return;
+    var chk = draft.checked, edited = numbers(draft) !== original;
+    var show = !chk || (OWNER && edited);
+    box.hidden = !show;
+    box.querySelector("span").textContent = !chk
+      ? "Save these numbers as this course's card, so next time it's ready with no checking"
+      : "Save my changes as the course's card (version " + (chk.version + 1) + ")";
   }
 
   function startRound() {
     var tee = teeOf(draft, setupTee), n = draft.holes;
     var holes = [];
     for (var i = 1; i <= n; i++) if (setupNine === "18" || (setupNine === "front" ? i <= 9 : i > 9)) holes.push(i);
+    var ab = app.querySelector(".sc-approve");
+    if (ab && !ab.hidden && ab.querySelector("input").checked) queueApproval(draft);
     round = { id: uuid(), v: 1, course: draft, tee: tee.key, holes: holes, scores: {}, current: holes[0],
-      player: prefs.name || "", date: new Date().toISOString(), startedAt: Date.now(), updatedAt: Date.now() };
+      player: prefs.name || "", date: new Date().toISOString(), day: today(), startedAt: Date.now(), updatedAt: Date.now(),
+      onSite: OWNER }; // Nick's rounds go on his Golf page unless he turns it off at the end
     prefs.tees[draft.id] = tee.key;
     prefs.recent = [{ id: draft.id, name: draft.name, place: draft.place }].concat(prefs.recent.filter(function (r) { return r.id !== draft.id; })).slice(0, 8);
     savePrefs();
-    // an OpenGolfAPI course, as Nick checked it, is kept and used as is next time
-    if (draft.id.indexOf("api:") === 0) {
-      var kept = copy(draft);
-      kept.source = { kind: "checked", at: new Date().toISOString(), from: "OpenGolfAPI" };
-      save(K.course + draft.id, kept);
-    }
+    // the course as checked here is kept on this phone too (offline, and until its approval reaches the server)
+    save(K.course + draft.id, copy(draft));
     undo = [];
     saveRound();
     holeScreen();
@@ -284,7 +389,127 @@
 
   // ---------- the round ----------
 
-  function saveRound() { round.updatedAt = Date.now(); save(K.round, round); }
+  // every change: stamped (newest wins on the server) and sent when there's signal; just moving between holes isn't a change
+  function saveRound(moveOnly) {
+    if (!moveOnly) round.updatedAt = Date.now();
+    save(K.round, round);
+    if (!moveOnly) queueSync();
+  }
+
+  // ---------- sync: this phone's rounds to the server, whenever there's signal ----------
+
+  var syncing = false, again = false, syncTimer = null;
+  function dayOf(r) {
+    if (r.day) return r.day;
+    var d = new Date(r.date || Date.now());
+    return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2);
+  }
+  function waiting() {
+    var list = load(K.rounds, []).filter(function (r) { return (r.updatedAt || 0) > (r.ackAt || 0); });
+    if (round && (round.updatedAt || 0) > (round.ackAt || 0)) list.unshift(round);
+    return list;
+  }
+  function pendingCount() { return waiting().length + load(K.del, []).length + load(K.approve, []).length; }
+  // the little dot by the round's name (and Past rounds): green = all saved to the server, amber = waiting for signal
+  function dot() {
+    var n = pendingCount();
+    app.querySelectorAll(".sc-sync").forEach(function (el) {
+      el.className = "sc-sync " + (n ? "wait" : "ok");
+      el.title = n ? "Saved on this phone; goes to the server when there's signal" : "Saved";
+    });
+  }
+  function queueSync(ms) {
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(syncAll, ms == null ? 2500 : ms);
+    dot();
+  }
+  // What a round sends: its header and totals, the course as played (the first time only), the holes changed since
+  // the server's last copy, and which holes have a score at all (so an undone hole is deleted there too)
+  function payload(r) {
+    var tee = teeOf(r.course, r.tee), hc = hcpSet(r.course, tee), st = stats(r), scores = {}, present = [];
+    r.holes.forEach(function (n) {
+      var x = r.scores[n];
+      if (!x || x.strokes == null) return;
+      present.push(n);
+      if ((x.at || 0) <= (r.ackAt || 0)) return;
+      scores[n] = { strokes: x.strokes, putts: x.putts, fairway: x.fairway, gir: x.gir, girShown: NMCard.girOf(r.course, r, n),
+        penalties: x.penalties || 0, par: r.course.par[n - 1], yards: tee.yards[n - 1], hcp: hc[n - 1], at: x.at || r.updatedAt };
+    });
+    return {
+      visitorId: VID,
+      round: { courseId: r.course.id, courseName: r.course.name, courseVersion: r.course.checked ? r.course.checked.version : null,
+        tee: r.tee, teeName: tee.name, holes: r.holes, player: r.player, day: dayOf(r), date: r.date,
+        finishedAt: r.finishedAt || null, updatedAt: r.updatedAt, onSite: !!r.onSite,
+        totals: { strokes: st.strokes, par: st.par, putts: st.puttsHoles ? st.putts : null, firHit: st.fw, firLeft: st.fwL, firRight: st.fwR,
+          firTotal: st.fwN, gir: st.gir, girTotal: st.girN, penalties: st.pen, done: st.done } },
+      course: r.courseAcked ? undefined : r.course, scores: scores, present: present,
+    };
+  }
+  function acked(id, sentAt) {
+    var mark = function (x) { x.ackAt = Math.max(x.ackAt || 0, sentAt); x.courseAcked = true; };
+    if (round && round.id === id) { mark(round); save(K.round, round); }
+    var past = load(K.rounds, []);
+    past.forEach(function (x) { if (x.id === id) mark(x); });
+    save(K.rounds, past);
+  }
+  function syncAll() {
+    if (!ready) return;
+    if (syncing) { again = true; return; }
+    var dels = load(K.del, []), approvals = load(K.approve, []), todo = waiting();
+    if (!dels.length && !approvals.length && !todo.length) { dot(); return; }
+    syncing = true;
+    var chain = Promise.resolve(), offline = false;
+    dels.forEach(function (id) {
+      chain = chain.then(function () {
+        if (offline) return;
+        return api("/scorecard/rounds/" + encodeURIComponent(id) + "?visitorId=" + encodeURIComponent(VID), { method: "DELETE" })
+          .then(function () { save(K.del, load(K.del, []).filter(function (x) { return x !== id; })); })
+          .catch(function (e) { if (!e.status) offline = true; });
+      });
+    });
+    approvals.forEach(function (a) {
+      chain = chain.then(function () {
+        if (offline) return;
+        return api("/scorecard/courses/" + encodeURIComponent(a.id) + "/approve", { method: "POST", body: { visitorId: VID, course: a.course } })
+          .then(function (res) {
+            save(K.approve, load(K.approve, []).filter(function (x) { return x.id !== a.id; }));
+            filed = null;
+            if (res.saved) { // the copy on this phone, and a round being played on it, now carry the version
+              var kept = load(K.course + a.id, null);
+              if (kept) { kept.checked = res.checked; save(K.course + a.id, kept); }
+              if (round && round.course.id === a.id && !round.course.checked) { round.course.checked = res.checked; save(K.round, round); }
+            }
+          })
+          .catch(function (e) {
+            if (!e.status) offline = true;
+            else if (e.status < 500) save(K.approve, load(K.approve, []).filter(function (x) { return x.id !== a.id; })); // refused: don't retry forever
+          });
+      });
+    });
+    todo.forEach(function (r) {
+      chain = chain.then(function () {
+        if (offline) return;
+        var sentAt = r.updatedAt;
+        return api("/scorecard/rounds/" + encodeURIComponent(r.id), { method: "PUT", body: payload(r) })
+          .then(function () { acked(r.id, sentAt); })
+          .catch(function (e) {
+            if (!e.status) offline = true;
+            else if (e.status === 403 || e.status === 400) acked(r.id, sentAt); // refused for good: stop retrying (the phone keeps it)
+          });
+      });
+    });
+    chain.then(function () {
+      syncing = false;
+      dot();
+      if (again) { again = false; queueSync(500); }
+    });
+  }
+  function queueApproval(c) {
+    var course = copy(c);
+    delete course.checked;
+    save(K.approve, load(K.approve, []).filter(function (x) { return x.id !== c.id; }).concat([{ id: c.id, course: course }]));
+    queueSync(0);
+  }
   function S(n) { return round.scores[n] || {}; }
   function parOf(n) { return round.course.par[n - 1]; }
   function stats(r) {
@@ -322,7 +547,7 @@
       '<div class="sc-play">' +
       '<header class="sc-bar">' +
         '<button class="sc-icon" type="button" data-act="menu" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>' +
-        '<div class="sc-title"><b>' + esc(c.name) + "</b><span>" + esc(tee.name) + " tees</span></div>" +
+        '<div class="sc-title"><b>' + esc(c.name) + "</b><span>" + esc(tee.name) + ' tees <i class="sc-sync" aria-hidden="true"></i></span></div>' +
         '<button class="sc-icon" type="button" data-act="undo" aria-label="Undo"' + (undo.length ? "" : " disabled") + '><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>' +
       "</header>" +
       '<nav class="sc-strip" aria-label="Holes">' + strip + "</nav>" +
@@ -375,6 +600,7 @@
     if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: "nearest", inline: "center" });
     swipe(hole);
     keepAwake();
+    dot();
   }
 
   // a change to hole n: undo remembers what it was; any entry on a hole also sets its score (par if not tapped yet)
@@ -395,7 +621,7 @@
     if (round.holes.indexOf(n) < 0 || n === round.current) return;
     dir = dir || (round.holes.indexOf(n) > round.holes.indexOf(round.current) ? 1 : -1);
     round.current = n;
-    saveRound();
+    saveRound(true);
     holeScreen(dir);
   }
   function step(d) {
@@ -443,6 +669,7 @@
   function releaseWake() { if (wake) { wake.release().catch(function () {}); wake = null; } }
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "visible" && round && !round.finishedAt && app.querySelector(".sc-play")) keepAwake();
+    if (document.visibilityState === "visible") queueSync(0);
   });
 
   // ---------- menu ----------
@@ -482,7 +709,13 @@
         var v = prompt("Name on the scorecard", prefs.name || "");
         if (v != null) { prefs.name = v.trim().slice(0, 24); savePrefs(); round.player = prefs.name; saveRound(); }
       }
-      if (m === "quit" && confirm("Quit this round? Its scores will be deleted.")) { drop(K.round); round = null; home(); }
+      if (m === "quit" && confirm("Quit this round? Its scores will be deleted, here and on the server.")) {
+        save(K.del, load(K.del, []).filter(function (x) { return x !== round.id; }).concat([round.id]));
+        drop(K.round);
+        round = null;
+        queueSync(0);
+        home();
+      }
     });
   }
 
@@ -593,6 +826,7 @@
     var done = round;
     round = null;
     releaseWake();
+    queueSync(0);
     summary(done);
   }
 
@@ -619,6 +853,8 @@
           (navigator.share ? '<button class="sc-go alt" type="button" data-act="share">Share</button>' : "") + "</div>" +
         '<div class="sc-actions small"><button type="button" data-act="csv">CSV</button><button type="button" data-act="json">JSON</button><button type="button" data-act="ghin">For GHIN</button></div>' +
         '<div class="sc-ghin" hidden></div>' +
+        (OWNER ? '<label class="sc-approve sc-site"><input type="checkbox" id="sc-site"' + (r.onSite ? " checked" : "") + '><span>Show on my Golf page' +
+          '<small>On the Golf page and the home page\'s Lately strip (only you see it until the Scorecard is public)</small></span></label>' : "") +
         '<div class="sc-actions small"><button type="button" data-act="edit">Edit scores</button><button type="button" data-act="delete" class="danger">Delete round</button></div>' +
         '<p class="sc-credit">' + esc(sourceLine(c)) + "</p>" +
       "</section>";
@@ -687,6 +923,24 @@
       return;
     }
     if (d.past) { var r = pastById(d.past); if (r) summary(r); return; }
+    if (d.remote) { // a round from another device: bring it here
+      b.classList.add("busy");
+      api("/scorecard/rounds/" + encodeURIComponent(d.remote) + "?visitorId=" + encodeURIComponent(VID)).then(function (full) {
+        if (!full.course) throw new Error("That round can't be opened here.");
+        if (full.finishedAt) {
+          save(K.rounds, [full].concat(load(K.rounds, []).filter(function (x) { return x.id !== full.id; })).slice(0, KEEP));
+          summary(full);
+        } else if (round && !round.finishedAt) {
+          throw new Error("Finish or quit the round you're playing here first.");
+        } else { // still being played: carry on here
+          round = full;
+          undo = [];
+          save(K.round, round);
+          holeScreen();
+        }
+      }).catch(function (err) { b.classList.remove("busy"); alert(err.status === 0 ? "No signal right now." : err.message); });
+      return;
+    }
     if (d.tee) { setupTee = d.tee; app.querySelectorAll(".sc-tee").forEach(function (x) { x.setAttribute("aria-pressed", String(x.dataset.tee === setupTee)); }); checkTable(); return; }
     if (d.nine) { setupNine = d.nine; app.querySelectorAll("[data-nine]").forEach(function (x) { x.setAttribute("aria-checked", String(x.dataset.nine === setupNine)); }); return; }
     if (d.par != null && draft) { var i = +d.par; draft.par[i] = draft.par[i] >= 6 ? 3 : draft.par[i] + 1; checkTable(); return; }
@@ -701,6 +955,20 @@
     var act = d.act;
     if (!act) return;
     if (act === "home") return home();
+    if (act === "code") {
+      api("/scorecard/me/code", { method: "POST", body: { visitorId: VID } }).then(function (d2) {
+        app.querySelector(".sc-code").textContent = d2.code;
+      }).catch(function (err) { app.querySelector(".sc-move .sc-error").textContent = err.status === 0 ? "No signal right now." : err.message; });
+      return;
+    }
+    if (act === "claim") {
+      var codeIn = app.querySelector("#sc-claim"), errEl = app.querySelector(".sc-move .sc-error");
+      api("/scorecard/me/claim", { method: "POST", body: { visitorId: VID, code: codeIn.value } }).then(function () {
+        errEl.textContent = "";
+        home();
+      }).catch(function (err) { errEl.textContent = err.status === 0 ? "No signal right now." : err.message; });
+      return;
+    }
     if (act === "sun") { prefs.sun = !prefs.sun; savePrefs(); document.body.classList.toggle("sun", prefs.sun); return; }
     if (act === "start") return startRound();
     if (act === "menu") return menu();
@@ -723,7 +991,7 @@
     if (act === "undo") {
       var u = undo.pop();
       if (!u) return;
-      if (u.before) round.scores[u.n] = u.before; else delete round.scores[u.n];
+      if (u.before) { u.before.at = Date.now(); round.scores[u.n] = u.before; } else delete round.scores[u.n];
       round.current = u.n;
       saveRound();
       buzz();
@@ -765,8 +1033,10 @@
       holeScreen();
       return;
     }
-    if (act === "delete" && confirm("Delete this round for good?")) {
+    if (act === "delete" && confirm("Delete this round for good? It goes from every device.")) {
       save(K.rounds, load(K.rounds, []).filter(function (x) { return x.id !== past.id; }));
+      save(K.del, load(K.del, []).filter(function (x) { return x !== past.id; }).concat([past.id]));
+      queueSync(0);
       home();
     }
   });
@@ -774,6 +1044,15 @@
   // the check table's number boxes
   app.addEventListener("change", function (e) {
     var el = e.target, d = el.dataset;
+    if (el.id === "sc-site") { // Show on my Golf page
+      var past = load(K.rounds, []), r = past.filter(function (x) { return x.id === app.dataset.round; })[0];
+      if (!r) return;
+      r.onSite = el.checked;
+      r.updatedAt = Date.now();
+      save(K.rounds, past);
+      queueSync(0);
+      return;
+    }
     if (!draft || (d.yds == null && d.hcp == null)) return;
     var v = el.value === "" ? null : Math.max(0, Math.round(+el.value));
     var tee = teeOf(draft, setupTee);

@@ -103,18 +103,28 @@
     return m;
   }
 
-  // The newest golf round from any source on the Golf page: Trackman (trackman.js + GOLF.trackman), X-Golf, 18Birdies
-  // (scores.js). Read like now.js's other data, without touching this page's globals.
+  // The newest golf round from any source on the Golf page: Trackman (trackman.js + GOLF.trackman), X-Golf (scores.js),
+  // and real courses from the Scorecard (Worker GET /scorecard/feed; while the Scorecard is owner only it answers
+  // only Nick in owner mode). Read like now.js's other data, without touching this page's globals.
   function loadData(src, name) {
     return fetch(src)
       .then(function (r) { return r.ok ? r.text() : ""; })
       .then(function (code) { var w = {}; try { new Function("window", code)(w); } catch (e) {} return w[name]; })
       .catch(function () { return undefined; });
   }
+  function scorecardRounds() {
+    if (!API) return [];
+    var token = null;
+    try { token = localStorage.getItem("nm-admin-token"); } catch (e) {}
+    return fetch(API + "/scorecard/feed", { headers: token ? { Authorization: "Bearer " + token } : {} })
+      .then(function (r) { return r.ok ? r.json() : {}; })
+      .then(function (d) { return d.rounds || []; })
+      .catch(function () { return []; });
+  }
   function latestRound() {
-    return Promise.all([loadData("/extras/golf/scores.js", "GOLF"), loadData("/extras/golf/trackman.js", "GOLF_TRACKMAN")]).then(function (d) {
+    return Promise.all([loadData("/extras/golf/scores.js", "GOLF"), loadData("/extras/golf/trackman.js", "GOLF_TRACKMAN"), scorecardRounds()]).then(function (d) {
       var golf = d[0] || {};
-      var rounds = (d[1] || []).concat(golf.trackman || [], golf.xgolf || [], golf.birdies || [])
+      var rounds = (d[1] || []).concat(golf.trackman || [], golf.xgolf || [], golf.birdies || [], d[2] || [])
         .filter(function (r) { return r && r.date && r.score && r.course && !r.hidden && !r.example; })
         .sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
       return rounds[0] || null;
