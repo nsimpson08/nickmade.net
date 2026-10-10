@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""The home page's Music tile: music.mp4 + .jpg. Now playing, three songs from Nick's Spotify Recently Listened
-(the Music page's list, Worker GET /spotify/recent; picked 2026-10-09 for covers that look different): for each, the
+"""The home page's Music tile: music.mp4 + .jpg. Now playing, three songs Nick picked (fixed here: the tile doesn't
+follow his listening; re-run and push to change them): for each, the
 album sleeve with its vinyl sliding out and spinning (the cover as its label), the title and artist, a progress bar
 and a pink spectrum visualizer pulsing to the beat, over a blurred glow of the cover. 3 s a song, crossfading, 9 s.
 
@@ -11,10 +11,10 @@ from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter
 from cliplib import W, H, FPS, Frames, ease, font, workdir
 
 WORK = workdir(os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else "clip-work"))
-SONGS = [  # title, artist, length (s), where it starts in the tile (s), cover
-    ("Live From Moscow", "Cult Member Archive", 221, 64, "https://i.scdn.co/image/ab67616d0000b2733be51c95cce268157f947bcf"),
-    ("free", "houseverbot", 136, 41, "https://i.scdn.co/image/ab67616d0000b27309fc5f6abd70567e3554237d"),
-    ("Pulsewidth", "Aphex Twin", 228, 97, "https://i.scdn.co/image/ab67616d0000b27338906032688bb13b135ce19a"),
+SONGS = [  # title, artist, length (s), where it starts in the tile (s), cover (Nick's picks, 2026-10-09)
+    ("Special Thing", "Gilligan Moss", 297, 92, "https://i.scdn.co/image/ab67616d0000b273ccec99c8fdfd266be336d3ee"),
+    ("Just Slow Down", "Thing", 169, 48, "https://i.scdn.co/image/ab67616d0000b273179042e39357ea8b1a5407e5"),
+    ("Rouge.", "St-Amour, cezanne", 104, 31, "https://i.scdn.co/image/ab67616d0000b2731c881ffcef2c7bec23070496"),
 ]
 SONG = 3.0      # seconds each
 FADE = 8        # frames of crossfade between songs (and back to the first)
