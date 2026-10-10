@@ -177,7 +177,7 @@ img { display: block; max-width: 100%; }
   background: var(--panel);
   transition: border-color .3s, box-shadow .3s;
 }
-.tile img, .tile video { /* Play's tile is a short muted video: gameplay is too busy for a small GIF */
+.tile img, .tile video { /* every tile is a short muted looping video (assets/gifs/make_*_clip.py); GIFs were too low quality */
   display: block;
   width: 100%;
   height: 100%;
