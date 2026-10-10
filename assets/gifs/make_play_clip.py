@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""The home page's Play tile: play.mp4 + .jpg. Nick's Office first and longest (the room's own 320x200 canvas, scaled
+"""The home page's Play tile: play.mp4 + .jpg. Three games, 3 seconds each (Nick asked for even time): Nick's Office (the room's own 320x200 canvas, scaled
 3x with hard pixel edges: The Dude, the cat, the SNES and the VW bus say their lines, the room turns, night falls),
-then a moment of each of the other games from their Play page clips (play/wall/: Nick's Nine's tee shot, Rapture's
+then each of the other games from their Play page clips (play/wall/: Nick's Nine's tee shot, Rapture's
 title), crossfading, and back round to the start.
 
     node record_play.js <work folder> && python3 make_play_clip.py <work folder>    # Pillow, ffmpeg
@@ -11,7 +11,7 @@ from PIL import Image
 from cliplib import ROOT, W, H, FPS, Frames, ease, workdir
 
 WORK = workdir(os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else "clip-work"))
-CLIPS = [("nicks-nine", 3.5, 1.7), ("rapture", 0.2, 1.7)]  # (play/wall/<name>.mp4, start s, length s)
+CLIPS = [("nicks-nine", 3.3, 3.0), ("rapture", 0.2, 3.0)]  # (play/wall/<name>.mp4, start s, length s): 3 s each, like the Office
 FADE = 7  # frames of crossfade
 
 

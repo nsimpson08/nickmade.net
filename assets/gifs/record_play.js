@@ -9,13 +9,13 @@ const fs = require("fs"), path = require("path");
 const puppeteer = require("puppeteer-core");
 const OUT = path.join(process.argv[2] || "clip-work", "play-raw");
 // [video frame, what happens]
-const SCRIPT = [
-  [0, "night:0"], [12, "hover:dude"], [20, "click:dude"],
-  [58, "turn:1"], [64, "click:cat"],
-  [98, "turn:2"], [100, "night:1"], [108, "click:snes"],
-  [136, "turn:3"], [140, "click:vw"],
+const SCRIPT = [  // 3 seconds, the same as each of the other games get in the tile
+  [0, "night:0"], [4, "hover:dude"], [6, "click:dude"],
+  [28, "turn:1"], [31, "click:cat"],
+  [50, "turn:2"], [51, "night:1"], [55, "click:snes"],
+  [72, "turn:3"], [74, "click:vw"],
 ];
-const FRAMES = 170;
+const FRAMES = 90;
 
 (async () => {
   fs.rmSync(OUT, { recursive: true, force: true });
