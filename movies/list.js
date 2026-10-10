@@ -46,13 +46,7 @@ window.SECTIONS = [
     live: "queue",
     title: "In the Queue",
     layout: "grid",
-    items: [
-      { title: "Blue Jay", year: 2016, image: "posters/blue-jay.jpg", credit: { official: true } },
-      { title: "Apocalypse Now", year: 1979, image: "posters/apocalypse-now.jpg", credit: { artist: "Dan Mumford", url: "http://www.dan-mumford.com" } },
-      { title: "The Florida Project", year: 2017, image: "posters/the-florida-project.jpg", credit: { artist: "Crisella Garcia", url: "https://www.instagram.com/bycrisella/" } },
-      { title: "After Hours", year: 1985, image: "posters/after-hours.jpg", credit: { artist: "Sam Coyle", url: "https://posterspy.com/profile/samcoyle" } },
-      { title: "Zodiac", year: 2007, image: "posters/zodiac.jpg", credit: { artist: "Brian Accardo", url: "https://alternativemovieposters.com/amp/zodiac-by-brian-accardo/" } }
-    ]
+    items: []
   },
   {
     group: "Favorites",

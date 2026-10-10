@@ -4,11 +4,9 @@
     python3 tools/pull_live.py            # do it
     python3 tools/pull_live.py --dry-run  # just show what would change
 
-For every movie/game you added from the site to a live section (live: "key" in list.js),
-and everything you added to a page's In the Queue yourself, this:
+For every movie/game you added from the site to a live section (live: "key" in list.js), this:
   1. saves its poster into movies/posters/ or games/posters/ (max 700px wide)
-  2. adds it to that section in list.js with the art credit: at the TOP for live sections (newest first, the order
-     the site shows), at the end for In the Queue
+  2. adds it to the TOP of that section in list.js with the art credit (newest first, the order the site shows)
 and for every list.js item you removed on the site (owner mode Remove), deletes it from list.js; once that's pushed,
 the next run clears it from the live site's hidden list.
 Then commit and push as usual. Until you push, the site keeps showing the live copy; after you
@@ -16,8 +14,8 @@ push, the page hides the live copy (same title already in list.js), and the next
 script clears those from the live site's storage (needs the admin password: set
 NICKMADE_ADMIN_TOKEN, or it will ask).
 
-Visitor suggestions and Recently Watched/Played stay on the live site (they need the site to
-show names, dates, and ratings), but everything live is saved to backups/live-YYYY-MM-DD.json,
+In the Queue (yours and visitors'), Recently Watched/Played stay on the live site only, never in list.js
+(Nick, 2026-10-09: a queue item in the code would stay put after he logs it), but everything live is saved to backups/live-YYYY-MM-DD.json,
 including the Library's site-added and removed discs (they live only in the Worker).
 
 It also deletes games from games/list.js In the Queue that are now in Recently Played (same title,
@@ -278,10 +276,6 @@ def main():
         for key, items in lists.items():
             for it in items:
                 work.append((page, 'live: "%s"' % key, key, it, "/lists/%s/%s/%s" % (page, key, it["imdbId"])))
-    for page in PAGES:
-        for it in snapshot["queue"][page]:
-            if it.get("owner"):
-                work.append((page, 'live: "queue"', "In the Queue", it, "/queue/%s?page=%s" % (it["imdbId"], page)))
 
     if not args.dry_run:
         os.makedirs(os.path.join(args.root, "backups"), exist_ok=True)

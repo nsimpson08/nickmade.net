@@ -13,7 +13,7 @@ SITE_URL = "https://nickmade.net"
 ALLOWED_ORIGINS = "https://nickmade.net,https://www.nickmade.net"
 QUEUE_LIMIT = "20"
 # Used only if the live movies/list.js can't be read
-OWNER_QUEUE_FALLBACK = "4"
+OWNER_QUEUE_FALLBACK = "0"
 # Spotify developer app (developer.spotify.com/dashboard) for the home page's "listening to";
 # its Client Secret is a secret: npx wrangler secret put SPOTIFY_CLIENT_SECRET
 SPOTIFY_CLIENT_ID = "1c18f59367834eaf9edd982c5858fa9b"

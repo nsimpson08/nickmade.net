@@ -50,12 +50,7 @@ window.SECTIONS = [
     live: "queue",
     title: "In the Queue",
     layout: "grid",
-    items: [
-      { title: "Grand Theft Auto VI", year: 2026, image: "posters/grand-theft-auto-vi.jpg", credit: { artist: "Rahalarts", url: "https://posterspy.com/profile/rahalarts" } },
-      { title: "Gears of War: E-Day", year: 2026, image: "posters/gears-of-war-e-day.jpg", credit: { artist: "Fakoori", url: "https://posterspy.com/profile/fakoori" } },
-      { title: "Well Dweller", year: 2026, image: "posters/well-dweller.jpg", credit: { official: true } },
-      { title: "Kingdom Come: Deliverance", year: 2018, image: "posters/kingdom-come-deliverance.jpg", credit: { official: true } }
-    ]
+    items: []
   },
   {
     group: "Favorites",

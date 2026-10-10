@@ -89,7 +89,7 @@ function queueKey(page) {
 function watchedKey(page) {
   return page === "movies" ? "watched" : "watched:" + page;
 }
-const IMG_HOSTS = ["m.media-amazon.com", "alternativemovieposters.com", "store-images.s-microsoft.com", "media.posterspy.com", "image.tmdb.org"];
+const IMG_HOSTS = ["nickmade.net", "m.media-amazon.com", "alternativemovieposters.com", "store-images.s-microsoft.com", "media.posterspy.com", "image.tmdb.org"];
 const XBOX_RECENT = 30; // how many recent Xbox games /xbox/recent lists
 const GAMERSCORE_KEY = "xbox:gamerscore";
 const GAMERSCORE_NIGHTS = 60;
