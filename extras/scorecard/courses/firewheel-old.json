@@ -1,0 +1,361 @@
+{
+ "id": "firewheel-old",
+ "name": "Firewheel \u00b7 Old Course",
+ "fullName": "Firewheel Golf Park, Old Course",
+ "place": "Garland, TX",
+ "apiId": null,
+ "nearApiId": "abc4d32e-d9f3-41ce-b50b-16f4f7dabf4e",
+ "website": "https://www.golffirewheel.com/old-course/",
+ "holes": 18,
+ "par": [
+  4,
+  4,
+  5,
+  3,
+  4,
+  4,
+  4,
+  3,
+  5,
+  4,
+  4,
+  3,
+  5,
+  4,
+  3,
+  5,
+  3,
+  4
+ ],
+ "hcp": [
+  5,
+  11,
+  1,
+  17,
+  7,
+  9,
+  13,
+  15,
+  3,
+  8,
+  6,
+  16,
+  4,
+  12,
+  14,
+  2,
+  18,
+  10
+ ],
+ "hcpWomen": [
+  5,
+  11,
+  1,
+  17,
+  7,
+  9,
+  13,
+  15,
+  3,
+  8,
+  6,
+  16,
+  4,
+  12,
+  14,
+  2,
+  18,
+  10
+ ],
+ "tees": [
+  {
+   "key": "gold",
+   "name": "Gold",
+   "label": "Gold Tees",
+   "color": "#b9995b",
+   "ink": "#ffffff",
+   "rating": 74.1,
+   "slope": 135,
+   "yards": [
+    425,
+    391,
+    566,
+    180,
+    420,
+    414,
+    372,
+    234,
+    552,
+    425,
+    457,
+    180,
+    517,
+    383,
+    195,
+    567,
+    167,
+    400
+   ],
+   "total": 6845
+  },
+  {
+   "key": "blue",
+   "name": "Blue",
+   "label": "Blue Tees",
+   "color": "#2f6db3",
+   "ink": "#ffffff",
+   "rating": 71.6,
+   "slope": 131,
+   "yards": [
+    366,
+    360,
+    532,
+    163,
+    400,
+    394,
+    343,
+    195,
+    535,
+    404,
+    442,
+    165,
+    505,
+    362,
+    188,
+    550,
+    151,
+    374
+   ],
+   "total": 6429
+  },
+  {
+   "key": "white",
+   "name": "White",
+   "label": "White Tees",
+   "color": "#ffffff",
+   "ink": "#1b1b1b",
+   "rating": 69.9,
+   "slope": 124,
+   "yards": [
+    350,
+    314,
+    507,
+    146,
+    374,
+    385,
+    338,
+    183,
+    505,
+    388,
+    424,
+    137,
+    495,
+    340,
+    167,
+    536,
+    118,
+    347
+   ],
+   "total": 6054
+  },
+  {
+   "key": "red",
+   "name": "Red",
+   "label": "Red Tees",
+   "color": "#c4343c",
+   "ink": "#ffffff",
+   "rating": null,
+   "slope": null,
+   "women": true,
+   "yards": [
+    346,
+    292,
+    473,
+    129,
+    352,
+    344,
+    326,
+    128,
+    495,
+    302,
+    381,
+    117,
+    460,
+    334,
+    146,
+    475,
+    93,
+    304
+   ],
+   "total": 5497
+  }
+ ],
+ "source": {
+  "kind": "website",
+  "name": "the course's own card",
+  "dated": "2021-04",
+  "url": "https://www.golffirewheel.com/wp-content/uploads/sites/8098/2021/04/oldcoursescorecard930px.jpeg",
+  "page": "https://www.golffirewheel.com/old-course/"
+ },
+ "checked": {
+  "version": 1,
+  "at": "2026-10-10",
+  "how": "Copied by hand from the Old Course card on the course website (posted 2021); every row adds up to the card's own Out, In and Tot. OpenGolfAPI's single 'Firewheel Golf Park' entry is a different course (par 72), so this file stands on its own. Nick confirms it on his first round."
+ },
+ "card": {
+  "w": 1250,
+  "bg": "#ffffff",
+  "frame": {
+   "color": "#1e5a35",
+   "width": 4,
+   "radius": 18
+  },
+  "header": {
+   "h": 200,
+   "ink": "#1e5a35",
+   "logo": null,
+   "title": {
+    "text": "Firewheel Golf Park",
+    "font": "Tinos",
+    "weight": 700,
+    "size": 44,
+    "color": "#1e5a35"
+   },
+   "sub": {
+    "text": "Old Course",
+    "font": "Dancing Script",
+    "weight": 700,
+    "size": 46,
+    "color": "#6f7a6a"
+   }
+  },
+  "grid": {
+   "pad": 30,
+   "labelW": 200,
+   "dividerW": 40,
+   "extras": [
+    "Hcp",
+    "Net"
+   ],
+   "font": "Tinos",
+   "line": "#7a8a7c"
+  },
+  "divider": {
+   "fromRow": 0,
+   "toRow": 14,
+   "fill": "#ffffff",
+   "color": "#1b1b1b",
+   "text": "Players Initials",
+   "style": "rotate"
+  },
+  "hand": {
+   "font": "Caveat",
+   "color": "#1e2a66"
+  },
+  "watermark": {
+   "text": "Old Course",
+   "fromRow": 6,
+   "toRow": 11,
+   "font": "Dancing Script",
+   "weight": 700,
+   "color": "rgba(110,120,110,0.13)"
+  },
+  "rows": [
+   {
+    "kind": "head",
+    "h": 42,
+    "fill": "#1e6a3b",
+    "color": "#ffffff",
+    "label": "Hole"
+   },
+   {
+    "kind": "tee",
+    "tee": "gold",
+    "h": 40
+   },
+   {
+    "kind": "tee",
+    "tee": "blue",
+    "h": 40
+   },
+   {
+    "kind": "tee",
+    "tee": "white",
+    "h": 40
+   },
+   {
+    "kind": "par",
+    "h": 40,
+    "fill": "#e9e8dc",
+    "color": "#1b1b1b",
+    "label": "Par"
+   },
+   {
+    "kind": "hcp",
+    "set": "men",
+    "h": 40,
+    "fill": "#d4e6cf",
+    "color": "#1b1b1b",
+    "label": "Men's Hdcp"
+   },
+   {
+    "kind": "player",
+    "role": "score",
+    "h": 46
+   },
+   {
+    "kind": "player",
+    "role": "putts",
+    "h": 46
+   },
+   {
+    "kind": "player",
+    "role": "plusminus",
+    "h": 40,
+    "label": "+/-"
+   },
+   {
+    "kind": "player",
+    "role": "fairways",
+    "h": 46
+   },
+   {
+    "kind": "player",
+    "role": "greens",
+    "h": 46
+   },
+   {
+    "kind": "player",
+    "role": "penalties",
+    "h": 40
+   },
+   {
+    "kind": "tee",
+    "tee": "red",
+    "h": 40
+   },
+   {
+    "kind": "par",
+    "h": 40,
+    "fill": "#e9e8dc",
+    "color": "#1b1b1b",
+    "label": "Par"
+   },
+   {
+    "kind": "hcp",
+    "set": "women",
+    "h": 40,
+    "fill": "#d4e6cf",
+    "color": "#1b1b1b",
+    "label": "Women's Hdcp"
+   },
+   {
+    "kind": "foot",
+    "h": 48,
+    "fill": "#ffffff",
+    "color": "#1b1b1b"
+   }
+  ],
+  "teeLabel": "inline"
+ }
+}

@@ -20,6 +20,9 @@ SPOTIFY_CLIENT_ID = "1c18f59367834eaf9edd982c5858fa9b"
 SPOTIFY_REDIRECT = "https://api.nickmade.net/spotify/callback"
 # Time zone for Recently Played's "Last played" dates
 TIMEZONE = "America/Chicago"
+# Extras > Scorecard (src/scorecard.js) is owner only while Nick tests it. "1" opens it to everyone (page, Extras card
+# and routes) as soon as the Worker is redeployed; no site push needed.
+SCORECARD_PUBLIC = "0"
 
 # Refresh of Games' Recently Played and the gamerscore banner from Xbox, every 4 hours (UTC times: 0:00, 4:00, 8:00...),
 # plus one at midnight in Chicago for the daily "+XG in the last 24h" snapshot. Midnight in Chicago is 05:00 UTC in

@@ -1,0 +1,373 @@
+{
+ "id": "pecan-hollow",
+ "name": "Pecan Hollow",
+ "fullName": "Pecan Hollow Golf Course",
+ "place": "Plano, TX",
+ "apiId": "cc515a23-2ef8-4dd3-b00f-e0a72be9c9a0",
+ "website": "https://www.pecanhollowgc.com/",
+ "holes": 18,
+ "par": [
+  4,
+  4,
+  5,
+  4,
+  3,
+  4,
+  4,
+  3,
+  5,
+  4,
+  3,
+  4,
+  4,
+  3,
+  4,
+  4,
+  5,
+  4
+ ],
+ "hcp": [
+  9,
+  5,
+  7,
+  11,
+  13,
+  1,
+  15,
+  17,
+  3,
+  10,
+  16,
+  18,
+  14,
+  12,
+  6,
+  2,
+  8,
+  4
+ ],
+ "hcpWomen": [
+  11,
+  5,
+  1,
+  9,
+  15,
+  3,
+  13,
+  17,
+  7,
+  12,
+  16,
+  18,
+  10,
+  14,
+  6,
+  2,
+  8,
+  4
+ ],
+ "tees": [
+  {
+   "key": "championship",
+   "name": "Championship",
+   "color": "#2e3531",
+   "ink": "#ffffff",
+   "rating": 75.4,
+   "slope": 141,
+   "range": "0-5",
+   "yards": [
+    426,
+    434,
+    581,
+    417,
+    223,
+    498,
+    401,
+    185,
+    569,
+    370,
+    193,
+    400,
+    355,
+    221,
+    395,
+    483,
+    554,
+    447
+   ],
+   "total": 7152
+  },
+  {
+   "key": "tournament",
+   "name": "Tournament",
+   "color": "#2a3f8f",
+   "ink": "#ffffff",
+   "rating": 73.3,
+   "slope": 136,
+   "range": "6-13",
+   "yards": [
+    386,
+    418,
+    543,
+    387,
+    203,
+    479,
+    366,
+    169,
+    532,
+    350,
+    172,
+    370,
+    340,
+    199,
+    370,
+    454,
+    505,
+    429
+   ],
+   "total": 6672
+  },
+  {
+   "key": "players",
+   "name": "Players",
+   "color": "#c9c8c3",
+   "ink": "#262626",
+   "rating": 70.5,
+   "slope": 130,
+   "range": "14-24",
+   "yards": [
+    368,
+    365,
+    518,
+    357,
+    182,
+    444,
+    330,
+    155,
+    490,
+    308,
+    172,
+    300,
+    321,
+    181,
+    346,
+    435,
+    466,
+    382
+   ],
+   "alt": {
+    "6": 406,
+    "7": 324,
+    "9": 465,
+    "16": 419
+   },
+   "total": 6120,
+   "altTotal": 6035
+  },
+  {
+   "key": "gentlemen",
+   "name": "Gentlemen",
+   "color": "#e3ae3b",
+   "ink": "#3b2a08",
+   "rating": 67.1,
+   "slope": 112,
+   "range": "25+Up",
+   "yards": [
+    326,
+    346,
+    475,
+    322,
+    159,
+    389,
+    288,
+    140,
+    422,
+    253,
+    140,
+    260,
+    288,
+    153,
+    312,
+    363,
+    409,
+    320
+   ],
+   "total": 5365
+  },
+  {
+   "key": "forward",
+   "name": "Forward",
+   "color": "#d6404d",
+   "ink": "#ffffff",
+   "rating": 68.9,
+   "slope": 116,
+   "range": "14+Up",
+   "women": true,
+   "yards": [
+    268,
+    328,
+    451,
+    263,
+    138,
+    326,
+    265,
+    101,
+    380,
+    218,
+    121,
+    229,
+    260,
+    134,
+    288,
+    352,
+    391,
+    306
+   ],
+   "total": 4819
+  }
+ ],
+ "source": {
+  "kind": "website",
+  "name": "the course's own card",
+  "dated": "2024-06",
+  "url": "https://www.pecanhollowgc.com/wp-content/uploads/sites/7942/2024/06/2024-06-11-09-25.pdf",
+  "page": "https://www.pecanhollowgc.com/golf-course-2/course-details-2/"
+ },
+ "checked": {
+  "version": 1,
+  "at": "2026-10-10",
+  "how": "Copied by hand from the course's June 2024 card; every row adds up to the card's own Out, In and Tot. Nick confirms it against the clubhouse card on his first round."
+ },
+ "card": {
+  "w": 1250,
+  "bg": [
+   "#b8db4a",
+   "#9fc935"
+  ],
+  "header": {
+   "h": 232,
+   "ink": "#22401a",
+   "logo": "pecan-hollow",
+   "title": {
+    "text": "Pecan Hollow",
+    "font": "Dancing Script",
+    "weight": 700,
+    "size": 50,
+    "color": "#2b6a2b"
+   }
+  },
+  "grid": {
+   "pad": 26,
+   "labelW": 196,
+   "dividerW": 40,
+   "extras": [
+    "HCP",
+    "NET"
+   ],
+   "font": "Roboto Condensed",
+   "line": "#8d8d89"
+  },
+  "divider": {
+   "fromRow": 0,
+   "toRow": 8,
+   "fill": "#b9b5ae",
+   "color": "#5b5751",
+   "text": "INITIAL",
+   "style": "letters"
+  },
+  "hand": {
+   "font": "Caveat",
+   "color": "#1e2a66"
+  },
+  "rows": [
+   {
+    "kind": "head",
+    "h": 40,
+    "fill": "#75716b",
+    "color": "#ffffff",
+    "label": "HOLE"
+   },
+   {
+    "kind": "tee",
+    "tee": "championship",
+    "h": 52
+   },
+   {
+    "kind": "tee",
+    "tee": "tournament",
+    "h": 52
+   },
+   {
+    "kind": "tee",
+    "tee": "players",
+    "h": 52
+   },
+   {
+    "kind": "tee",
+    "tee": "gentlemen",
+    "h": 52
+   },
+   {
+    "kind": "hcp",
+    "set": "men",
+    "h": 40,
+    "fill": "#ffffff",
+    "color": "#4a4a4a",
+    "label": "Handicap"
+   },
+   {
+    "kind": "player",
+    "role": "score",
+    "h": 50
+   },
+   {
+    "kind": "player",
+    "role": "putts",
+    "h": 50
+   },
+   {
+    "kind": "player",
+    "role": "plusminus",
+    "h": 40,
+    "label": "+/-"
+   },
+   {
+    "kind": "par",
+    "h": 40,
+    "fill": "#545d5a",
+    "color": "#ffffff",
+    "label": "Par"
+   },
+   {
+    "kind": "player",
+    "role": "fairways",
+    "h": 50
+   },
+   {
+    "kind": "player",
+    "role": "greens",
+    "h": 50
+   },
+   {
+    "kind": "tee",
+    "tee": "forward",
+    "h": 52
+   },
+   {
+    "kind": "hcp",
+    "set": "women",
+    "h": 40,
+    "fill": "#ffffff",
+    "color": "#4a4a4a",
+    "label": "Handicap"
+   },
+   {
+    "kind": "foot",
+    "h": 46,
+    "fill": "#ffffff",
+    "color": "#4a4a4a"
+   }
+  ],
+  "teeLabel": "stack"
+ }
+}

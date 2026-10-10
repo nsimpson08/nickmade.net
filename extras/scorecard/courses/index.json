@@ -1,0 +1,16 @@
+{
+ "courses": [
+  {
+   "id": "pecan-hollow",
+   "name": "Pecan Hollow",
+   "place": "Plano, TX",
+   "apiId": "cc515a23-2ef8-4dd3-b00f-e0a72be9c9a0"
+  },
+  {
+   "id": "firewheel-old",
+   "name": "Firewheel \u00b7 Old Course",
+   "place": "Garland, TX",
+   "nearApiId": "abc4d32e-d9f3-41ce-b50b-16f4f7dabf4e"
+  }
+ ]
+}

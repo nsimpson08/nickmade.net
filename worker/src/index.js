@@ -3,6 +3,7 @@ import { musicRoute, MUSIC_SCOPES } from "./music.js";
 import { votesRoute } from "./votes.js";
 import { libraryRoute } from "./library.js";
 import { photosRoute } from "./photos.js";
+import { scorecardRoute } from "./scorecard.js";
 
 // nickmade-queue: the live sections of the Movies and Games pages: visitor suggestions for "In the Queue",
 // Nick's "Recently Watched"/"Recently Played" lists, and Nick's site-added picks for other sections.
@@ -47,6 +48,7 @@ import { photosRoute } from "./photos.js";
 //   /golf/leaderboard           Nick's Nine leaderboard (GET, POST; DELETE /golf/leaderboard/:id as admin), see golf.js
 //   /music/search, /music/recs  Music's "Suggest a song": songs added to Nick's private community playlist, see music.js
 //   GET/POST /votes             upvotes on In the Queue (Movies and Games), see votes.js
+//   /scorecard/...              Extras > Scorecard, the real-course score tracker (owner only until SCORECARD_PUBLIC), see scorecard.js
 //
 // Storage: one KV namespace (QUEUE). Keys (Movies keeps the original unprefixed names):
 //   queue / queue:games            JSON array of queue submissions
@@ -175,6 +177,10 @@ export default {
       }
       if (url.pathname === "/photos" || url.pathname.startsWith("/photos/")) {
         const res = await photosRoute(request, url, env, cors, { json, isAdmin });
+        if (res) return res;
+      }
+      if (url.pathname.startsWith("/scorecard/")) {
+        const res = await scorecardRoute(request, url, env, cors, { json, isAdmin });
         if (res) return res;
       }
       if (url.pathname.startsWith("/music/")) {

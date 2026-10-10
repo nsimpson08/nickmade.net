@@ -355,6 +355,7 @@ html.wall-bg-on .topbar nav a[href="/play/"]::before { background: rgba(255, 255
   border-top: 1px solid var(--line);
 }
 .project:last-child { border-bottom: 1px solid var(--line); }
+.project[hidden] { display: none; } /* Extras' Scorecard card while it's owner only (extras/index.html) */
 .project h2 {
   margin: 0;
   font-family: var(--display);

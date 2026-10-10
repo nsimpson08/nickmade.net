@@ -43,6 +43,18 @@
         </div>
         <a class="open" href="/extras/golf/">Open <span>&rarr;</span></a>
       </article>
+      <!-- Owner only while Nick tests it: shown by the script below when the Worker says owner or public -->
+      <article class="project" id="scorecard-card" hidden>
+        <div>
+          <h2>Scorecard</h2>
+          <p>Keep score on a real golf course, one hole at a time: score, putts, fairways and greens, even with no signal. Ends with the round written onto the course's own scorecard.</p>
+          <ul class="tags">
+            <li>Golf</li>
+            <li>Works offline</li>
+          </ul>
+        </div>
+        <a class="open" href="/extras/scorecard/">Open <span>&rarr;</span></a>
+      </article>
       <article class="project">
         <div>
           <h2>Video Game Montage Maker</h2>
@@ -59,6 +71,18 @@
     </section>
   </main>
   <footer id="site-footer">&copy; 2026 Nick Simpson</footer>
+  <script>
+    // Scorecard is owner only until the Worker's SCORECARD_PUBLIC is "1" (see worker/src/scorecard.js)
+    (function () {
+      var local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+      var token = null;
+      try { token = localStorage.getItem("nm-admin-token"); } catch (e) {}
+      fetch((local ? "http://localhost:8787" : "https://api.nickmade.net") + "/scorecard/status", { headers: token ? { Authorization: "Bearer " + token } : {} })
+        .then(function (r) { return r.json(); })
+        .then(function (d) { if (d.public || d.owner) document.getElementById("scorecard-card").hidden = false; })
+        .catch(function () {});
+    })();
+  </script>
   <script src="/changelog/log.js"></script>
   <script src="/assets/js/footer.js"></script>
 </body>

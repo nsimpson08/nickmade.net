@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- Owner only while Nick tests it (the Worker's SCORECARD_PUBLIC). Take noindex out at launch. -->
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#000000">
+  <title>Scorecard · NickMade</title>
+  <meta name="description" content="A simple score tracker for real golf courses: score, putts, fairways and greens, one hole at a time, even with no signal.">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- The app's fonts, plus the ones the scorecards are drawn in (card.js): Roboto Condensed and Tinos for the
+       printed parts, Dancing Script for the script names, Caveat for the handwriting. sw.js keeps them for offline. -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Dancing+Script:wght@700&family=Roboto+Condensed:wght@400;700&family=Space+Grotesk:wght@400;500;700&family=Tinos:wght@400;700&family=Unbounded:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="scorecard.css">
+</head>
+<body>
+  <!-- Scorecard (Extras): a score tracker for real golf courses. scorecard.js draws every screen into #app;
+       card.js draws the finished scorecard; sw.js keeps it all working with no signal. SCORECARD-PLAN.md. -->
+  <main id="app" class="sc-app"><p class="sc-loading">Loading…</p></main>
+  <script src="card.js"></script>
+  <script src="scorecard.js" data-api="https://api.nickmade.net" data-api-local="http://localhost:8787"></script>
+</body>
+</html>
