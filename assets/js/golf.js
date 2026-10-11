@@ -1,5 +1,5 @@
 // Renders extras/golf/scores.js (window.GOLF) into the Golf page: a score grid per source, then What's In The Bag.
-// "On the course" (first, Nick 2026-10-10) is Nick's real rounds from the Scorecard (extras/scorecard/, Worker GET
+// "On the course" (right under the Score Trend, Nick 2026-10-10) is Nick's real rounds from the Scorecard (extras/scorecard/, Worker GET
 // /scorecard/feed: the finished rounds he marked "Show on my Golf page"); the page draws first and again when they
 // arrive. Tapping one opens its scorecard full screen (card.js + viewer.js, loaded on the first tap). Its "Scorecard"
 // label links to the Scorecard for whoever can open it. While the Scorecard is owner only, the feed and the link are
@@ -138,12 +138,12 @@
         : '<p class="empty">Coming soon.</p>') +
     "</section>");
 
-    // On the course first, then the Score Trend, then the simulators
-    sections.splice(1, 0, '<section class="subsection" id="score-trend">' + head("Score Trend", "18-hole rounds") +
+    // the Score Trend first, then On the course (Nick, 2026-10-10), then the simulators
+    sections.unshift('<section class="subsection" id="score-trend">' + head("Score Trend", "18-hole rounds") +
       '<div class="trend" id="trend-chart"></div></section>');
 
     var links = SOURCES.map(function (s) { return '<a href="#' + slug(s.title) + '">' + esc(s.title) + "</a>"; });
-    links.splice(1, 0, '<a href="#score-trend">Score Trend</a>');
+    links.unshift('<a href="#score-trend">Score Trend</a>');
     var jump = '<nav class="jump" aria-label="Sections">' + links.join("") + '<a href="#whats-in-the-bag">What\'s In The Bag</a></nav>';
 
     root.innerHTML = jump + sections.join("");
