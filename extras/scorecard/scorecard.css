@@ -221,20 +221,6 @@ a { color: inherit; }
 }
 .sc-sheet-body .sc-ghost { justify-content: center; background: transparent; border: 1px solid var(--line); }
 .danger { color: var(--warn); }
-/* the card full screen (scorecard.js viewer()): it zooms itself, so the page never does */
-.sc-viewer {
-  width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0;
-  background: #0b0b0c; color: #ecebe7; display: flex; flex-direction: column;
-}
-.sc-viewer:not([open]) { display: none; }
-.sc-viewer::backdrop { background: #000; }
-.sc-viewer-bar {
-  flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: calc(8px + env(safe-area-inset-top)) 12px 8px 16px; font-size: 0.85rem; color: #9d9b95;
-}
-.sc-viewer-done { min-height: 48px; padding: 0 20px; border: 0; border-radius: 14px; background: #7ee0b5; color: #062218; font-weight: 700; }
-.sc-viewer-stage { position: relative; flex: 1; overflow: hidden; touch-action: none; }
-.sc-viewer-stage canvas { position: absolute; transform-origin: 0 0; border-radius: 6px; }
 
 /* ---------- finish ---------- */
 .sc-sum-head { display: flex; align-items: baseline; gap: 12px; margin-top: 18px; }
@@ -282,6 +268,60 @@ a { color: inherit; }
 .sc-move-row .sc-in { flex: 1; height: 48px; text-transform: uppercase; letter-spacing: 0.08em; }
 .sc-code { font: 700 1.15rem/1 var(--display); letter-spacing: 0.06em; }
 .sc-move .sc-error { margin: 0 14px 12px; }
+
+/* ---------- phase 3: the card check, compare, add a course ---------- */
+.sc-cc { margin-top: 14px; padding: 12px; border: 1px dashed var(--line); border-radius: 14px; }
+.sc-cc-status { margin: 0 2px 10px; font-size: 0.92rem; }
+.sc-cc-status:empty { display: none; }
+.sc-cc-choices { display: grid; gap: 8px; margin-bottom: 10px; }
+.sc-cc-choices .sc-cc-btn { justify-content: flex-start; text-align: left; }
+.sc-cc-checks { margin: 0 2px 10px; padding-left: 18px; font-size: 0.85rem; color: var(--over); }
+.sc-cc-checks li { margin: 2px 0; }
+.sc-cc-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.sc-cc-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; flex: 1 1 140px; min-height: 52px; padding: 0 14px;
+  border: 1px solid var(--line); border-radius: 12px; background: var(--chip); font-weight: 600; cursor: pointer; text-align: center;
+}
+.sc-cc-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
+.sc-cc-btn.go { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.sc-seg-wrap { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+.sc-seg-wrap button { padding: 6px 8px; font-size: 0.9rem; line-height: 1.2; }
+.sc-cmp-intro { margin: 14px 0 0; }
+.sc-cmp-warn { margin-top: 14px; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--over) 14%, transparent); font-size: 0.88rem; }
+.sc-cmp-warn p { margin: 4px 0; }
+.sc-cmp-group { margin-top: 12px; }
+.sc-cmp-group summary .sc-muted { font-weight: 400; font-size: 0.85rem; }
+.sc-diff { display: grid; gap: 6px; margin: 0 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+.sc-diff-label { font-weight: 600; font-size: 0.92rem; }
+.sc-diff-opts { display: flex; flex-wrap: wrap; gap: 6px; }
+.sc-opt {
+  display: grid; justify-items: center; min-width: 76px; min-height: 52px; padding: 6px 10px; border: 2px solid var(--line); border-radius: 12px;
+  background: var(--panel); line-height: 1.15;
+}
+.sc-opt b { font-size: 1.1rem; }
+.sc-opt small { font-size: 0.68rem; color: var(--muted); max-width: 150px; }
+.sc-opt.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--panel)); }
+.sc-type { min-width: 52px; font-size: 1.1rem; }
+.sc-new { display: grid; gap: 6px; margin-top: 14px; }
+.sc-new label { margin-top: 8px; font-size: 0.85rem; color: var(--muted); }
+.sc-new .sc-in { height: 52px; font-size: 1rem; }
+.sc-add { border-style: dashed; }
+
+/* the start screen's round in progress, and the "saved" notice */
+.sc-resume {
+  display: grid; gap: 2px; width: 100%; margin-top: 16px; padding: 14px 16px; border: 2px solid var(--accent); border-radius: 16px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel)); text-align: left;
+}
+.sc-resume span { font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+.sc-resume b { font: 600 1.1rem/1.3 var(--display); }
+.sc-resume small { color: var(--muted); }
+.sc-resume i { font-style: normal; font-weight: 700; color: var(--accent); }
+.sc-toast {
+  position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); z-index: 50; max-width: calc(100vw - 32px);
+  padding: 12px 16px; border-radius: 12px; background: #ecebe7; color: #111; font-size: 0.9rem; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+  transform: translate(-50%, 20px); opacity: 0; pointer-events: none; transition: transform 0.2s ease, opacity 0.2s ease;
+}
+.sc-toast.in { transform: translate(-50%, 0); opacity: 1; }
 
 /* ---------- closed / login ---------- */
 .sc-closed { padding: 60px 20px; }

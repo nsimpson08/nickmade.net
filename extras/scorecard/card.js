@@ -68,12 +68,44 @@
 
   // ---------- drawing ----------
 
-  function draw(canvas, course, round, opts) {
-    var t = template(course);
-    return fonts(t).then(function () { paint(canvas, course, round, t, (opts && opts.scale) || 2); return canvas; });
+  // The card's look always comes from the course's own file in the repo when it has one (Nick's hand-tuned cards),
+  // so a round saved with an older copy of it (or a course file approved before the look changed) gets the new look
+  var FILES = "/extras/scorecard/courses/", fresh = {};
+  function freshTemplate(course) {
+    if (!course.card || /^api:/.test(course.id || "") || !course.id) return Promise.resolve(template(course));
+    if (!fresh[course.id]) {
+      fresh[course.id] = fetch(FILES + encodeURIComponent(course.id) + ".json").then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (f) { return f && f.card ? f.card : null; }).catch(function () { return null; });
+    }
+    return fresh[course.id].then(function (card) {
+      // only if it still fits this course's tees (a card drawn around tees the round doesn't have would be wrong)
+      var fits = card && (card.rows || []).every(function (r) { return r.kind !== "tee" || course.tees.some(function (x) { return x.key === r.tee; }); });
+      return fits ? card : template(course);
+    });
+  }
+  // the course's own hole drawings for the header (tools/scorecard_art.py cuts them from the real card)
+  var pics = {};
+  function art(t) {
+    return Promise.all(((t.header && t.header.art) || []).map(function (a) {
+      if (!pics[a.src]) {
+        pics[a.src] = new Promise(function (res) {
+          var img = new Image();
+          img.onload = function () { res(img); };
+          img.onerror = function () { res(null); };
+          img.src = a.src;
+        });
+      }
+      return pics[a.src];
+    }));
   }
 
-  function paint(canvas, course, round, t, scale) {
+  function draw(canvas, course, round, opts) {
+    return freshTemplate(course).then(function (t) {
+      return Promise.all([fonts(t), art(t)]).then(function (r) { paint(canvas, course, round, t, (opts && opts.scale) || 2, r[1]); return canvas; });
+    });
+  }
+
+  function paint(canvas, course, round, t, scale, pictures) {
     var n = course.holes || 18;
     var g = t.grid, hand = t.hand || HAND;
     var W = t.w, pad = g.pad, gx = pad, gw = W - pad * 2, gy = t.header.h;
@@ -117,7 +149,7 @@
       ctx.fillText(String(s), x, y);
     }
 
-    header(ctx, course, round, t, tee, W, text);
+    header(ctx, course, round, t, tee, W, text, pictures || []);
 
     // rows
     var y = gy, rowY = [];
@@ -218,6 +250,15 @@
           if (rs) text(rs, L.x + 10, ry + h * 0.72, { align: "left", size: 16, color: ink });
           if (tt.range) text(tt.range, L.x + L.w - 10, ry + h * 0.72, { align: "right", size: 16, color: ink });
         }
+        if (tt.key === round.tee) { // the tee played, circled by hand
+          ctx.save();
+          ctx.strokeStyle = lum(rowFill(r)) < 0.45 ? "#ffffff" : hand.color;
+          ctx.lineWidth = 2.4;
+          ctx.beginPath();
+          ctx.ellipse(L.x + L.w / 2, ry + h / 2, L.w / 2 - 3, h / 2 - 3, -0.03, 0.15, Math.PI * 2 + 0.05);
+          ctx.stroke();
+          ctx.restore();
+        }
         var alt = tt.alt || {};
         var y1 = function (k) { return tt.yards[k - 1]; };
         var y2 = function (k) { return alt[k] != null ? alt[k] : tt.yards[k - 1]; };
@@ -256,7 +297,10 @@
         var dx = (back ? colOf["in"] : colOf.tot).x;
         text("Date:", dx, fy, { align: "left", size: fsz, color: ink });
         ctx.font = font(g.font, fsz);
-        handText(dateText(round.date), dx + 8 + ctx.measureText("Date:").width, fy, { align: "left", size: 28 });
+        var dateX = dx + 8 + ctx.measureText("Date:").width, ds = 28, when = dateText(round.date);
+        ctx.font = font(hand.font, ds, 700);
+        while (ds > 16 && dateX + ctx.measureText(when).width > gx + gw - 10) { ds--; ctx.font = font(hand.font, ds, 700); } // shrink to fit the box
+        handText(when, dateX, fy, { align: "left", size: ds });
       }
     }
 
@@ -372,13 +416,17 @@
 
   // ---------- the header: the course's logo and name, and the round in a few words ----------
 
-  function header(ctx, course, round, t, tee, W, text) {
+  function header(ctx, course, round, t, tee, W, text, pictures) {
     var hd = t.header, g = t.grid, cx = W / 2;
-    if (hd.logo && LOGOS[hd.logo]) LOGOS[hd.logo](ctx, cx, hd.h * 0.43, text);
+    // the real card's hole drawings, where the course file has them (the round is then on the card itself: the tee
+    // circled, the totals in Out / In / Tot, the scorer and date on the bottom line, like a real card)
+    (hd.art || []).forEach(function (a, i) { if (pictures[i]) ctx.drawImage(pictures[i], a.x, a.y, a.w, a.h); });
+    if (hd.logo && LOGOS[hd.logo]) LOGOS[hd.logo](ctx, cx, hd.logoY || hd.h * 0.43, text);
     else {
       if (hd.title) text(hd.title.text, cx, hd.h * (hd.sub ? 0.36 : 0.5), { font: hd.title.font, size: hd.title.size, weight: hd.title.weight, color: hd.title.color });
       if (hd.sub && hd.sub.text) text(hd.sub.text, cx, hd.h * 0.66, { font: hd.sub.font, size: hd.sub.size, weight: hd.sub.weight, color: hd.sub.color });
     }
+    if (hd.art && hd.art.length) return;
     // left: date and tee; right: the score
     var strokes = 0, putts = 0, par = 0, done = 0;
     round.holes.forEach(function (k) {

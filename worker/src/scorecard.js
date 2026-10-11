@@ -5,6 +5,7 @@
 //   GET    /scorecard/status              { public, owner }: the page and the Extras card ask this to show themselves
 //   GET    /scorecard/feed                Nick's finished rounds marked for his site (Golf page, home Lately strip); empty
 //                                         for visitors while the Scorecard is owner only (Nick: everything his until launch)
+//   GET    /scorecard/feed/:id            one of those rounds in full, for drawing its scorecard on the Golf page
 //   GET    /scorecard/courses/search?q=   { courses: [{ apiId, name, place, par, holes }] }  (OpenGolfAPI search)
 //   GET    /scorecard/courses/api/:id     one OpenGolfAPI course, cleaned into the app's course shape (see clean())
 //   GET    /scorecard/courses             the approved course files: [{ id, name, place, version, ownerChecked }]
@@ -21,6 +22,18 @@
 //                                         another phone (visitors; Nick is the owner on every device)
 //   POST   /scorecard/me/claim            { visitorId, code } -> this browser joins the code's player (its own
 //                                         rounds move over)
+//   GET    /scorecard/lookup?site=&name=  the course's own scorecard on its website (phase 3): reads the homepage and the
+//                                         pages it links that look like course or scorecard pages, and lists the PDFs
+//                                         and images that look like the card, best first: { candidates: [{ url, label,
+//                                         dated, kind }] }. Checks robots.txt; never third-party sites. Cached 7 days
+//   GET    /scorecard/file?u=             one of those files, passed through (course sites don't allow a browser to
+//                                         read them directly); only URLs a lookup found
+//   POST   /scorecard/read                { visitorId, image: "data:image/jpeg;base64,...", part: "all"|"front"|"back",
+//                                         holes } -> { read }: the card reader (phase 3), a scorecard picture read into
+//                                         numbers by a Workers AI vision model (READ_MODEL). The phone does the image
+//                                         work (shrinking, cutting the card in halves) and the sums checks; this only
+//                                         asks the model. Visitors get READS_PER_DAY, everyone together READS_DAY_ALL
+//                                         (the free plan's 10,000 neurons a day; a read is roughly 100-300)
 //
 // Players: Nick's admin token is the player "owner" on any device. A visitor is their browser's visitor id (the
 // site's nm-visitor, hashed with SALT); a recovery code adds another way in to the same player. Rounds, players and
@@ -49,6 +62,13 @@ export async function scorecardRoute(request, url, env, cors, h) {
   if (url.pathname === "/scorecard/feed" && request.method === "GET" && !open && !owner) return h.json({ rounds: [] }, 200, cors);
   if (!open && !owner) return h.json({ error: "Not available." }, 401, cors);
   if (url.pathname === "/scorecard/feed" && request.method === "GET") return feed(env, cors, h);
+  if (url.pathname.startsWith("/scorecard/feed/") && request.method === "GET") {
+    const id = decodeURIComponent(url.pathname.split("/")[3] || "");
+    if (!env.GOLF || !RID.test(id)) return h.json({ error: "Not found." }, 404, cors);
+    const ok = await env.GOLF.prepare("SELECT id FROM rounds WHERE id = ? AND player_id = 'owner' AND on_site = 1 AND finished_at IS NOT NULL").bind(id).first();
+    if (!ok) return h.json({ error: "Not found." }, 404, cors);
+    return fullRound(id, "owner", env, cors, h);
+  }
 
   if (url.pathname === "/scorecard/courses/search" && request.method === "GET") {
     const q = (url.searchParams.get("q") || "").replace(/\s+/g, " ").trim().slice(0, 60);
@@ -94,6 +114,9 @@ export async function scorecardRoute(request, url, env, cors, h) {
     if (m === "DELETE") return deleteRound(request, url, parts[2], env, cors, h);
   }
   if (parts[1] === "me" && parts[2] === "code" && m === "POST") return newCode(request, env, cors, h);
+  if (parts[1] === "read" && parts.length === 2 && m === "POST") return readCard(request, env, cors, h);
+  if (parts[1] === "lookup" && parts.length === 2 && m === "GET") return lookup(url, env, cors, h);
+  if (parts[1] === "file" && parts.length === 2 && m === "GET") return passFile(url, env, cors, h);
   if (parts[1] === "me" && parts[2] === "claim" && m === "POST") return claim(request, env, cors, h);
   return null;
 }
@@ -121,8 +144,8 @@ async function player(request, env, h, vid, create) {
   return { id, owner: false, key };
 }
 
-async function body(request) {
-  if (Number(request.headers.get("Content-Length") || 0) > 300000) return null;
+async function body(request, max) {
+  if (Number(request.headers.get("Content-Length") || 0) > (max || 300000)) return null;
   try { return await request.json(); } catch (e) { return null; }
 }
 
@@ -169,6 +192,193 @@ async function claim(request, env, cors, h) {
   }
   if (stmts.length) await env.GOLF.batch(stmts);
   return h.json({ ok: true }, 200, cors);
+}
+
+// ---------- the card reader ----------
+
+// Picked by testing on Pecan Hollow's and Firewheel's real cards (2026-10-10): Mistral Small 3.1 read every yardage,
+// par and handicap on both. Llama 4 Scout matched it on one card only; GLM-5.3 and Kimi need the paid plan.
+const READ_MODEL = "@cf/mistralai/mistral-small-3.1-24b-instruct";
+const READ_MODELS = ["@cf/mistralai/mistral-small-3.1-24b-instruct", "@cf/meta/llama-4-scout-17b-16e-instruct"]; // owner can try the other
+const READS_PER_DAY = 8;
+const READS_DAY_ALL = 60;
+
+// No real-looking numbers in the example: on tiny print a model will copy them (it once read "70.5/130" off Firewheel)
+const SHAPE = (n, from, extra) => `{"tees": [{"name": "<tee name>", "color": "<color>", "rating": <number or null>, "slope": <number or null>, "yards": [<${n} numbers, holes ${from} to ${from + n - 1}>]${extra.tee}, "alt": {}}], ` +
+  `"par": [<${n} numbers>]${extra.par}, "hcp": [<${n} numbers>], "hcpWomen": [<${n} numbers>] or null}`;
+const RULES = `Rules:
+- Tees are the rows of yardages, named by color (Gold, Blue, White, Red...) or by name (Championship, Forward...). List every one, top to bottom as printed, including any printed below the Par row.
+- rating and slope are the two small numbers often printed by the tee name (rating has a decimal point, slope is a whole number), written rating/slope. Use null if they aren't printed or you can't read them clearly.
+- A cell with two numbers stacked (like 444 over 406): put the top one in yards and the bottom one in alt, keyed by hole number, like {"6": 406}.
+- hcp is the handicap (stroke index) row, numbers 1 to 18. If there are two handicap rows (men's and women's), the second is hcpWomen.
+- Every list has exactly one value per hole, in hole order. If a cell is blank or you can't read it, put null in its place so the holes stay lined up; never skip a cell.
+- A par cell showing two pars like 4/5, and par totals like 36/37: use the first number. (Yardage cells with two numbers follow the alt rule above.)
+- color is the row's background color in one plain word.
+- If you can't read a number, use null. Never guess a number.
+Reply with the JSON only, no other words.`;
+const ASK = {
+  all: (n) => `This is a golf course scorecard. Read every number exactly as printed and reply with JSON in this shape:\n` +
+    SHAPE(n, 1, { tee: ', "out": <number>, "in": <number>, "total": <number>', par: ', "parOut": <number>, "parIn": <number>, "parTotal": <number>' }) + "\n" + RULES,
+  front: () => `This is the left half of a golf course scorecard: the row names and holes 1 to 9, with the OUT column. ` +
+    `Read every number exactly as printed and reply with JSON in this shape:\n` +
+    SHAPE(9, 1, { tee: ', "out": <number>', par: ', "parOut": <number>' }) + "\n" + RULES,
+  back: () => `This is the right half of a golf course scorecard: holes 10 to 18 with the IN and TOT (total) columns. The row names ` +
+    `are on the other half, so for each tee row give its background color and leave name as null. Read every number exactly as printed ` +
+    `and reply with JSON in this shape:\n` + SHAPE(9, 10, { tee: ', "in": <number>, "total": <number>', par: ', "parIn": <number>, "parTotal": <number>' }) + "\n" + RULES,
+};
+
+// the first {...} block in the model's reply (some wrap it in ```json fences or add a sentence)
+function firstJson(text) {
+  const t = String(text || "").replace(/```(?:json)?/g, "");
+  const a = t.indexOf("{"), z = t.lastIndexOf("}");
+  if (a < 0 || z <= a) return null;
+  try { return JSON.parse(t.slice(a, z + 1)); } catch (e) { return null; }
+}
+
+async function readCard(request, env, cors, h) {
+  if (!env.AI) return h.json({ error: "The card reader isn't set up." }, 503, cors);
+  const b = await body(request, 3500000);
+  if (!b || !/^data:image\/(jpeg|png|webp);base64,/.test(b.image || "") || b.image.length > 3400000) {
+    return h.json({ error: "Send the card as a JPEG or PNG under about 2.5 MB." }, 400, cors);
+  }
+  const me = await player(request, env, h, b.visitorId, true);
+  if (!me) return h.json({ error: "Missing this browser's id." }, 400, cors);
+  // a card from a course website (a file a lookup found) is read once, for everyone
+  const fileKey = /^https?:\/\//.test(b.source || "") && (await env.QUEUE.get("scorecard:file:" + (await h.sha256(b.source))))
+    ? "scorecard:read:" + (await h.sha256(b.source + "|" + (b.part || "all"))) : null; // the whole card and each close-up kept apart
+  if (fileKey && !b.model) {
+    const hit = await env.QUEUE.get(fileKey);
+    if (hit) return h.json(JSON.parse(hit), 200, cors);
+  }
+  const part = ASK[b.part] ? b.part : "all";
+  const n = b.holes === 9 ? 9 : 18;
+  const model = me.owner && READ_MODELS.indexOf(b.model) >= 0 ? b.model : READ_MODEL;
+  // the day's allowance: per visitor, and for everyone together (Nick's own reads count only toward the total)
+  const day = new Date().toISOString().slice(0, 10);
+  const allKey = "scorecard:reads:" + day, myKey = "scorecard:reads:" + me.id + ":" + day;
+  const [all, mine] = await Promise.all([env.QUEUE.get(allKey), me.owner ? null : env.QUEUE.get(myKey)]);
+  if (+all >= READS_DAY_ALL || (!me.owner && +mine >= READS_PER_DAY)) {
+    return h.json({ error: "The card reader has done all it can for today. Type the numbers in, or try again tomorrow." }, 429, cors);
+  }
+  let out, err;
+  const ask = { messages: [{ role: "user", content: [{ type: "text", text: ASK[part](n) }, { type: "image_url", image_url: { url: b.image } }] }],
+    max_tokens: 2500, temperature: 0 };
+  for (let tries = 0; tries < 2 && !out; tries++) { // Workers AI sometimes fails a request outright; once more usually works
+    if (tries) await new Promise((r) => setTimeout(r, 1500));
+    try { out = await env.AI.run(model, ask); } catch (e) { err = e; }
+  }
+  if (!out) return h.json({ error: "The card reader couldn't read that one just now. Try again in a moment.", detail: me.owner ? String(err && (err.message || err)) : undefined }, 502, cors);
+  const ops = [env.QUEUE.put(allKey, String(+all + 1), { expirationTtl: 2 * DAY })];
+  if (!me.owner) ops.push(env.QUEUE.put(myKey, String(+mine + 1), { expirationTtl: 2 * DAY }));
+  await Promise.all(ops);
+  const text = out && (out.response ?? (out.choices && out.choices[0] && out.choices[0].message && out.choices[0].message.content));
+  const read = typeof text === "object" && text ? text : firstJson(text);
+  if (!read) return h.json({ error: "The card reader couldn't make sense of that photo. Try a straighter, closer one.", raw: me.owner ? text : undefined }, 502, cors);
+  if (fileKey && !b.model) await env.QUEUE.put(fileKey, JSON.stringify({ read, part, model }), { expirationTtl: 30 * DAY });
+  return h.json({ read, part, model, raw: me.owner && b.raw ? text : undefined }, 200, cors);
+}
+
+// ---------- finding the course's own card on its website ----------
+
+const UA = "Mozilla/5.0 (compatible; nickmade-scorecard/1.0; +https://nickmade.net/extras/scorecard/)";
+const CARDISH = /score\s*-?_?card|scorecard|yardage|course[-_ ]?(guide|layout|map)/i;
+const PAGEISH = /score\s*-?_?card|course|layout|the-course|golf|rates|yardage|tour/i;
+const FILE = /\.(pdf|jpe?g|png|webp)(?:[?#]|$)/i;
+
+const host = (x) => x.hostname.replace(/^www\./, ""); // http/https and www. or not: the same site
+
+function publicHost(u) {
+  try {
+    const x = new URL(u);
+    return /^https?:$/.test(x.protocol) && x.hostname.includes(".") && !/^(\d+\.){3}\d+$/.test(x.hostname) && !/localhost|\.local$|\.internal$/i.test(x.hostname) ? x : null;
+  } catch (e) { return null; }
+}
+
+// robots.txt's rules for everyone (User-agent: *): a path is allowed unless a Disallow prefix matches it
+async function robots(origin) {
+  const rules = [];
+  try {
+    const r = await fetch(origin + "/robots.txt", { headers: { "User-Agent": UA } });
+    if (r.ok) {
+      let mine = false;
+      (await r.text()).split(/\r?\n/).forEach((line) => {
+        const m = /^\s*(user-agent|disallow)\s*:\s*(.*?)\s*$/i.exec(line.replace(/#.*/, ""));
+        if (!m) return;
+        if (m[1].toLowerCase() === "user-agent") mine = m[2] === "*";
+        else if (mine && m[2]) rules.push(m[2].replace(/\*.*$/, ""));
+      });
+    }
+  } catch (e) {}
+  return (path) => !rules.some((d) => d && path.startsWith(d));
+}
+
+// every link and image on a page: [{ url, text }]
+async function linksOf(pageUrl) {
+  const r = await fetch(pageUrl, { headers: { "User-Agent": UA, Accept: "text/html" }, redirect: "follow" });
+  if (!r.ok || !/html/i.test(r.headers.get("Content-Type") || "")) return [];
+  const out = [];
+  let cur = null;
+  const abs = (v) => { try { return new URL(v, r.url).href; } catch (e) { return null; } };
+  await new HTMLRewriter()
+    .on("a[href]", { element(el) { cur = { url: abs(el.getAttribute("href")), text: "" }; out.push(cur); }, text(t) { if (cur) cur.text += t.text; } })
+    .on("img[src]", { element(el) { out.push({ url: abs(el.getAttribute("src")), text: el.getAttribute("alt") || "" }); } })
+    .on("iframe[src], embed[src], object[data]", { element(el) { out.push({ url: abs(el.getAttribute("src") || el.getAttribute("data")), text: "" }); } })
+    .transform(r).arrayBuffer();
+  return out.filter((l) => l.url).map((l) => ({ url: l.url.split("#")[0], text: l.text.replace(/\s+/g, " ").trim().slice(0, 120) }));
+}
+
+async function lookup(url, env, cors, h) {
+  const site = publicHost(url.searchParams.get("site") || "");
+  if (!site) return h.json({ error: "No website for this course." }, 400, cors);
+  const name = (url.searchParams.get("name") || "").toLowerCase();
+  const key = "scorecard:lookup:" + (await h.sha256(host(site) + site.pathname + "|" + name));
+  const hit = await env.QUEUE.get(key);
+  if (hit) return h.json(JSON.parse(hit), 200, cors);
+
+  const allowed = await robots(site.origin);
+  if (!allowed(site.pathname)) return h.json({ candidates: [], note: "This course's website asks not to be read." }, 200, cors);
+  const words = name.split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !/golf|course|club|country|park|the/.test(w));
+  const files = new Map();
+  const add = (l, page) => {
+    const u = publicHost(l.url);
+    if (!u || !FILE.test(u.pathname)) return;
+    const hay = u.pathname + " " + l.text;
+    if (!CARDISH.test(hay) && !/\bcard\b/i.test(hay)) return;
+    if (host(u) !== host(site) && !/\.(wp\.com|wordpress\.com|amazonaws\.com|cloudfront\.net|squarespace-cdn\.com|wixstatic\.com)$/.test(u.hostname)) return;
+    const date = /\/(20\d\d)\/(\d\d)\//.exec(u.pathname);
+    const f = files.get(u.href) || { url: u.href, label: "", dated: date ? date[1] + "-" + date[2] : null, kind: /\.pdf/i.test(u.pathname) ? "pdf" : "image", page, score: 0 };
+    f.label = f.label || l.text;
+    f.score = Math.max(f.score, (CARDISH.test(hay) ? 10 : 3) + (words.some((w) => hay.toLowerCase().includes(w)) ? 6 : 0) + (date ? +date[1] - 2000 : 0) / 10);
+    files.set(u.href, f);
+  };
+  let home = [];
+  try { home = await linksOf(site.href); } catch (e) {}
+  home.forEach((l) => add(l, site.href));
+  // the course's own pages that might hold the card (a named course's page first, e.g. /old-course/)
+  const pages = [...new Set(home.map((l) => l.url).filter((u) => {
+    const x = publicHost(u);
+    return x && host(x) === host(site) && !FILE.test(x.pathname) && x.href !== site.href && allowed(x.pathname) && PAGEISH.test(x.pathname + " ");
+  }))].map((u) => ({ u, s: (CARDISH.test(u) ? 10 : 0) + (words.some((w) => u.toLowerCase().includes(w)) ? 6 : 0) }))
+    .sort((a, b) => b.s - a.s).slice(0, 6);
+  for (const p of pages) {
+    try { (await linksOf(p.u)).forEach((l) => add(l, p.u)); } catch (e) {}
+  }
+  const candidates = [...files.values()].sort((a, b) => b.score - a.score).slice(0, 5)
+    .map((f) => ({ url: f.url, label: f.label, dated: f.dated, kind: f.kind, page: f.page, score: Math.round(f.score * 10) / 10 }));
+  // only files a lookup found can be passed through (/scorecard/file), so the Worker is no open proxy
+  await Promise.all(candidates.map(async (c) => env.QUEUE.put("scorecard:file:" + (await h.sha256(c.url)), "1", { expirationTtl: 30 * DAY })));
+  const out = { candidates, site: site.origin };
+  await env.QUEUE.put(key, JSON.stringify(out), { expirationTtl: (candidates.length ? 7 : 1) * DAY }); // found nothing: try again tomorrow
+  return h.json(out, 200, cors);
+}
+
+async function passFile(url, env, cors, h) {
+  const u = publicHost(url.searchParams.get("u") || "");
+  if (!u || !(await env.QUEUE.get("scorecard:file:" + (await h.sha256(u.href))))) return h.json({ error: "Unknown file." }, 404, cors);
+  const r = await fetch(u.href, { headers: { "User-Agent": UA }, redirect: "follow" });
+  if (!r.ok) return h.json({ error: "The course's website didn't send it." }, 502, cors);
+  if (Number(r.headers.get("Content-Length") || 0) > 15000000) return h.json({ error: "That file is too big." }, 413, cors);
+  return new Response(r.body, { headers: { "Content-Type": r.headers.get("Content-Type") || "application/octet-stream", "Cache-Control": "private, max-age=3600", ...cors } });
 }
 
 // ---------- course files ----------
@@ -273,7 +483,12 @@ async function listRounds(request, url, env, cors, h) {
 async function getRound(request, url, id, env, cors, h) {
   const me = await player(request, env, h, url.searchParams.get("visitorId"), false);
   if (!me || !RID.test(id)) return h.json({ error: "Not found." }, 404, cors);
-  const r = await env.GOLF.prepare("SELECT * FROM rounds WHERE id = ? AND player_id = ?").bind(id, me.id).first();
+  return fullRound(id, me.id, env, cors, h);
+}
+
+// a round in full: the course as played, every hole (the shape the app keeps rounds in)
+async function fullRound(id, playerId, env, cors, h) {
+  const r = await env.GOLF.prepare("SELECT * FROM rounds WHERE id = ? AND player_id = ?").bind(id, playerId).first();
   if (!r) return h.json({ error: "Not found." }, 404, cors);
   const { results } = await env.GOLF.prepare("SELECT * FROM round_holes WHERE round_id = ?").bind(id).all();
   const scores = {};
@@ -368,7 +583,7 @@ async function deleteRound(request, url, id, env, cors, h) {
 // Nick's finished rounds he's marked for the site, in the Golf page's round shape (extras/golf/scores.js)
 async function feed(env, cors, h) {
   if (!env.GOLF) return h.json({ rounds: [] }, 200, cors);
-  const { results } = await env.GOLF.prepare("SELECT course_name, tee_name, played_on, strokes, par, putts, fir_hit, fir_total, gir, " +
+  const { results } = await env.GOLF.prepare("SELECT id, course_name, tee_name, played_on, strokes, par, putts, fir_hit, fir_total, gir, " +
     "gir_total, penalties, holes_done FROM rounds WHERE player_id = 'owner' AND on_site = 1 AND finished_at IS NOT NULL " +
     "AND holes_done >= 9 ORDER BY played_on DESC, updated_at DESC LIMIT 60").all();
   return h.json({
@@ -379,7 +594,7 @@ async function feed(env, cors, h) {
       if (r.gir_total) stats.push(["Greens", r.gir + "/" + r.gir_total]);
       if (r.penalties) stats.push(["Penalties", r.penalties]);
       if (r.tee_name) stats.push(["Tees", r.tee_name]);
-      return { date: r.played_on, course: r.course_name, holes: r.holes_done, par: r.par, score: r.strokes, stats };
+      return { id: r.id, date: r.played_on, course: r.course_name, holes: r.holes_done, par: r.par, score: r.strokes, stats };
     }),
   }, 200, cors);
 }

@@ -5,8 +5,9 @@
 // Bump CACHE only to throw away everything saved (e.g. a course file was renamed).
 var CACHE = "scorecard-v1";
 var FONTS_CSS = "https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Dancing+Script:wght@700&family=Roboto+Condensed:wght@400;700&family=Space+Grotesk:wght@400;500;700&family=Tinos:wght@400;700&family=Unbounded:wght@500;600;700&display=swap";
-var SHELL = ["./", "scorecard.css", "scorecard.js", "card.js", "courses/index.json",
-  "courses/pecan-hollow.json", "courses/firewheel-old.json", "/assets/favicon.svg"];
+var SHELL = ["./", "scorecard.css", "scorecard.js", "card.js", "cardread.js", "viewer.js", "courses/index.json",
+  "courses/pecan-hollow.json", "courses/firewheel-old.json", "/assets/favicon.svg",
+  "courses/pecan-hollow-holes-1.png", "courses/pecan-hollow-holes-2.png", "courses/firewheel-old-holes-1.png", "courses/firewheel-old-holes-2.png"];
 
 self.addEventListener("install", function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) {

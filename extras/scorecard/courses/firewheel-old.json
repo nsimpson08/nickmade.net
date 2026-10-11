@@ -206,23 +206,27 @@
    "radius": 18
   },
   "header": {
-   "h": 200,
+   "h": 272,
    "ink": "#1e5a35",
    "logo": null,
-   "title": {
-    "text": "Firewheel Golf Park",
-    "font": "Tinos",
-    "weight": 700,
-    "size": 44,
-    "color": "#1e5a35"
-   },
-   "sub": {
-    "text": "Old Course",
-    "font": "Dancing Script",
-    "weight": 700,
-    "size": 46,
-    "color": "#6f7a6a"
-   }
+   "title": null,
+   "sub": null,
+   "art": [
+    {
+     "src": "/extras/scorecard/courses/firewheel-old-holes-1.png",
+     "x": 19,
+     "y": 12,
+     "w": 599,
+     "h": 247
+    },
+    {
+     "src": "/extras/scorecard/courses/firewheel-old-holes-2.png",
+     "x": 631,
+     "y": 12,
+     "w": 606,
+     "h": 247
+    }
+   ]
   },
   "grid": {
    "pad": 30,

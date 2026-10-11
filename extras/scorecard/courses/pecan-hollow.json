@@ -240,7 +240,7 @@
    "#9fc935"
   ],
   "header": {
-   "h": 232,
+   "h": 282,
    "ink": "#22401a",
    "logo": "pecan-hollow",
    "title": {
@@ -249,7 +249,24 @@
     "weight": 700,
     "size": 50,
     "color": "#2b6a2b"
-   }
+   },
+   "logoY": 118,
+   "art": [
+    {
+     "src": "/extras/scorecard/courses/pecan-hollow-holes-1.png",
+     "x": 44,
+     "y": 12,
+     "w": 450,
+     "h": 260
+    },
+    {
+     "src": "/extras/scorecard/courses/pecan-hollow-holes-2.png",
+     "x": 781,
+     "y": 12,
+     "w": 469,
+     "h": 260
+    }
+   ]
   },
   "grid": {
    "pad": 26,

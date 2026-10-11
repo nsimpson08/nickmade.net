@@ -51,3 +51,8 @@ bucket_name = "nickmade-photos"
 binding = "GOLF"
 database_name = "nickmade-golf"
 database_id = "8df64932-30bf-4909-8ee8-b67757dd4e69"
+
+# Workers AI (Nick's pick for Scorecard's card reader, 2026-10-10: free within 10,000 neurons a day). src/scorecard.js
+# POST /scorecard/read sends a scorecard photo to a vision model and gets its numbers back as JSON.
+[ai]
+binding = "AI"

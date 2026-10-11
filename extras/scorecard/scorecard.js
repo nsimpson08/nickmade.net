@@ -136,15 +136,44 @@
     });
   }
 
+  // ---------- the phone's Back button: one step back through the app's own screens ----------
+  // The start screen is level 0; a course's setup, a round being played, a finished round and "Add a course" are
+  // level 1; the compare screen and the mid-round card check are level 2. Each level is one history entry, so Back goes
+  // up a level (from a finished round to the start screen, not out to Extras: Nick, 2026-10-10), and the app's own ←
+  // buttons do the same through history. Starting a round replaces the setup, and finishing replaces the round.
+  // A screen calls at(level, redraw) first: false means history is stepping back and will draw it (via popstate).
+  var level = 0, screens = [home], popping = false;
+  function at(lv, redraw) {
+    screens.length = Math.max(screens.length, lv + 1);
+    screens[lv] = redraw;
+    if (popping || lv === level) { level = lv; return true; }
+    if (lv < level) { history.go(lv - level); return false; }
+    for (var l = level + 1; l <= lv; l++) history.pushState({ sc: l }, "");
+    level = lv;
+    return true;
+  }
+  window.addEventListener("popstate", function (e) {
+    if (document.querySelector("dialog[open]")) return; // an open menu or the card viewer closes itself
+    var lv = e.state && typeof e.state.sc === "number" ? e.state.sc : 0;
+    if (lv === level) return; // back from a closed menu or the card viewer: the same screen
+    level = lv;
+    popping = true;
+    try { (screens[lv] || home)(); } finally { popping = false; }
+  });
+
   function boot() {
     gate().then(function (ok) {
       if (!ok) return params.has("admin") ? login() : closed();
       if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function () {});
       if (!prefs.name && ADMIN) { prefs.name = "Nick"; savePrefs(); }
       ready = true;
+      try { history.replaceState({ sc: 0 }, ""); } catch (e) {}
       if (round && !round.finishedAt) holeScreen(); else home();
       queueSync(400);
-      window.addEventListener("online", function () { queueSync(0); });
+      window.addEventListener("online", function () {
+        queueSync(0);
+        if (app.querySelector(".sc-cc") && load(K_SNAP + cc.id, null)) readSnap();
+      });
       setInterval(function () { if (navigator.onLine !== false) queueSync(0); }, 60000);
     });
   }
@@ -198,9 +227,15 @@
     '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg></button>';
 
   function home() {
+    if (!at(0, home)) return;
     releaseWake();
     app.innerHTML = bar('<a class="sc-icon sc-back" href="/extras/" aria-label="Back to Extras">&larr;</a>', "Scorecard", sunBtn) +
       '<section class="sc-pad">' +
+        (round && !round.finishedAt ? (function () {
+          var st = stats(round);
+          return '<button type="button" class="sc-resume" data-act="resume"><span>Round in progress</span><b>' + esc(round.course.name) + "</b>" +
+            "<small>Hole " + round.current + (st.done ? " · " + st.strokes + " (" + toPar(st.toPar) + ") thru " + st.done : "") + "</small><i>Resume &rarr;</i></button>";
+        })() : "") +
         '<h2 class="sc-h">New round</h2>' +
         '<div class="sc-search"><input id="sc-q" type="search" autocomplete="off" placeholder="Search for a course" aria-label="Search for a course"></div>' +
         '<ul class="sc-list sc-results" hidden></ul>' +
@@ -244,7 +279,9 @@
             rows.push(courseRow({ id: "api:" + c.apiId, name: c.name, place: c.place + (c.par ? " · par " + c.par : ""),
               note: near ? "A different course from " + near.name : "" }, (filed || []).some(function (f) { return f.id === "api:" + c.apiId; }) ? "✓ Checked" : ""));
           });
-          out.innerHTML = rows.join("") || '<li class="sc-muted">' + esc(found.error || "No courses found.") + "</li>";
+          out.innerHTML = (rows.join("") || '<li class="sc-muted">' + esc(found.error || "No courses found.") + "</li>") +
+            '<li><button class="sc-row-btn sc-add" type="button" data-act="newcourse"><span class="sc-row-main"><b>Not listed, or not the right course?</b>' +
+            '<span class="sc-row-sub">Add it from its card</span></span></button></li>';
         });
     }
   }
@@ -298,35 +335,333 @@
   var draft = null, setupTee = null, setupNine = "18", original = "";
   function numbers(c) { return JSON.stringify([c.par, c.hcp, c.hcpWomen || null, c.tees.map(function (t) { return t.yards; })]); }
 
-  function setup(course) {
+  // keep: re-drawing the same course after the card check (its sources and the "original" numbers stay)
+  function setup(course, keep) {
+    if (!at(1, function () { setup(draft && draft.id === course.id ? draft : course, true); })) return; // with any numbers changed since
     draft = copy(course);
-    original = numbers(draft);
-    setupTee = defaultTee(draft);
-    setupNine = "18";
-    var src = draft.source || {}, chk = draft.checked;
+    if (!keep) {
+      original = numbers(draft);
+      cc = { id: draft.id, sources: [], status: "", now: copy(course) };
+      setupNine = "18";
+    }
+    setupTee = draft.tees.some(function (t) { return t.key === setupTee; }) && keep ? setupTee : defaultTee(draft);
+    var src = draft.source || {}, chk = draft.checked, blank = !draft.tees.length;
     var trust = chk
       ? '<p class="sc-trust ok">✓ Card checked ' + (chk.owner ? (OWNER ? "by you" : "by Nick") : "by a player") + " on " + esc(fmtDate(chk.at)) +
         (chk.version > 1 ? " (version " + chk.version + ")" : "") + ". It's ready as is.</p>"
+      : src.read
+      ? '<p class="sc-trust ok">✓ Read from ' + esc(src.name) + ". Look over the numbers below.</p>"
       : src.kind === "website"
       ? '<p class="sc-trust ok">✓ Copied from ' + esc(src.name || "the course's card") + (src.dated ? " (" + esc(monthYear(src.dated)) + ")" : "") + ". Still check it against the card in the clubhouse.</p>"
       : src.kind === "checked"
       ? '<p class="sc-trust ok">✓ Checked by you on ' + esc(fmtDate(src.at)) + ".</p>"
-      : '<p class="sc-trust warn">From OpenGolfAPI, which is often off. Check the numbers below against the real card before you start.</p>';
+      : src.kind === "compared"
+      ? '<p class="sc-trust ok">✓ Checked against ' + esc(src.from.join(" and ")) + ". Save it below so it's ready next time.</p>"
+      : blank
+      ? '<p class="sc-trust warn">This course has no numbers yet. Snap the card in the clubhouse, or find it on the course\'s website.</p>'
+      : '<p class="sc-trust warn">From OpenGolfAPI, which is often off. Check it against the real card before you start.</p>';
     app.innerHTML = bar('<button class="sc-icon sc-back" type="button" data-act="home" aria-label="Back">&larr;</button>', esc(draft.name), sunBtn) +
       '<section class="sc-pad">' +
-        '<p class="sc-place">' + esc(draft.place || "") + "</p>" + trust +
-        '<h3 class="sc-sub">Tee</h3><div class="sc-tees">' + draft.tees.map(teeBtn).join("") + "</div>" +
-        (draft.holes > 9 ? '<h3 class="sc-sub">Holes</h3><div class="sc-seg" role="radiogroup">' +
+        '<p class="sc-place">' + esc(draft.place || "") + "</p>" + trust + cardPanel() +
+        (blank ? "" : '<h3 class="sc-sub">Tee</h3><div class="sc-tees">' + draft.tees.map(teeBtn).join("") + "</div>") +
+        (draft.holes > 9 && !blank ? '<h3 class="sc-sub">Holes</h3><div class="sc-seg" role="radiogroup">' +
           [["18", "18"], ["front", "Front 9"], ["back", "Back 9"]].map(function (o) {
             return '<button type="button" role="radio" data-nine="' + o[0] + '" aria-checked="' + (o[0] === setupNine) + '">' + o[1] + "</button>";
           }).join("") + "</div>" : "") +
-        '<details class="sc-check"' + (src.kind === "api" && !chk ? " open" : "") + "><summary>" + (chk ? "Something's different? Check the card" : "Check the card") + "</summary>" +
+        (blank ? "" :
+        '<details class="sc-check"' + ((src.kind === "api" && !chk) || src.kind === "photo" || src.kind === "website" && !draft.card ? " open" : "") + "><summary>" +
+          (chk ? "Look over the numbers" : "Check the numbers") + "</summary>" +
           '<p class="sc-muted small">Tap a par to change it. Yardage is for the tee you picked.</p><div class="sc-table"></div></details>' +
         '<label class="sc-approve" hidden><input type="checkbox" id="sc-approve" checked><span></span></label>' +
-        '<button class="sc-go" type="button" data-act="start">Start round</button>' +
+        '<button class="sc-go" type="button" data-act="start">Start round</button>') +
         (draft.credit ? '<p class="sc-credit">' + esc(draft.credit) + "</p>" : "") +
       "</section>";
-    checkTable();
+    if (!blank) checkTable();
+    // a course with no checked file: look for its own card on its website straight away (once per course here)
+    if (!keep && !chk && draft.website && navigator.onLine !== false) lookupCard();
+  }
+
+  // ---------- the card check (phase 3): the course's website card and a photo of the clubhouse card, compared ----------
+
+  var cc = { id: null, sources: [], status: "", now: null }; // this course's card sources: [{ id, label, course, checks }]
+  var K_SNAP = "nm-scorecard-snap:", K_READ = "nm-scorecard-read:";
+
+  function cardPanel() {
+    var waiting = load(K_SNAP + cc.id, null);
+    var diffs = cc.sources.length ? countDiffs() : 0;
+    return '<section class="sc-cc">' +
+      '<p class="sc-cc-status" aria-live="polite">' + esc(cc.status || (waiting ? "A card photo is waiting for signal to be read." : "")) + "</p>" +
+      (cc.choices ? '<div class="sc-cc-choices">' + cc.choices.map(function (c, i) {
+        return '<button type="button" class="sc-cc-btn" data-cand="' + i + '">' + esc(cardName(c)) + "</button>";
+      }).join("") + "</div>" : "") +
+      (cc.checks && cc.checks.length ? '<ul class="sc-cc-checks">' + cc.checks.map(function (x) { return "<li>" + esc(x.msg) + "</li>"; }).join("") + "</ul>" : "") +
+      '<div class="sc-cc-actions">' +
+        '<label class="sc-cc-btn"><input type="file" id="sc-snap" accept="image/*,application/pdf" capture="environment" hidden>' +
+          '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg> Snap the card</label>' +
+        (waiting ? '<button type="button" class="sc-cc-btn" data-act="readsnap">Read the photo</button>' : "") +
+        (draft.website && !cc.looked ? '<button type="button" class="sc-cc-btn" data-act="lookup">Find the website\'s card</button>' : "") +
+        (cc.sources.length && draft.tees.length ? '<button type="button" class="sc-cc-btn go" data-act="compare">Compare' + (diffs ? " (" + diffs + ")" : "") + "</button>" : "") +
+      "</div></section>";
+  }
+  function ccPaint(status) {
+    if (status != null) cc.status = status;
+    var el = app.querySelector(".sc-cc");
+    if (el) el.outerHTML = cardPanel();
+  }
+  function hostOf(u) { try { return new URL(u).hostname.replace(/^www\./, ""); } catch (e) { return u; } }
+
+  // A card picture read into numbers: the whole card, then (only if its par or handicap rows don't hold up) a close-up
+  // of that nine for just those rows (cardread.js closeUps)
+  function readImage(img, holes, source) {
+    var ask = function (image, part) {
+      return api("/scorecard/read", { method: "POST", body: { visitorId: VID, image: image, part: part, holes: holes, source: source } });
+    };
+    return ask(img, "all").then(function (res) {
+      var sides = NMCardRead.closeUps(res.read, holes);
+      if (sides.length) ccPaint("Taking a closer look at the par and handicap rows…");
+      // both nines at once when both need it
+      return Promise.all(sides.map(function (side) {
+        return NMCardRead.half(img, side).then(function (h) { return ask(h, side); }).then(function (close) { return close.read; }, function () { return null; });
+      })).then(function (closes) {
+        return closes.reduce(function (read, close, i) { return close ? NMCardRead.mergeCloseUp(read, sides[i], close) : read; }, res.read);
+      });
+    });
+  }
+
+  // the course's own card from its website: found by the Worker, read once (and kept here by its address)
+  function lookupCard() {
+    cc.looked = true;
+    ccPaint("Looking for the course's card on " + hostOf(draft.website) + "…");
+    var id = cc.id;
+    api("/scorecard/lookup?site=" + encodeURIComponent(draft.website) + "&name=" + encodeURIComponent(draft.fullName || draft.name)).then(function (d) {
+      var all = d.candidates || [], c = all[0];
+      if (cc.id !== id) return;
+      if (!c) { ccPaint(d.note || "No card on the course's website. Snap the one in the clubhouse instead."); return; }
+      // several cards that fit equally well (a park with three courses, under one name): ask which is this one
+      var close = all.filter(function (x) { return x.score >= c.score - 1; });
+      if (close.length > 1) {
+        cc.choices = close;
+        ccPaint("The course's website has " + close.length + " cards. Which one is this course?");
+        return;
+      }
+      readWebCard(c, id);
+    }).catch(function (err) {
+      if (cc.id !== id) return;
+      cc.looked = false; // the "Find the website's card" button comes back, to try again
+      ccPaint(err.status === 0 ? "No signal to look for the card. Snap the clubhouse card instead." : err.message);
+    });
+  }
+  function readWebCard(c, id) {
+    cc.choices = null;
+    var when = c.dated ? " (" + monthYear(c.dated) + ")" : "";
+    (function () {
+      ccPaint("Found the course's card" + when + ". Reading it…");
+      var kept = load(K_READ + c.url, null);
+      var reading = kept ? Promise.resolve(kept) : fetch(API + "/scorecard/file?u=" + encodeURIComponent(c.url), { headers: auth() })
+        .then(function (r) { if (!r.ok) throw new Error("The course's website didn't send its card."); return r.blob(); })
+        .then(function (blob) { return NMCardRead.fromFile(new File([blob], c.url.split("/").pop(), { type: blob.type })); })
+        .then(function (img) { return readImage(img, draft.holes, c.url); })
+        .then(function (read) { save(K_READ + c.url, read); return read; });
+      return reading.then(function (read) {
+        if (cc.id !== id) return;
+        addSource("web", "the website card" + when, read, { kind: "website", url: c.url, dated: c.dated, label: "the course's website card" + when });
+      });
+    })().catch(function (err) {
+      if (cc.id !== id) return;
+      cc.looked = false;
+      ccPaint(err.status === 0 ? "No signal to read the card. Snap the clubhouse card instead." : err.message);
+    });
+  }
+  function cardName(c) {
+    var f = decodeURIComponent(c.url.split("/").pop().replace(/\.[a-z]+$/i, "")).replace(/[-_]+/g, " ").replace(/\d{3,}px/i, "").trim();
+    return c.label && c.label.length < 60 ? c.label : f;
+  }
+
+  // a photo of the card (or a PDF/picture of it): read now, or kept until there's signal
+  function snap(file) {
+    var id = cc.id;
+    ccPaint("Getting the photo ready…");
+    NMCardRead.fromFile(file).then(function (img) {
+      if (!save(K_SNAP + id, { img: img, at: Date.now() })) throw new Error("The phone is out of room for the photo.");
+      return readSnap();
+    }).catch(function (err) { ccPaint(err.message); });
+  }
+  function readSnap() {
+    var id = cc.id, waiting = load(K_SNAP + id, null);
+    if (!waiting) return;
+    if (navigator.onLine === false) { ccPaint("Saved. The photo will be read when there's signal."); return; }
+    ccPaint("Reading the card…");
+    return readImage(waiting.img, draft.holes).then(function (read) {
+      drop(K_SNAP + id);
+      if (cc.id !== id) return;
+      addSource("photo", "your photo", read, { kind: "photo", dated: today(), label: "your photo of the card (" + fmtDate(new Date()) + ")" });
+    }).catch(function (err) {
+      ccPaint(err.status === 0 ? "Saved. The photo will be read when there's signal." : err.message);
+    });
+  }
+
+  function addSource(sid, label, read, meta) {
+    var made = NMCardRead.toCourse(read, { id: draft.id, name: draft.name, fullName: draft.fullName, place: draft.place, apiId: draft.apiId,
+      nearApiId: draft.nearApiId, website: draft.website, credit: draft.credit, holes: draft.holes, kind: meta.kind, url: meta.url,
+      dated: meta.dated, label: meta.label });
+    if (!made.course.tees.length) { ccPaint("The card reader couldn't find any tees on " + label + ". Try a straighter, closer photo."); return; }
+    cc.sources = cc.sources.filter(function (x) { return x.id !== sid; }).concat([{ id: sid, label: label, course: made.course, checks: made.checks, unread: made.unread }]);
+    if (!draft.tees.length) { // a course with no numbers yet: the card is the course
+      cc.status = "Read " + label + "." + (made.checks.length ? " Look these over below:" : "");
+      cc.checks = made.checks;
+      var c = made.course;
+      c.checked = draft.checked;
+      setup(c, true);
+      return;
+    }
+    var n = countDiffs();
+    ccPaint(n ? "The numbers differ from " + label + " in " + n + (n === 1 ? " place." : " places.") + (made.checks.length ? " Some of its numbers don't add up." : "")
+      : "✓ " + label.charAt(0).toUpperCase() + label.slice(1) + " matches these numbers." + (made.checks.length ? " (Some of its own totals don't add up.)" : ""));
+  }
+
+  // ---------- comparing: every source side by side, only where they differ ----------
+
+  function nowLabel() {
+    var c = cc.now || draft, src = c.source || {};
+    return c.checked ? "the course file" + (c.checked.version > 1 ? " (v" + c.checked.version + ")" : "")
+      : src.kind === "api" ? "OpenGolfAPI" : src.kind === "website" ? "the saved card" + (src.dated ? " (" + monthYear(src.dated) + ")" : "")
+      : src.kind === "checked" ? "your last check" : "what's here now";
+  }
+  function columns() {
+    return [{ id: "now", label: nowLabel(), course: draft, checks: [] }].concat(cc.sources);
+  }
+  function teeKey(t) { return NMCardRead.slug(String(t.name).replace(/\s+tees?$/i, "")); }
+  // the same tee on another source's card: by name, else by color, else by about the same length
+  function matchTee(t, c) {
+    var k = teeKey(t), byName = c.tees.filter(function (x) { return teeKey(x) === k; })[0];
+    if (byName) return byName;
+    var byColor = c.tees.filter(function (x) { return x.color && x.color === t.color && x.color !== "#8a8a86"; });
+    if (byColor.length === 1) return byColor[0];
+    var tot = yardsOf(t);
+    return c.tees.filter(function (x) { return tot && Math.abs(yardsOf(x) - tot) / tot < 0.015; })[0] || null;
+  }
+  // every place the sources disagree, from the base's point of view: [{ key, group, label, opts: [{ v, from }] }]
+  function diffList(baseId) {
+    var cols = columns(), base = cols.filter(function (c) { return c.id === baseId; })[0] || cols[0], b = base.course, out = [];
+    var n = b.holes;
+    function item(key, group, label, get) {
+      var opts = [], seen = {};
+      cols.forEach(function (c) {
+        var v = get(c.course);
+        if (v == null || v === "") return;
+        if (!seen[v]) { seen[v] = { v: v, from: [] }; opts.push(seen[v]); }
+        seen[v].from.push(c.label);
+      });
+      var bv = get(b);
+      if (opts.length > 1 || (opts.length === 1 && bv == null)) out.push({ key: key, group: group, label: label, opts: opts, base: bv, now: get(cols[0].course) });
+    }
+    for (var i = 0; i < n; i++) (function (i) {
+      item("par:" + i, "Par", "Hole " + (i + 1), function (c) { return c.par && c.par.length === n ? c.par[i] : null; });
+      item("hcp:" + i, "Handicap", "Hole " + (i + 1), function (c) { return c.hcp && c.hcp.length === n ? c.hcp[i] : null; });
+      if (b.hcpWomen) item("hcpWomen:" + i, "Women's handicap", "Hole " + (i + 1), function (c) { return c.hcpWomen && c.hcpWomen.length === n ? c.hcpWomen[i] : null; });
+    })(i);
+    b.tees.forEach(function (t) {
+      var g = t.name + " tees";
+      var other = function (c) { return c === b ? t : matchTee(t, c); };
+      item("tee:" + t.key + ":rating", g, "Rating", function (c) { var x = other(c); return x ? x.rating : null; });
+      item("tee:" + t.key + ":slope", g, "Slope", function (c) { var x = other(c); return x ? x.slope : null; });
+      for (var j = 0; j < n; j++) (function (j) {
+        item("tee:" + t.key + ":yards:" + j, g, "Hole " + (j + 1) + " yards", function (c) { var x = other(c); return x && x.yards.length === n ? x.yards[j] : null; });
+      })(j);
+    });
+    return { base: base, items: out };
+  }
+  function countDiffs() { return diffList(newestId()).items.length; }
+  function newestId() {
+    var ids = cc.sources.map(function (x) { return x.id; });
+    return ids.indexOf("photo") >= 0 ? "photo" : ids.indexOf("web") >= 0 ? "web" : "now";
+  }
+
+  var cmp = null; // the compare screen's state: { baseId, picks: { key: value }, done }
+  function compareScreen(done) {
+    if (!at(2, drawCompare)) { cmp = { baseId: newestId(), picks: {}, done: done }; return; }
+    cmp = { baseId: cmp && cmp.done === done ? cmp.baseId : newestId(), picks: {}, done: done };
+    drawCompare();
+  }
+  function drawCompare() {
+    if (!at(2, drawCompare)) return;
+    var cols = columns(), d = diffList(cmp.baseId), groups = {}, order = [];
+    // A read card's row that fails its own totals check (cardread.js) isn't trusted by default: there the checked
+    // course file's number is picked (Firewheel's tiny Gold slope read 143 off the same row whose Out misread)
+    var suspect = {};
+    (d.base.checks || []).forEach(function (x) { suspect[x.where] = true; });
+    d.items.forEach(function (it) {
+      if (!groups[it.group]) { groups[it.group] = []; order.push(it.group); }
+      groups[it.group].push(it);
+      var p = it.key.split(":"), where = p[0] === "tee" ? "tee:" + p[1] : p[0];
+      var trustNow = d.base.id !== "now" && suspect[where] && it.now != null && (draft.checked || (draft.source && !draft.source.read && draft.source.kind === "website"));
+      if (!(it.key in cmp.picks)) cmp.picks[it.key] = trustNow ? it.now : it.base != null ? it.base : it.opts[0].v;
+    });
+    var playTee = teeOf(d.base.course, setupTee || defaultTee(d.base.course));
+    var warn = [];
+    cols.forEach(function (c) { (c.checks || []).forEach(function (x) { warn.push(c.label + ": " + x.msg); }); });
+    app.innerHTML = bar('<button class="sc-icon sc-back" type="button" data-act="cmpback" aria-label="Back">&larr;</button>', "Compare the cards", sunBtn) +
+      '<section class="sc-pad">' +
+        '<p class="sc-muted small sc-cmp-intro">Where every source agrees, it\'s folded away. Tap the right number in each row, or ✎ to type what\'s on the card in your hand.</p>' +
+        '<h3 class="sc-sub">Start from</h3><div class="sc-seg sc-seg-wrap" role="radiogroup">' + cols.map(function (c) {
+          return '<button type="button" role="radio" data-base="' + c.id + '" aria-checked="' + (c.id === cmp.baseId) + '">' + esc(cap(c.label)) + "</button>";
+        }).join("") + "</div>" +
+        (warn.length ? '<div class="sc-cmp-warn">' + warn.map(function (w) { return "<p>" + esc(w) + "</p>"; }).join("") + "</div>" : "") +
+        (d.items.length ? order.map(function (g) {
+          var items = groups[g], open = d.items.length <= 12 || g === "Par" || g === "Handicap" || g === playTee.name + " tees";
+          return '<details class="sc-check sc-cmp-group"' + (open ? " open" : "") + "><summary>" + esc(g) + ' <span class="sc-muted">' + items.length +
+            (items.length === 1 ? " difference" : " differences") + "</span></summary>" + items.map(function (it) {
+              return '<div class="sc-diff"><span class="sc-diff-label">' + esc(it.label) + '</span><div class="sc-diff-opts">' + it.opts.map(function (o) {
+                return '<button type="button" class="sc-opt' + (String(cmp.picks[it.key]) === String(o.v) ? " on" : "") + '" data-pick="' + esc(it.key) + '" data-v="' + esc(o.v) + '"><b>' +
+                  esc(o.v) + "</b><small>" + esc(o.from.join(" · ")) + "</small></button>";
+              }).join("") + (it.opts.some(function (o) { return String(o.v) === String(cmp.picks[it.key]); }) ? "" :
+                '<button type="button" class="sc-opt on"><b>' + esc(cmp.picks[it.key]) + "</b><small>typed</small></button>") +
+                '<button type="button" class="sc-opt sc-type" data-type="' + esc(it.key) + '" aria-label="Type it">✎</button></div></div>';
+            }).join("") + "</details>";
+        }).join("") : '<p class="sc-trust ok">✓ Every source agrees.</p>') +
+        '<button class="sc-go" type="button" data-act="cmpuse">Use these numbers</button>' +
+      "</section>";
+  }
+  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+  // the base source with the picked numbers, keeping the course's own identity (id, name, links, card look)
+  function compared() {
+    var cols = columns(), base = cols.filter(function (c) { return c.id === cmp.baseId; })[0] || cols[0];
+    var c = copy(base.course);
+    ["id", "name", "fullName", "place", "apiId", "nearApiId", "website", "credit", "checked"].forEach(function (k) { if (draft[k] != null) c[k] = draft[k]; else delete c[k]; });
+    Object.keys(cmp.picks).forEach(function (key) {
+      var v = +cmp.picks[key], p = key.split(":");
+      if (!Number.isFinite(v)) return;
+      if (p[0] === "par" || p[0] === "hcp" || p[0] === "hcpWomen") { if (c[p[0]]) c[p[0]][+p[1]] = v; return; }
+      var t = c.tees.filter(function (x) { return x.key === p[1]; })[0];
+      if (!t) return;
+      if (p[2] === "yards") { t.yards[+p[3]] = v; t.total = t.yards.every(function (y) { return y != null; }) ? t.yards.reduce(function (a, y) { return a + y; }, 0) : t.total; }
+      else t[p[2]] = v;
+    });
+    // the course's hand-tuned card look stays only if every tee it draws is still there
+    if (draft.card && (draft.card.rows || []).every(function (r) { return r.kind !== "tee" || c.tees.some(function (t) { return t.key === r.tee; }); })) c.card = draft.card;
+    else delete c.card;
+    c.source = { kind: "compared", from: cols.map(function (x) { return x.label; }), at: new Date().toISOString() };
+    return c;
+  }
+
+  // "Add it from its card": a course that isn't listed (or is listed as something else, like Firewheel's Old Course)
+  function newCourse(name) {
+    if (!at(1, function () { newCourse(name); })) return;
+    app.innerHTML = bar('<button class="sc-icon sc-back" type="button" data-act="home" aria-label="Back">&larr;</button>', "Add a course", sunBtn) +
+      '<section class="sc-pad"><p class="sc-muted">Name it, then snap its card (or find the card on its website) and the numbers fill in.</p>' +
+      '<form class="sc-new"><label for="sc-new-name">Course name</label><input id="sc-new-name" class="sc-in" required maxlength="80" value="' + esc(name || "") + '" placeholder="Firewheel · Lakes Course">' +
+      '<label for="sc-new-place">Town</label><input id="sc-new-place" class="sc-in" maxlength="80" placeholder="Garland, TX">' +
+      '<label for="sc-new-site">Website <span class="sc-muted">(optional, to find its card)</span></label><input id="sc-new-site" class="sc-in" type="url" maxlength="300" placeholder="https://…">' +
+      '<button class="sc-go" type="submit">Next</button></form></section>';
+    app.querySelector("form").addEventListener("submit", function (e) {
+      e.preventDefault();
+      var nm = app.querySelector("#sc-new-name").value.trim();
+      if (!nm) return;
+      var site = app.querySelector("#sc-new-site").value.trim();
+      var slug = NMCardRead.slug(nm).slice(0, 48) + "-" + Math.random().toString(36).slice(2, 6);
+      setup({ id: slug, name: nm, place: app.querySelector("#sc-new-place").value.trim(), website: /^https?:\/\//.test(site) ? site : undefined,
+        holes: 18, par: Array(18).fill(4), hcp: Array(18).fill(null), tees: [], source: { kind: "card-only" } });
+    });
   }
 
   function teeBtn(t) {
@@ -532,6 +867,8 @@
   }
 
   function holeScreen(dir) {
+    if (!round) return home();
+    if (!at(1, function () { holeScreen(); })) return;
     var n = round.current, c = round.course, tee = teeOf(c, round.tee), s = S(n), par = parOf(n);
     var set = s.strokes != null, strokes = set ? s.strokes : par;
     var idx = round.holes.indexOf(n), last = idx === round.holes.length - 1;
@@ -679,11 +1016,32 @@
     d.className = "sc-sheet";
     d.innerHTML = html;
     document.body.appendChild(d);
-    d.addEventListener("close", function () { d.remove(); });
+    // Back closes it: it takes a history step of its own, given back when it's closed another way. A choice runs only
+    // once that step is back (else the step coming back would undo what the choice opens, like the card viewer's own)
+    var stepped = false, after = null;
+    function done() {
+      window.removeEventListener("popstate", onPop);
+      var f = after;
+      after = null;
+      if (f) f();
+    }
+    function onPop() {
+      stepped = false;
+      if (d.open) d.close();
+      done();
+    }
+    try { history.pushState({ scSheet: true }, ""); stepped = true; window.addEventListener("popstate", onPop); } catch (e) {}
+    d.addEventListener("close", function () {
+      d.remove();
+      if (stepped) { stepped = false; history.back(); } // onPop runs the choice when the step is back
+      else done();
+    });
     d.addEventListener("click", function (e) {
       if (e.target === d) return d.close(); // the backdrop
       var b = e.target.closest("[data-m]");
-      if (b) onclick(b.dataset.m, d, b);
+      if (!b || b.tagName === "A") return; // a link just goes
+      after = function () { onclick(b.dataset.m, b); };
+      d.close();
     });
     d.showModal();
     return d;
@@ -692,16 +1050,16 @@
   function menu() {
     sheet('<div class="sc-sheet-body">' +
       '<button type="button" data-m="card">Scorecard so far</button>' +
+      '<button type="button" data-m="check">Check the card</button>' +
       '<button type="button" data-m="finish">Finish round</button>' +
       '<button type="button" data-m="sun">Sun mode: ' + (prefs.sun ? "on" : "off") + "</button>" +
       '<button type="button" data-m="wake">Keep screen on: ' + (prefs.wake === false ? "off" : "on") + "</button>" +
       '<button type="button" data-m="name">Name on the card: ' + esc(prefs.name || "none") + "</button>" +
       '<a href="/extras/" data-m="leave">Back to Extras (the round stays saved)</a>' +
       '<button type="button" data-m="quit" class="danger">Quit without saving</button>' +
-      '<button type="button" data-m="close" class="sc-ghost">Close</button></div>', function (m, d) {
-      if (m === "leave") return;
-      d.close();
+      '<button type="button" data-m="close" class="sc-ghost">Close</button></div>', function (m) {
       if (m === "card") showCard();
+      if (m === "check") roundCheck();
       if (m === "finish") finish();
       if (m === "sun") { prefs.sun = !prefs.sun; savePrefs(); document.body.classList.toggle("sun", prefs.sun); }
       if (m === "wake") { prefs.wake = prefs.wake === false; savePrefs(); if (prefs.wake === false) releaseWake(); else keepAwake(); }
@@ -721,97 +1079,20 @@
 
   function showCard() { viewer(round); }
 
-  // The card full screen with its own pinch zoom, so the page itself never zooms (Nick, 2026-10-10: zooming the
-  // card in a sheet zoomed the whole page, and the hole screen then couldn't be zoomed back out). Pinch or
-  // double-tap to zoom, drag to look around, Done or Escape to close.
-  function viewer(r) {
-    var d = document.createElement("dialog");
-    d.className = "sc-viewer";
-    d.innerHTML = '<div class="sc-viewer-bar"><span>Pinch or double-tap to zoom</span><button type="button" class="sc-viewer-done">Done</button></div>' +
-      '<div class="sc-viewer-stage"><canvas class="sc-card" aria-label="The scorecard"></canvas></div>';
-    document.body.appendChild(d);
-    var stage = d.querySelector(".sc-viewer-stage"), cv = d.querySelector("canvas");
-    var s = 1, tx = 0, ty = 0, w = 0, h = 0, ox = 0, oy = 0;
-    var pts = {}, start = null, lastTap = 0;
-    function fit() {
-      var sw = stage.clientWidth, sh = stage.clientHeight, ar = cv.width / cv.height || 1.3;
-      w = Math.min(sw, sh * ar); h = w / ar;
-      ox = (sw - w) / 2; oy = (sh - h) / 2;
-      cv.style.width = w + "px"; cv.style.height = h + "px";
-      cv.style.left = ox + "px"; cv.style.top = oy + "px";
-      apply();
-    }
-    function clampAxis(t, size, room, o) { // keep the card on screen: centered while it fits, edges to the edges after
-      var big = size * s;
-      if (big <= room) return (room - big) / 2 - o;
-      return Math.min(-o, Math.max(room - big - o, t));
-    }
-    function apply() {
-      s = Math.max(1, Math.min(5, s));
-      tx = clampAxis(tx, w, stage.clientWidth, ox);
-      ty = clampAxis(ty, h, stage.clientHeight, oy);
-      cv.style.transform = "translate(" + tx + "px," + ty + "px) scale(" + s + ")";
-    }
-    function zoomAt(px, py, ns) { // zoom to ns keeping the point under (px, py) still
-      var qx = (px - ox - tx) / s, qy = (py - oy - ty) / s;
-      s = Math.max(1, Math.min(5, ns));
-      tx = px - ox - qx * s; ty = py - oy - qy * s;
-      apply();
-    }
-    function local(e) { var b = stage.getBoundingClientRect(); return [e.clientX - b.left, e.clientY - b.top]; }
-    function pair() {
-      var a = Object.keys(pts).map(function (k) { return pts[k]; });
-      return { mid: [(a[0][0] + a[1][0]) / 2, (a[0][1] + a[1][1]) / 2], dist: Math.hypot(a[0][0] - a[1][0], a[0][1] - a[1][1]) || 1 };
-    }
-    stage.addEventListener("pointerdown", function (e) {
-      stage.setPointerCapture(e.pointerId);
-      pts[e.pointerId] = local(e);
-      var n = Object.keys(pts).length;
-      if (n === 2) { var pr = pair(); start = { s: s, tx: tx, ty: ty, mid: pr.mid, dist: pr.dist }; }
-      else if (n === 1) {
-        var now = Date.now(), p = pts[e.pointerId];
-        if (now - lastTap < 300) { zoomAt(p[0], p[1], s > 1.2 ? 1 : 2.5); lastTap = 0; }
-        else lastTap = now;
-        start = { s: s, tx: tx, ty: ty, at: p };
-      }
-    });
-    stage.addEventListener("pointermove", function (e) {
-      if (!pts[e.pointerId] || !start) return;
-      pts[e.pointerId] = local(e);
-      var n = Object.keys(pts).length;
-      if (n >= 2 && start.dist) {
-        var pr = pair();
-        // the content point that was under the fingers' first midpoint stays under their midpoint now
-        var qx = (start.mid[0] - ox - start.tx) / start.s, qy = (start.mid[1] - oy - start.ty) / start.s;
-        s = Math.max(1, Math.min(5, start.s * pr.dist / start.dist));
-        tx = pr.mid[0] - ox - qx * s; ty = pr.mid[1] - oy - qy * s;
-        apply();
-      } else if (n === 1 && start.at) {
-        var p = pts[e.pointerId];
-        tx = start.tx + p[0] - start.at[0]; ty = start.ty + p[1] - start.at[1];
-        apply();
-      }
-    });
-    function lift(e) {
-      delete pts[e.pointerId];
-      var left = Object.keys(pts);
-      // one finger still down after a pinch: carry on as a drag from where it is
-      start = left.length === 1 ? { s: s, tx: tx, ty: ty, at: pts[left[0]] } : null;
-    }
-    stage.addEventListener("pointerup", lift);
-    stage.addEventListener("pointercancel", lift);
-    stage.addEventListener("wheel", function (e) { // trackpads and mice
-      e.preventDefault();
-      var p = local(e);
-      zoomAt(p[0], p[1], s * Math.exp(-e.deltaY / 300));
-    }, { passive: false });
-    d.querySelector(".sc-viewer-done").addEventListener("click", function () { d.close(); });
-    d.addEventListener("close", function () { window.removeEventListener("resize", fit); d.remove(); });
-    window.addEventListener("resize", fit);
-    d.showModal();
-    NMCard.draw(cv, r.course, r, { scale: 3 }).then(fit);
+  // During a round: snap the card (or find the website's), compare, and fix this round's numbers (and the course file)
+  function roundCheck() {
+    if (!at(2, function () { roundCheck(); })) return;
+    draft = copy(round.course);
+    original = numbers(draft);
+    setupTee = round.tee;
+    cc = { id: draft.id, sources: [], status: "", now: copy(round.course), inRound: true };
+    app.innerHTML = bar('<button class="sc-icon sc-back" type="button" data-act="cmpback" aria-label="Back">&larr;</button>', "Check the card", sunBtn) +
+      '<section class="sc-pad"><p class="sc-muted">Snap the card in the clubhouse (or find the course\'s own), then compare it with the numbers this round is using.</p>' +
+      cardPanel() + "</section>";
+    if (load(K_SNAP + cc.id, null) && navigator.onLine !== false) readSnap();
   }
 
+  function viewer(r) { NMCardViewer.open(r); }
   // ---------- finish ----------
 
   function finish() {
@@ -831,6 +1112,7 @@
   }
 
   function summary(r) {
+    if (!at(1, function () { summary(r); })) return;
     var s = stats(r), c = r.course, tee = teeOf(c, r.tee);
     var tile = function (label, big, small) { return '<div class="sc-stat"><span>' + label + "</span><b>" + big + "</b>" + (small ? "<small>" + small + "</small>" : "") + "</div>"; };
     var kinds = ["eagle", "birdie", "par", "bogey", "double"].filter(function (k) { return s.kinds[k]; }).map(function (k) {
@@ -873,13 +1155,30 @@
   function fileName(r, ext) {
     return "scorecard-" + String(r.course.name).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + "-" + String(r.date).slice(0, 10) + "." + ext;
   }
-  function download(blob, name) {
+  // Chrome on Android saves a download without a word (Nick, 2026-10-10: tapping again only asked "download again?"),
+  // so the page says so itself, and the button shows it for a moment
+  function download(blob, name, button) {
     var a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = name;
     document.body.appendChild(a);
     a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    toast("Saved to your Downloads: " + name);
+    if (button) {
+      var was = button.innerHTML;
+      button.innerHTML = "Saved ✓";
+      button.disabled = true;
+      setTimeout(function () { button.innerHTML = was; button.disabled = false; }, 2500);
+    }
+  }
+  function toast(msg) {
+    var t = document.querySelector(".sc-toast");
+    if (!t) { t = document.createElement("div"); t.className = "sc-toast"; t.setAttribute("role", "status"); document.body.appendChild(t); }
+    t.textContent = msg;
+    t.classList.add("in");
+    clearTimeout(t.timer);
+    t.timer = setTimeout(function () { t.classList.remove("in"); }, 3500);
   }
   function cardBlob(r) {
     var cv = document.createElement("canvas");
@@ -941,6 +1240,14 @@
       }).catch(function (err) { b.classList.remove("busy"); alert(err.status === 0 ? "No signal right now." : err.message); });
       return;
     }
+    if (d.cand != null && cc.choices) { var pick = cc.choices[+d.cand]; readWebCard(pick, cc.id); return; }
+    if (d.base) { cmp.baseId = d.base; cmp.picks = {}; drawCompare(); return; }
+    if (d.pick) { cmp.picks[d.pick] = d.v; drawCompare(); return; }
+    if (d.type) {
+      var typed = prompt("What does the card in your hand say?", cmp.picks[d.type] != null ? cmp.picks[d.type] : "");
+      if (typed != null && /^\d+(\.\d)?$/.test(typed.trim())) { cmp.picks[d.type] = typed.trim(); drawCompare(); }
+      return;
+    }
     if (d.tee) { setupTee = d.tee; app.querySelectorAll(".sc-tee").forEach(function (x) { x.setAttribute("aria-pressed", String(x.dataset.tee === setupTee)); }); checkTable(); return; }
     if (d.nine) { setupNine = d.nine; app.querySelectorAll("[data-nine]").forEach(function (x) { x.setAttribute("aria-checked", String(x.dataset.nine === setupNine)); }); return; }
     if (d.par != null && draft) { var i = +d.par; draft.par[i] = draft.par[i] >= 6 ? 3 : draft.par[i] + 1; checkTable(); return; }
@@ -955,6 +1262,30 @@
     var act = d.act;
     if (!act) return;
     if (act === "home") return home();
+    if (act === "resume") return holeScreen();
+    if (act === "newcourse") { var qv = app.querySelector("#sc-q"); return newCourse(qv ? qv.value.trim() : ""); }
+    if (act === "lookup") return lookupCard();
+    if (act === "readsnap") return readSnap();
+    if (act === "compare") return compareScreen(cc.inRound ? "round" : "setup");
+    if (act === "cmpback") {
+      if (cc.inRound && round) return holeScreen();
+      return setup(draft, true);
+    }
+    if (act === "cmpuse") {
+      var result = compared();
+      if (cmp.done === "round" && round) { // this round's numbers change now; the course file too, where allowed
+        var keepTee = result.tees.some(function (t) { return t.key === round.tee; }) ? round.tee
+          : (matchTee(teeOf(round.course, round.tee), result) || result.tees[0]).key;
+        round.course = result;
+        round.tee = keepTee;
+        round.courseAcked = false;
+        saveRound();
+        if (OWNER || !result.checked) queueApproval(result);
+        save(K.course + result.id, copy(result));
+        return holeScreen();
+      }
+      return setup(result, true);
+    }
     if (act === "code") {
       api("/scorecard/me/code", { method: "POST", body: { visitorId: VID } }).then(function (d2) {
         app.querySelector(".sc-code").textContent = d2.code;
@@ -1005,18 +1336,18 @@
     var past = pastById(app.dataset.round);
     if (!past) return;
     if (act === "viewcard") { viewer(past); return; }
-    if (act === "image") { cardBlob(past).then(function (blob) { download(blob, fileName(past, "png")); }); return; }
+    if (act === "image") { cardBlob(past).then(function (blob) { download(blob, fileName(past, "png"), b); }); return; }
     if (act === "share") {
       cardBlob(past).then(function (blob) {
         var file = new File([blob], fileName(past, "png"), { type: "image/png" });
         var data = { title: past.course.name + " · " + stats(past).strokes, files: [file] };
         if (navigator.canShare && navigator.canShare(data)) return navigator.share(data);
-        download(blob, file.name);
+        download(blob, file.name, b);
       }).catch(function () {});
       return;
     }
-    if (act === "csv") return download(new Blob([csv(past)], { type: "text/csv" }), fileName(past, "csv"));
-    if (act === "json") return download(new Blob([JSON.stringify({ format: "nickmade-scorecard", version: 1, round: past }, null, 1)], { type: "application/json" }), fileName(past, "json"));
+    if (act === "csv") return download(new Blob([csv(past)], { type: "text/csv" }), fileName(past, "csv"), b);
+    if (act === "json") return download(new Blob([JSON.stringify({ format: "nickmade-scorecard", version: 1, round: past }, null, 1)], { type: "application/json" }), fileName(past, "json"), b);
     if (act === "ghin") { var g = app.querySelector(".sc-ghin"); g.hidden = !g.hidden; if (!g.hidden) g.innerHTML = ghin(past); return; }
     if (act === "ghincopy") {
       var txt = past.holes.map(function (n) { return n + ": " + ((past.scores[n] || {}).strokes || "-"); }).join("\n") + "\nTotal: " + stats(past).strokes;
@@ -1044,6 +1375,7 @@
   // the check table's number boxes
   app.addEventListener("change", function (e) {
     var el = e.target, d = el.dataset;
+    if (el.id === "sc-snap") { if (el.files && el.files[0]) snap(el.files[0]); return; }
     if (el.id === "sc-site") { // Show on my Golf page
       var past = load(K.rounds, []), r = past.filter(function (x) { return x.id === app.dataset.round; })[0];
       if (!r) return;

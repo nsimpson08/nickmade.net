@@ -1,7 +1,9 @@
 // Renders extras/golf/scores.js (window.GOLF) into the Golf page: a score grid per source, then What's In The Bag.
-// "On the course" is Nick's real rounds from the Scorecard (extras/scorecard/, Worker GET /scorecard/feed: the
-// finished rounds he marked "Show on my Golf page"); the page draws first and again when they arrive. While the
-// Scorecard is owner only, the feed only answers Nick (owner mode), so visitors see "Coming soon" there.
+// "On the course" (first, Nick 2026-10-10) is Nick's real rounds from the Scorecard (extras/scorecard/, Worker GET
+// /scorecard/feed: the finished rounds he marked "Show on my Golf page"); the page draws first and again when they
+// arrive. Tapping one opens its scorecard full screen (card.js + viewer.js, loaded on the first tap). Its "Scorecard"
+// label links to the Scorecard for whoever can open it. While the Scorecard is owner only, the feed and the link are
+// Nick's alone, so visitors see "Coming soon" there.
 (function () {
   var script = document.currentScript;
   var local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
@@ -13,10 +15,11 @@
   data.trackman = (window.GOLF_TRACKMAN || []).concat(data.trackman || []).filter(function (r) { return !r.hidden; });
 
   var SOURCES = [
+    { key: "course", title: "On the course", sub: "Scorecard", href: "/extras/scorecard/" },
     { key: "trackman", title: "Trackman", sub: "Simulator" },
-    { key: "xgolf", title: "X-Golf", sub: "Simulator" },
-    { key: "course", title: "On the course", sub: "Scorecard" }
+    { key: "xgolf", title: "X-Golf", sub: "Simulator" }
   ];
+  var scorecardOpen = false; // the Worker says this viewer can open the Scorecard (Nick, until it's public)
 
   function esc(s) {
     return String(s).replace(/[&<>"']/g, function (c) {
@@ -44,9 +47,10 @@
     return (n === 0 ? "E" : n > 0 ? "+" + n : "−" + -n) + (r.net ? " net" : "");
   }
 
-  function head(title, sub) {
+  function head(title, sub, href) {
     return '<h2 class="subhead"><span>' + esc(title) + "</span>" +
-      (sub ? '<small class="sub">' + esc(sub) + "</small>" : "") +
+      (sub && href ? '<a class="sub sub-link" href="' + esc(href) + '">' + esc(sub) + ' <span aria-hidden="true">&rarr;</span></a>'
+        : sub ? '<small class="sub">' + esc(sub) + "</small>" : "") +
       "</h2>";
   }
 
@@ -83,7 +87,9 @@
 
   function card(r) {
     var n = overPar(r);
-    return '<article class="round' + (r.example ? " example" : "") + (r.image ? " has-photo" : "") + '"' + (r._id ? ' id="' + r._id + '"' : "") + ">" +
+    var opens = r._source === "On the course" && r.id; // a Scorecard round: tap for its scorecard
+    return '<article class="round' + (r.example ? " example" : "") + (r.image ? " has-photo" : "") + (opens ? " opens-card" : "") + '"' +
+      (r._id ? ' id="' + r._id + '"' : "") + (opens ? ' data-sc-round="' + esc(r.id) + '" tabindex="0" role="button" aria-label="' + esc(r.course + ", " + day(r.date) + ": open the scorecard") + '"' : "") + ">" +
       (r.image ? '<div class="round-photo"><img src="' + esc(r.image) + '" alt="" loading="lazy"></div>' : "") +
       '<div class="round-top"><span>' + esc(day(r.date)) + "</span>" +
         ((r.holes || 18) !== 18 ? '<span class="holes">' + esc(r.holes) + " holes</span>" : "") + "</div>" +
@@ -98,6 +104,7 @@
         : "") +
       (r.note ? '<p class="round-note">' + esc(r.note) + "</p>" : "") +
       (r.example ? '<span class="example-tag">Example</span>' : "") +
+      (opens ? '<span class="round-card-link">Scorecard <span aria-hidden="true">&rarr;</span></span>' : "") +
     "</article>";
   }
 
@@ -106,7 +113,7 @@
     var sections = SOURCES.map(function (s) {
       var rounds = (data[s.key] || []).slice().sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
       rounds.forEach(function (r, i) { r._id = "round-" + s.key + "-" + i; r._source = s.title; }); // the chart links to these
-      return '<section class="subsection" id="' + slug(s.title) + '">' + head(s.title, s.sub) +
+      return '<section class="subsection" id="' + slug(s.title) + '">' + head(s.title, s.sub, s.href && scorecardOpen ? s.href : null) +
         (rounds.length
           ? summary(rounds, data[s.key + "Stats"]) + '<div class="rounds">' + rounds.map(card).join("") + "</div>"
           : '<p class="empty">Coming soon.</p>') +
@@ -130,13 +137,13 @@
         : '<p class="empty">Coming soon.</p>') +
     "</section>");
 
-    sections.unshift('<section class="subsection" id="score-trend">' + head("Score Trend", "18-hole rounds") +
+    // On the course first, then the Score Trend, then the simulators
+    sections.splice(1, 0, '<section class="subsection" id="score-trend">' + head("Score Trend", "18-hole rounds") +
       '<div class="trend" id="trend-chart"></div></section>');
 
-    var jump = '<nav class="jump" aria-label="Sections">' +
-      '<a href="#score-trend">Score Trend</a>' +
-      SOURCES.map(function (s) { return '<a href="#' + slug(s.title) + '">' + esc(s.title) + "</a>"; }).join("") +
-      '<a href="#whats-in-the-bag">What\'s In The Bag</a></nav>';
+    var links = SOURCES.map(function (s) { return '<a href="#' + slug(s.title) + '">' + esc(s.title) + "</a>"; });
+    links.splice(1, 0, '<a href="#score-trend">Score Trend</a>');
+    var jump = '<nav class="jump" aria-label="Sections">' + links.join("") + '<a href="#whats-in-the-bag">What\'s In The Bag</a></nav>';
 
     root.innerHTML = jump + sections.join("");
     chartBox = document.getElementById("trend-chart");
@@ -391,20 +398,59 @@
     timer = setTimeout(function () { if (chartBox && chartBox.clientWidth !== lastW) { lastW = chartBox.clientWidth; drawChart(); } }, 150);
   });
 
-  // Nick's real-course rounds from the Scorecard
+  // Nick's real-course rounds from the Scorecard, and whether this viewer can open the Scorecard (for the link)
   var token = null;
   try { token = localStorage.getItem("nm-admin-token"); } catch (e) {}
+  var auth = token ? { Authorization: "Bearer " + token } : {};
+  function getJson(path) { return fetch(API + path, { headers: auth }).then(function (r) { return r.ok ? r.json() : {}; }).catch(function () { return {}; }); }
   if (API) {
-    fetch(API + "/scorecard/feed", { headers: token ? { Authorization: "Bearer " + token } : {} })
-      .then(function (r) { return r.ok ? r.json() : { rounds: [] }; })
-      .then(function (d) {
-        if (!d.rounds || !d.rounds.length) return;
-        data.course = d.rounds;
-        render();
-        lastW = chartBox ? chartBox.clientWidth : 0;
-        var target = location.hash && document.getElementById(location.hash.slice(1));
-        if (target) target.scrollIntoView();
-      })
-      .catch(function () {});
+    Promise.all([getJson("/scorecard/feed"), getJson("/scorecard/status")]).then(function (res) {
+      var rounds = res[0].rounds || [], open = !!(res[1].public || res[1].owner);
+      if (!rounds.length && !open) return;
+      data.course = rounds;
+      scorecardOpen = open;
+      render();
+      lastW = chartBox ? chartBox.clientWidth : 0;
+      var target = location.hash && document.getElementById(location.hash.slice(1));
+      if (target) target.scrollIntoView();
+    });
   }
+
+  // A Scorecard round's card, full screen: the card drawing code, the viewer and the card's fonts load on the first tap
+  var cardKit = null;
+  function loadCardKit() {
+    if (cardKit) return cardKit;
+    function js(src) {
+      return new Promise(function (res, rej) { var x = document.createElement("script"); x.src = src; x.onload = res; x.onerror = rej; document.head.appendChild(x); });
+    }
+    var fonts = new Promise(function (res) {
+      var l = document.createElement("link");
+      l.rel = "stylesheet";
+      l.href = "https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Dancing+Script:wght@700&family=Roboto+Condensed:wght@400;700&family=Tinos:wght@400;700&display=swap";
+      l.onload = res; l.onerror = res;
+      document.head.appendChild(l);
+    });
+    cardKit = Promise.all([fonts, js("/extras/scorecard/card.js").then(function () { return js("/extras/scorecard/viewer.js"); })]);
+    cardKit.catch(function () { cardKit = null; });
+    return cardKit;
+  }
+  function openCard(el) {
+    if (el.classList.contains("busy")) return;
+    el.classList.add("busy");
+    Promise.all([loadCardKit(), fetch(API + "/scorecard/feed/" + encodeURIComponent(el.dataset.scRound), { headers: auth }).then(function (r) {
+      if (!r.ok) throw new Error();
+      return r.json();
+    })]).then(function (res) {
+      el.classList.remove("busy");
+      if (res[1].course) window.NMCardViewer.open(res[1]);
+    }).catch(function () { el.classList.remove("busy"); });
+  }
+  root.addEventListener("click", function (e) {
+    var el = e.target.closest("[data-sc-round]");
+    if (el && !e.target.closest("a")) openCard(el);
+  });
+  root.addEventListener("keydown", function (e) {
+    var el = e.target.closest && e.target.closest("[data-sc-round]");
+    if (el && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openCard(el); }
+  });
 })();

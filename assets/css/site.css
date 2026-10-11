@@ -499,6 +499,11 @@ html.wall-bg-on .topbar nav a[href="/play/"]::before { background: rgba(255, 255
 .trend-tip-meta { display: flex; align-items: center; gap: 6px; font-size: 0.72rem; }
 .trend-tip-meta i { width: 12px; height: 2px; border-radius: 1px; }
 .round.flash { animation: round-flash 1.6s ease-out; }
+/* a Scorecard round (Golf page, golf.js): tap for its scorecard, full screen */
+.round.opens-card { cursor: pointer; transition: border-color 0.15s ease, transform 0.15s ease; }
+.round.opens-card:hover, .round.opens-card:focus-visible { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); outline: none; }
+.round.opens-card.busy { opacity: 0.6; }
+.round-card-link { display: block; margin-top: 12px; font-size: 0.85rem; font-weight: 500; color: var(--accent); }
 @keyframes round-flash {
   0%, 30% { box-shadow: 0 0 0 2px var(--accent), 0 0 40px -6px var(--accent); }
   100% { box-shadow: 0 0 0 0 transparent; }
@@ -1138,6 +1143,10 @@ html.wall-bg-on .group.panel {
   text-transform: none;
   color: var(--muted);
 }
+/* Golf page: On the course's "Scorecard ->" (golf.js), a link to the Scorecard for whoever can open it */
+.subhead .sub-link { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, var(--accent) 60%, transparent); color: var(--fg); }
+.subhead .sub-link span { display: inline-block; margin-left: 2px; color: var(--accent); transition: transform 0.15s ease; }
+.subhead .sub-link:hover span, .subhead .sub-link:focus-visible span { transform: translateX(3px); }
 
 .entries { display: grid; gap: 80px; }
 .entry {
