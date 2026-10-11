@@ -438,6 +438,12 @@
       ctx.fillStyle = HAND.color; ctx.textAlign = align || "center"; ctx.textBaseline = "middle";
       ctx.fillText(String(s), x, y + 1);
     };
+    // the biggest size up to max at which the text is no wider than room
+    var fit = function (v, max, room) {
+      ctx.font = "700 " + max + "px '" + HAND.font + "', cursive";
+      var tw = ctx.measureText(String(v)).width;
+      return tw > room ? max * room / tw : max;
+    };
     var cell = function (c, row) { return { x: (c[0] + c[1]) / 2 * W, y: (row[0] + row[1]) / 2 * H, w: (c[1] - c[0]) * W, h: (row[1] - row[0]) * H }; };
     var nineOf = function (h) { return g.nines[card.play[h <= 9 || card.play.length < 2 ? 0 : 1]]; };
     var n = course.holes || 18, any = function (f) { for (var h = 1; h <= n; h++) if (f(h) != null) return true; return false; };
@@ -495,14 +501,23 @@
         if (v == null || !nine) continue;
         var c = cell(nine.holes[(h - 1) % 9], row), size = Math.min(c.w, c.h) * 0.86;
         if (role.draw) { role.draw(v, c, size); continue; }
-        write(v, c.x, c.y, size);
-        if (role.marks) {
-          var d = v - course.par[h - 1], rr = size * 0.42;
-          ctx.strokeStyle = HAND.color; ctx.lineWidth = Math.max(1.4, size * 0.05);
-          var ring = function (rad) { ctx.beginPath(); ctx.ellipse(c.x, c.y, rad * 1.02, rad * 0.98, -0.2, 0, Math.PI * 2); ctx.stroke(); };
-          var box = function (rad) { ctx.beginPath(); ctx.rect(c.x - rad, c.y - rad, rad * 2, rad * 2); ctx.stroke(); };
-          if (d <= -1) { ring(rr); if (d <= -2) ring(rr * 0.78); } else if (d >= 1) { box(rr * 0.95); if (d >= 2) box(rr * 0.75); }
-        }
+        if (!role.marks || v === course.par[h - 1]) { write(v, c.x, c.y, fit(v, size, size * 0.92)); continue; }
+        // a birdie's ring or a bogey's box: one thin line set in from the card's own box lines; an eagle or a double bogey
+        // (or worse) is the same mark lightly shaded, not a second ring or box inside it (Nick, 2026-10-11: on Stone
+        // River's small boxes the nested marks crowded the numbers and looked like thick borders), so the number keeps
+        // its size on any card
+        var d = v - course.par[h - 1], two = Math.abs(d) >= 2, room = Math.min(c.w, c.h);
+        var half = room * 0.38, lw = Math.max(0.9, room * 0.035), nest = false;
+        var path = function (rad) {
+          ctx.beginPath();
+          if (d < 0) ctx.ellipse(c.x, c.y, rad, rad * 0.96, -0.2, 0, Math.PI * 2); else ctx.rect(c.x - rad, c.y - rad, rad * 2, rad * 2);
+        };
+        if (two && !nest) { path(half); ctx.fillStyle = "rgba(30, 42, 102, 0.16)"; ctx.fill(); }
+        ctx.strokeStyle = HAND.color; ctx.lineWidth = lw;
+        path(half); ctx.stroke();
+        var inner = half;
+        if (nest) { inner = half - Math.max(2.5, room * 0.09); path(inner); ctx.stroke(); }
+        write(v, c.x, c.y, fit(v, Math.min(size, inner * 2.3), inner * 2 * (d < 0 ? 0.8 : 0.88)));
       }
       // each nine's total, then the round's: a sum, or hits out of tries ("5/7")
       var tally = function (a, b) {
