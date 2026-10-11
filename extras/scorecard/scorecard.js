@@ -340,7 +340,7 @@
     Promise.all([myCourses(), fileList()]).then(function (res) {
       var list = res[0], files = res[1];
       var known = function (id) { return list.some(function (m) { return m.id === id; }); };
-      var rows = list.map(function (c) { return courseRow(c, "✓ Card"); });
+      var rows = list.map(function (c) { return courseRow(c, ownBadge(c, files)); });
       files.forEach(function (f) { if (!known(f.id)) rows.push(courseRow(f, f.ownerChecked ? "✓ Card" : "✓ Checked")); });
       prefs.recent.forEach(function (r) { if (!known(r.id) && !files.some(function (f) { return f.id === r.id; })) rows.push(courseRow(r, "")); });
       app.querySelector(".sc-mine").innerHTML = rows.join("") || '<li class="sc-muted">Search for a course to start.</li>';
@@ -372,7 +372,7 @@
         .then(function (res) {
           if (my !== seq) return;
           var own = res[0], files = res[1], found = res[2], shown = {};
-          var rows = own.filter(hit).map(function (c) { shown[c.id] = 1; return courseRow(c, "✓ Card"); });
+          var rows = own.filter(hit).map(function (c) { shown[c.id] = 1; return courseRow(c, ownBadge(c, files)); });
           files.filter(hit).forEach(function (f) {
             if (shown[f.id]) return;
             shown[f.id] = 1;
@@ -393,10 +393,15 @@
 
   }
 
+  // Nick's hand-made course files (courses/*.json): "✓ Copied" (copied by hand from the course's card), unless a card
+  // has been saved on the server for it too, which is what's used then (and what Remove saved card removes)
+  function ownBadge(c, files) {
+    return (files || []).some(function (f) { return f.id === c.id && f.ownerChecked; }) ? "✓ Card" : "✓ Copied";
+  }
   function courseRow(c, badge) {
     return '<li><button class="sc-row-btn" type="button" data-course="' + esc(c.id) + '"><span class="sc-row-main"><b>' + esc(c.name) + "</b>" +
       '<span class="sc-row-sub">' + esc(c.place || "") + (c.note ? " · " + esc(c.note) : "") + "</span></span>" +
-      (badge ? '<span class="sc-badge" title="This course\'s card has been checked">' + esc(badge) + "</span>" : "") + "</button></li>";
+      (badge ? '<span class="sc-badge" title="' + (badge === "✓ Copied" ? "Copied by hand from the course\'s card" : "This course\'s card has been checked") + '">' + esc(badge) + "</span>" : "") + "</button></li>";
   }
 
   // one row for a round kept here (r.course) or only on the server (a summary from GET /scorecard/rounds)
@@ -509,7 +514,9 @@
         return '<button type="button" class="sc-cc-btn" data-cand="' + i + '">' + esc(cardName(c)) + "</button>";
       }).join("") + "</div>" : "") +
       (cc.pictured ? '<p class="sc-cc-status">✓ Rounds here will be written on this card' + (draft.checked ? "." : ". Save the numbers as the course's card to keep it.") + "</p>" : "") +
-      (draft && draft.card && draft.card.kind === "photo" ? '<button type="button" class="sc-cc-prev" data-act="cardprev" aria-label="See the card full screen">' +
+      // every course: what a finished round will look like on the card it uses (its card picture, Nick's hand-made
+      // Pecan Hollow / Firewheel card, or the plain one)
+      (draft && draft.tees && draft.tees.length ? '<button type="button" class="sc-cc-prev" data-act="cardprev" aria-label="See the card full screen">' +
         '<canvas class="sc-card"></canvas><span>An example round on this course\'s card. Tap to see it big.</span></button>' : "") +
       (cc.checks && cc.checks.length ? '<ul class="sc-cc-checks">' + cc.checks.map(function (x) { return "<li>" + esc(x.msg) + "</li>"; }).join("") + "</ul>" : "") +
       '<div class="sc-cc-actions">' +
@@ -561,19 +568,20 @@
       // A three-nine card in one read can pass a minute, past what the reader allows. So the card is cut into its nines
       // (cardgrid.js), which are read side by side (about 15 s each). The whole card is read alongside only for its
       // rating table (per pair of nines) and its nines' names, and isn't waited on for long.
-      var whole = ask(img, "nines").then(function (r) { return r.read; }, function () { return null; });
+      var wholeErr = null;
+      var whole = ask(img, "nines").then(function (r) { return r.read; }, function (e) { wholeErr = e; return null; });
       var wholeRead = function () { // the whole read, or nothing if it's still going 20 s after the nines are in
         var late = new Promise(function (res) { setTimeout(function () { res(null); }, 20000); });
         return Promise.race([whole, late]);
       };
       return NMCardRead.ninePieces(img).then(function (pieces) {
-        if (!pieces) return whole.then(function (r) { if (!r) throw new Error("The card reader couldn't read that one just now. Try again in a moment."); return { read: r }; });
+        if (!pieces) return whole.then(function (r) { if (!r) throw wholeErr || new Error("The card reader couldn't read that one just now. Try again in a moment."); return { read: r }; });
         ccPaint("Reading the card's " + pieces.length + " nines…");
         return Promise.all(pieces.map(function (p) { return ask(p, "nine").then(function (r) { return r.read; }, function () { return null; }); }))
           .then(function (reads) {
             if (reads.some(function (r) { return !r; })) {
               // a piece failed: the whole card's read is the fallback
-              return whole.then(function (r) { if (!r) throw new Error("The card reader couldn't read that one just now. Try again in a moment."); return { read: r }; });
+              return whole.then(function (r) { if (!r) throw wholeErr || new Error("The card reader couldn't read that one just now. Try again in a moment."); return { read: r }; });
             }
             return wholeRead().then(function (w) {
               var nines = reads.map(NMCardRead.asNine);

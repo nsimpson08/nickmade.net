@@ -344,6 +344,10 @@ async function readCard(request, env, cors, h) {
     if (tries) await new Promise((r) => setTimeout(r, 1500));
     try { out = await env.AI.run(model, ask); } catch (e) { err = e; }
   }
+  // Workers AI's free daily allowance (10,000 neurons, reset at midnight UTC) used up: say so, not "in a moment"
+  if (!out && /4006|daily free allocation/i.test(String(err && (err.message || err)))) {
+    return h.json({ error: "The card reader has done all it can for today. Type the numbers in, or try again tomorrow." }, 429, cors);
+  }
   if (!out) return h.json({ error: "The card reader couldn't read that one just now. Try again in a moment.", detail: me.owner ? String(err && (err.message || err)) : undefined }, 502, cors);
   const ops = [env.QUEUE.put(allKey, String(+all + 1), { expirationTtl: 2 * DAY })];
   if (!me.owner) ops.push(env.QUEUE.put(myKey, String(+mine + 1), { expirationTtl: 2 * DAY }));
