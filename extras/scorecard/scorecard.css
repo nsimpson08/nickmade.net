@@ -307,6 +307,10 @@ a { color: inherit; }
 .sc-new .sc-in { height: 52px; font-size: 1rem; }
 .sc-add { border-style: dashed; }
 
+.sc-date { height: 52px; font-size: 1rem; color-scheme: inherit; }
+.sc-date-note { margin: 6px 2px 0; }
+.sc-redate { display: grid; gap: 6px; margin-top: 10px; }
+.sc-redate label { font-size: 0.85rem; color: var(--muted); }
 /* the start screen's round in progress, and the "saved" notice */
 .sc-resume {
   display: grid; gap: 2px; width: 100%; margin-top: 16px; padding: 14px 16px; border: 2px solid var(--accent); border-radius: 16px;

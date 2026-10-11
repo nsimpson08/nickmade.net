@@ -102,6 +102,12 @@
   var undo = [];                    // this session's changes, newest last: { n, before }
   var wake = null;                  // the screen wake lock while a hole is showing
   var ready = false;                // the gate has let us in (sync waits for it)
+  // a "YYYY-MM-DD" played-on day as the round's date: now for today, noon that day for an old round
+  function dayToIso(d) {
+    if (!d || d === today()) return new Date().toISOString();
+    var p = d.split("-");
+    return new Date(+p[0], +p[1] - 1, +p[2], 12).toISOString();
+  }
   function today() { var d = new Date(); return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); }
 
   // ---------- the gate: owner only until the Worker says it's public ----------
@@ -263,27 +269,44 @@
       if (term.length < 3) { out.hidden = true; out.innerHTML = ""; return; }
       timer = setTimeout(function () { search(term, ++seq); }, 350);
     });
+    // Search covers Nick's hand-made course files, every approved course file on the server (courses added from
+    // their card, like Firewheel's Lakes Course) and OpenGolfAPI. Every word has to match, in any order. OpenGolfAPI
+    // matches whole names, so a search it finds nothing for is tried again with fewer words: "firewheel lakes" finds
+    // its single "Firewheel Golf Park" listing.
+    function apiSearch(words) {
+      return api("/scorecard/courses/search?q=" + encodeURIComponent(words.join(" "))).then(function (d) {
+        return (d.courses || []).length || words.length < 2 ? d : apiSearch(words.slice(0, -1));
+      });
+    }
     function search(term, my) {
       out.hidden = false;
       out.innerHTML = '<li class="sc-muted">Searching…</li>';
-      var lower = term.toLowerCase();
-      Promise.all([myCourses(), api("/scorecard/courses/search?q=" + encodeURIComponent(term)).catch(function (e) { return { error: e.message, courses: [] }; })])
+      var words = term.toLowerCase().split(/\s+/).filter(Boolean);
+      var hit = function (c) { var hay = (c.name + " " + (c.place || "")).toLowerCase(); return words.every(function (w) { return hay.indexOf(w) >= 0; }); };
+      filed = null; // fetch the server's list fresh, so a course just added from its card is found
+      Promise.all([myCourses(), fileList(), apiSearch(words).catch(function (e) { return { error: e.message, courses: [] }; })])
         .then(function (res) {
           if (my !== seq) return;
-          var own = res[0], found = res[1];
-          var rows = own.filter(function (c) { return (c.name + " " + c.place).toLowerCase().indexOf(lower) >= 0; }).map(function (c) { return courseRow(c, "✓ Card"); });
+          var own = res[0], files = res[1], found = res[2], shown = {};
+          var rows = own.filter(hit).map(function (c) { shown[c.id] = 1; return courseRow(c, "✓ Card"); });
+          files.filter(hit).forEach(function (f) {
+            if (shown[f.id]) return;
+            shown[f.id] = 1;
+            rows.push(courseRow(f, f.ownerChecked ? "✓ Card" : "✓ Checked"));
+          });
           (found.courses || []).forEach(function (c) {
             var file = own.filter(function (m) { return m.apiId === c.apiId; })[0];
-            if (file) return; // Nick's own file for it is already listed
+            if (file || shown["api:" + c.apiId]) return; // its course file is already listed
             var near = own.filter(function (m) { return m.nearApiId === c.apiId; })[0];
             rows.push(courseRow({ id: "api:" + c.apiId, name: c.name, place: c.place + (c.par ? " · par " + c.par : ""),
-              note: near ? "A different course from " + near.name : "" }, (filed || []).some(function (f) { return f.id === "api:" + c.apiId; }) ? "✓ Checked" : ""));
+              note: near ? "A different course from " + near.name : "" }, ""));
           });
           out.innerHTML = (rows.join("") || '<li class="sc-muted">' + esc(found.error || "No courses found.") + "</li>") +
             '<li><button class="sc-row-btn sc-add" type="button" data-act="newcourse"><span class="sc-row-main"><b>Not listed, or not the right course?</b>' +
             '<span class="sc-row-sub">Add it from its card</span></span></button></li>';
         });
     }
+
   }
 
   function courseRow(c, badge) {
@@ -332,7 +355,7 @@
 
   // ---------- setup: tee, holes, and a look at the numbers before teeing off ----------
 
-  var draft = null, setupTee = null, setupNine = "18", original = "";
+  var draft = null, setupTee = null, setupNine = "18", original = "", setupDay = null; // setupDay: the date played, for entering old rounds
   function numbers(c) { return JSON.stringify([c.par, c.hcp, c.hcpWomen || null, c.tees.map(function (t) { return t.yards; })]); }
 
   // keep: re-drawing the same course after the card check (its sources and the "original" numbers stay)
@@ -340,6 +363,7 @@
     if (!at(1, function () { setup(draft && draft.id === course.id ? draft : course, true); })) return; // with any numbers changed since
     draft = copy(course);
     if (!keep) {
+      setupDay = null;
       original = numbers(draft);
       cc = { id: draft.id, sources: [], status: "", now: copy(course) };
       setupNine = "18";
@@ -369,6 +393,8 @@
             return '<button type="button" role="radio" data-nine="' + o[0] + '" aria-checked="' + (o[0] === setupNine) + '">' + o[1] + "</button>";
           }).join("") + "</div>" : "") +
         (blank ? "" :
+        '<h3 class="sc-sub">Date played</h3><input type="date" id="sc-date" class="sc-in sc-date" max="' + today() + '" value="' + esc(setupDay || today()) + '" aria-label="Date played">' +
+        '<p class="sc-muted small sc-date-note"' + (setupDay && setupDay !== today() ? "" : " hidden") + '>An old round: enter each hole\'s score; putts and fairways can be left blank.</p>' +
         '<details class="sc-check"' + ((src.kind === "api" && !chk) || src.kind === "photo" || src.kind === "website" && !draft.card ? " open" : "") + "><summary>" +
           (chk ? "Look over the numbers" : "Check the numbers") + "</summary>" +
           '<p class="sc-muted small">Tap a par to change it. Yardage is for the tee you picked.</p><div class="sc-table"></div></details>' +
@@ -710,7 +736,7 @@
     var ab = app.querySelector(".sc-approve");
     if (ab && !ab.hidden && ab.querySelector("input").checked) queueApproval(draft);
     round = { id: uuid(), v: 1, course: draft, tee: tee.key, holes: holes, scores: {}, current: holes[0],
-      player: prefs.name || "", date: new Date().toISOString(), day: today(), startedAt: Date.now(), updatedAt: Date.now(),
+      player: prefs.name || "", date: dayToIso(setupDay), day: setupDay || today(), startedAt: Date.now(), updatedAt: Date.now(),
       onSite: OWNER }; // Nick's rounds go on his Golf page unless he turns it off at the end
     prefs.tees[draft.id] = tee.key;
     prefs.recent = [{ id: draft.id, name: draft.name, place: draft.place }].concat(prefs.recent.filter(function (r) { return r.id !== draft.id; })).slice(0, 8);
@@ -884,7 +910,8 @@
       '<div class="sc-play">' +
       '<header class="sc-bar">' +
         '<button class="sc-icon" type="button" data-act="menu" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>' +
-        '<div class="sc-title"><b>' + esc(c.name) + "</b><span>" + esc(tee.name) + ' tees <i class="sc-sync" aria-hidden="true"></i></span></div>' +
+        '<div class="sc-title"><b>' + esc(c.name) + "</b><span>" + esc(tee.name) + " tees" + (round.day && round.day !== today() ? " · " + esc(fmtDate(round.date)) : "") +
+          ' <i class="sc-sync" aria-hidden="true"></i></span></div>' +
         '<button class="sc-icon" type="button" data-act="undo" aria-label="Undo"' + (undo.length ? "" : " disabled") + '><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>' +
       "</header>" +
       '<nav class="sc-strip" aria-label="Holes">' + strip + "</nav>" +
@@ -1137,7 +1164,9 @@
         '<div class="sc-ghin" hidden></div>' +
         (OWNER ? '<label class="sc-approve sc-site"><input type="checkbox" id="sc-site"' + (r.onSite ? " checked" : "") + '><span>Show on my Golf page' +
           '<small>On the Golf page and the home page\'s Lately strip (only you see it until the Scorecard is public)</small></span></label>' : "") +
-        '<div class="sc-actions small"><button type="button" data-act="edit">Edit scores</button><button type="button" data-act="delete" class="danger">Delete round</button></div>' +
+        '<div class="sc-actions small"><button type="button" data-act="edit">Edit scores</button><button type="button" data-act="redate">Change date</button>' +
+          '<button type="button" data-act="delete" class="danger">Delete round</button></div>' +
+        '<div class="sc-redate" hidden><label for="sc-redate">Date played</label><input type="date" id="sc-redate" class="sc-in sc-date" max="' + today() + '" value="' + esc(dayOf(r)) + '"></div>' +
         '<p class="sc-credit">' + esc(sourceLine(c)) + "</p>" +
       "</section>";
     app.dataset.round = r.id;
@@ -1354,6 +1383,7 @@
       if (navigator.clipboard) navigator.clipboard.writeText(txt).then(function () { b.textContent = "Copied"; });
       return;
     }
+    if (act === "redate") { var rd = app.querySelector(".sc-redate"); rd.hidden = !rd.hidden; if (!rd.hidden) rd.querySelector("input").focus(); return; }
     if (act === "edit") {
       if (round && !round.finishedAt) { alert("Finish or quit the round you're playing first."); return; }
       round = copy(past);
@@ -1376,6 +1406,26 @@
   app.addEventListener("change", function (e) {
     var el = e.target, d = el.dataset;
     if (el.id === "sc-snap") { if (el.files && el.files[0]) snap(el.files[0]); return; }
+    if (el.id === "sc-date") {
+      setupDay = /^\d{4}-\d{2}-\d{2}$/.test(el.value) && el.value <= today() ? el.value : today();
+      el.value = setupDay;
+      var note = app.querySelector(".sc-date-note");
+      if (note) note.hidden = setupDay === today();
+      return;
+    }
+    if (el.id === "sc-redate") { // a saved round's date: here, on the server, and on the Golf page
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(el.value) || el.value > today()) return;
+      var all = load(K.rounds, []), rr = all.filter(function (x) { return x.id === app.dataset.round; })[0];
+      if (!rr) return;
+      rr.day = el.value;
+      rr.date = dayToIso(el.value);
+      rr.updatedAt = Date.now();
+      save(K.rounds, all.sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); }));
+      queueSync(0);
+      toast("Date changed to " + fmtDate(rr.date));
+      summary(rr);
+      return;
+    }
     if (el.id === "sc-site") { // Show on my Golf page
       var past = load(K.rounds, []), r = past.filter(function (x) { return x.id === app.dataset.round; })[0];
       if (!r) return;
