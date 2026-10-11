@@ -1226,7 +1226,8 @@
   }
 
   function reloadWatched() {
-    return fetch(API + "/watched?" + PQ).then(function (r) { return r.json(); }).then(function (data) {
+    // with the owner's login, or the Worker leaves out who he watched with (and a later Edit would then save it empty)
+    return fetch(API + "/watched?" + PQ, { cache: "no-store", headers: authHeaders() }).then(function (r) { return r.json(); }).then(function (data) {
       renderWatched(data.items || [], data.archive);
       resetFields();
       validate();
