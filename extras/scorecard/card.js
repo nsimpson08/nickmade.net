@@ -116,6 +116,7 @@
     var ctx = canvas.getContext("2d");
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
     var tee = course.tees.filter(function (x) { return x.key === round.tee; })[0] || course.tees[0];
+    var teeBox = null; // the tee played's name box, outlined at the end
 
     // columns: label, holes 1-9, OUT, divider, holes 10-18, IN, TOT, extras (HCP, NET)
     var front = Math.min(9, n), back = n > 9 ? n - 9 : 0, extras = g.extras || [];
@@ -206,6 +207,11 @@
     ctx.lineWidth = t.frame ? t.frame.width : 2;
     roundRect(ctx, gx, gy, gw, rowsH, t.frame ? t.frame.radius : 0);
     ctx.stroke();
+    if (teeBox) {
+      ctx.strokeStyle = teeBox.color;
+      ctx.lineWidth = 4.5;
+      ctx.strokeRect(teeBox.x + 2.25, teeBox.y + 2.25, teeBox.w - 4.5, teeBox.h - 4.5);
+    }
 
     // ---- cell contents ----
     function rowFill(r, c) {
@@ -250,15 +256,8 @@
           if (rs) text(rs, L.x + 10, ry + h * 0.72, { align: "left", size: 16, color: ink });
           if (tt.range) text(tt.range, L.x + L.w - 10, ry + h * 0.72, { align: "right", size: 16, color: ink });
         }
-        if (tt.key === round.tee) { // the tee played, circled by hand
-          ctx.save();
-          ctx.strokeStyle = lum(rowFill(r)) < 0.45 ? "#ffffff" : hand.color;
-          ctx.lineWidth = 2.4;
-          ctx.beginPath();
-          ctx.ellipse(L.x + L.w / 2, ry + h / 2, L.w / 2 - 3, h / 2 - 3, -0.03, 0.15, Math.PI * 2 + 0.05);
-          ctx.stroke();
-          ctx.restore();
-        }
+        // the tee played gets a bold outline round its name box (drawn last, over the grid lines; Nick: not a circle)
+        if (tt.key === round.tee) teeBox = { x: L.x, y: ry, w: L.w, h: h, color: lum(rowFill(r)) < 0.45 ? "#ffffff" : hand.color };
         var alt = tt.alt || {};
         var y1 = function (k) { return tt.yards[k - 1]; };
         var y2 = function (k) { return alt[k] != null ? alt[k] : tt.yards[k - 1]; };
@@ -419,7 +418,7 @@
   function header(ctx, course, round, t, tee, W, text, pictures) {
     var hd = t.header, g = t.grid, cx = W / 2;
     // the real card's hole drawings, where the course file has them (the round is then on the card itself: the tee
-    // circled, the totals in Out / In / Tot, the scorer and date on the bottom line, like a real card)
+    // outlined, the totals in Out / In / Tot, the scorer and date on the bottom line, like a real card)
     (hd.art || []).forEach(function (a, i) { if (pictures[i]) ctx.drawImage(pictures[i], a.x, a.y, a.w, a.h); });
     if (hd.logo && LOGOS[hd.logo]) LOGOS[hd.logo](ctx, cx, hd.logoY || hd.h * 0.43, text);
     else {

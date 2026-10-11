@@ -503,7 +503,16 @@ html.wall-bg-on .topbar nav a[href="/play/"]::before { background: rgba(255, 255
 .round.opens-card { cursor: pointer; transition: border-color 0.15s ease, transform 0.15s ease; }
 .round.opens-card:hover, .round.opens-card:focus-visible { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); outline: none; }
 .round.opens-card.busy { opacity: 0.6; }
-.round-card-link { display: block; margin-top: 12px; font-size: 0.85rem; font-weight: 500; color: var(--accent); }
+.round-card-link {
+  display: inline-flex; align-items: center; gap: 8px; margin-top: 14px; padding: 9px 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  font-size: 0.9rem; font-weight: 600; color: var(--accent); transition: background 0.15s ease, color 0.15s ease;
+}
+.round-card-link svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; }
+.round-card-link .arrow { transition: transform 0.15s ease; }
+.round.opens-card:hover .round-card-link, .round.opens-card:focus-visible .round-card-link { background: var(--accent); color: #062218; }
+.round.opens-card:hover .round-card-link .arrow, .round.opens-card:focus-visible .round-card-link .arrow { transform: translateX(3px); }
 @keyframes round-flash {
   0%, 30% { box-shadow: 0 0 0 2px var(--accent), 0 0 40px -6px var(--accent); }
   100% { box-shadow: 0 0 0 0 transparent; }

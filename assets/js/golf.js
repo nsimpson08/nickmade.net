@@ -104,7 +104,8 @@
         : "") +
       (r.note ? '<p class="round-note">' + esc(r.note) + "</p>" : "") +
       (r.example ? '<span class="example-tag">Example</span>' : "") +
-      (opens ? '<span class="round-card-link">Scorecard <span aria-hidden="true">&rarr;</span></span>' : "") +
+      (opens ? '<span class="round-card-link"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/>' +
+        '<path d="M3 10h18M3 14.5h18M9 5v14M15 5v14"/></svg>View scorecard <span class="arrow" aria-hidden="true">&rarr;</span></span>' : "") +
     "</article>";
   }
 
