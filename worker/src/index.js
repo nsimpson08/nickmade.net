@@ -79,6 +79,8 @@ const WITH_MAX = 120;
 function cleanWith(w) { return String(w == null ? "" : w).replace(/\s+/g, " ").trim().slice(0, WITH_MAX); }
 // where Nick watched it (Movies, public): "home" or "theater"; anything else means not said
 function cleanWhere(w) { return w === "home" || w === "theater" ? w : ""; }
+// first time seeing it or a rewatch (Movies, public): "first" or "rewatch"
+function cleanWatch(w) { return w === "first" || w === "rewatch" ? w : ""; }
 function withoutPrivate(it) { if (!it.watchedWith) return it; const { watchedWith, ...rest } = it; return rest; }
 const MOVIE_TYPES = new Set(["movie", "tvMovie", "video"]);
 const GAME_TYPES = new Set(["videoGame"]);
@@ -655,6 +657,7 @@ function archived(it, owner) {
   if (it.rating) out.rating = it.rating;
   if (it.review) out.review = it.review;
   if (it.where) out.where = it.where;
+  if (it.watch) out.watch = it.watch;
   if (it.archivedAt) out.archivedAt = it.archivedAt;
   return out;
 }
@@ -714,6 +717,8 @@ async function addWatched(request, env, cors) {
   if (withWho) item.watchedWith = withWho;
   const where = page === "movies" ? cleanWhere(body.where) : "";
   if (where) item.where = where;
+  const watch = page === "movies" ? cleanWatch(body.watch) : "";
+  if (watch) item.watch = watch;
 
   const items = (await getList(env, watchedKey(page))).filter((it) => it.id !== item.id);
   items.push(item);
@@ -764,6 +769,10 @@ async function editWatched(request, url, env, cors) {
   if (body.where !== undefined && page === "movies") { // the same
     const where = cleanWhere(body.where);
     if (where) item.where = where; else delete item.where;
+  }
+  if (body.watch !== undefined && page === "movies") { // the same
+    const watch = cleanWatch(body.watch);
+    if (watch) item.watch = watch; else delete item.watch;
   }
   item.id = item.imdbId + "-" + date;
   // A new date could collide with another viewing of the same movie; keep the edited one

@@ -177,13 +177,23 @@
 
   // Where Nick watched a movie (Movies' Recently Watched, 2026-10-10): a little house or a cinema ticket under the date
   var WHERE = {
-    home: { label: "At home", icon: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 7.2 8 2.6l5.5 4.6"/><path d="M4 6.1v7.3h3V10h2v3.4h3V6.1"/></svg>' },
-    theater: { label: "In theaters", icon: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.8 4.5h12.4v2.1a1.4 1.4 0 0 0 0 2.8v2.1H1.8V9.4a1.4 1.4 0 0 0 0-2.8z"/><path d="M10.6 5.3v.9M10.6 7.5v.9M10.6 9.7v.9"/></svg>' },
+    home: { label: "Home", icon: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 7.2 8 2.6l5.5 4.6"/><path d="M4 6.1v7.3h3V10h2v3.4h3V6.1"/></svg>' },
+    theater: { label: "Theater", icon: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.8 4.5h12.4v2.1a1.4 1.4 0 0 0 0 2.8v2.1H1.8V9.4a1.4 1.4 0 0 0 0-2.8z"/><path d="M10.6 5.3v.9M10.6 7.5v.9M10.6 9.7v.9"/></svg>' },
+  };
+  // First time or a rewatch (Movies' Recently Watched, 2026-10-10): a play or a rewind icon, under the date too
+  var WATCH = {
+    first: { label: "1st watch", icon: '<svg class="solid" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 3v10l8.5-5z"/></svg>' },
+    rewatch: { label: "Rewatch", icon: '<svg class="solid" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5 2 8l6 4.5zM14.5 3.5 8.5 8l6 4.5z"/></svg>' },
   };
   window.NMWhere = WHERE; // film-dialog.js shows it in the case too
-  function whereLine(w) {
-    var o = WHERE[w];
-    return o ? '<div class="watched-where" data-where="' + w + '">' + o.icon + "<span>" + o.label + "</span></div>" : "";
+  window.NMWatch = WATCH;
+  // 1st watch / Rewatch and Home / Theater side by side on one line, to save room (Nick)
+  function watchWhere(it) {
+    var a = WATCH[it.watch], b = WHERE[it.where];
+    if (!a && !b) return "";
+    var bit = function (o, attr, v) { return '<span class="ww" ' + attr + '="' + v + '">' + o.icon + "<span>" + o.label + "</span></span>"; };
+    return '<div class="watched-where">' + (a ? bit(a, "data-watch", it.watch) : "") + (a && b ? '<span class="ww-sep" aria-hidden="true">·</span>' : "") +
+      (b ? bit(b, "data-where", it.where) : "") + "</div>";
   }
 
   // kind: "queue" (default), "watched", or "list" (then l is the live section it belongs to)
@@ -234,7 +244,7 @@
           "</div>"
         : "") +
       (watched && it.date ? '<div class="watched-on">' + (it.xbox ? "Last played" : DID) + " " + esc(watchedOn(it.date)) + "</div>" : "") +
-      (watched && PAGE === "movies" ? whereLine(it.where) : "") +
+      (watched && PAGE === "movies" ? watchWhere(it) : "") +
       (ADMIN ? '<div class="owner-actions">' + (watched ? '<button class="edit" type="button">Edit</button>' : "") +
         '<button class="remove" type="button">Remove</button></div>'
         : yours ? '<div class="owner-actions mine-actions"><span>Your suggestion</span><button class="edit" type="button">Edit</button>' +
@@ -776,6 +786,10 @@
       '<p class="count" id="q-review-count" aria-live="polite"></p>' +
       // who Nick watched it with (Movies, owner only; never shown to visitors: the Worker only sends it back to him)
       // where Nick watched it (Movies, owner only to set; shown on the card to everyone). Click a picked one again to clear it
+      '<fieldset class="who where" id="q-watch"><legend>Seen it?</legend>' +
+        '<label><input type="radio" name="q-watch" value="first">' + WATCH.first.icon + " 1st watch</label>" +
+        '<label><input type="radio" name="q-watch" value="rewatch">' + WATCH.rewatch.icon + " Rewatch</label>" +
+      "</fieldset>" +
       '<fieldset class="who where" id="q-where"><legend>Where?</legend>' +
         '<label><input type="radio" name="q-where" value="home">' + WHERE.home.icon + " Home</label>" +
         '<label><input type="radio" name="q-where" value="theater">' + WHERE.theater.icon + " Theater</label>" +
@@ -830,11 +844,16 @@
   var whereField = dialog.querySelector("#q-where");
   function whereValue() { var c = whereField.querySelector("input:checked"); return c ? c.value : ""; }
   function setWhere(w) { whereField.querySelectorAll("input").forEach(function (i) { i.checked = i.value === w; }); }
+  var watchField = dialog.querySelector("#q-watch");
+  function watchValue() { var c = watchField.querySelector("input:checked"); return c ? c.value : ""; }
+  function setWatch(w) { watchField.querySelectorAll("input").forEach(function (i) { i.checked = i.value === w; }); }
   // radios can't be unpicked, so a click on the picked one clears it ("not said")
-  whereField.addEventListener("click", function (e) {
-    var input = e.target.closest("label") && e.target.closest("label").querySelector("input");
-    if (!input || e.target === input) return;
-    if (input.checked) { e.preventDefault(); input.checked = false; }
+  [whereField, watchField].forEach(function (f) {
+    f.addEventListener("click", function (e) {
+      var input = e.target.closest("label") && e.target.closest("label").querySelector("input");
+      if (!input || e.target === input) return;
+      if (input.checked) { e.preventDefault(); input.checked = false; }
+    });
   });
   function showReviewCount() {
     var left = REVIEW_MAX - reviewInput.value.length;
@@ -962,6 +981,7 @@
     showReviewCount();
     withInput.value = "";
     setWhere("");
+    setWatch("");
     dialog.querySelector('input[name="q-who"][value="public"]').checked = true;
     hidePreview();
   }
@@ -983,7 +1003,7 @@
     dateLabel.hidden = dateInput.hidden = !watching;
     rateLabel.hidden = rate.hidden = !watching;
     reviewLabel.hidden = reviewInput.hidden = reviewCount.hidden = !watching;
-    withLabel.hidden = withInput.hidden = whereField.hidden = !(watching && ADMIN && PAGE === "movies");
+    withLabel.hidden = withInput.hidden = whereField.hidden = watchField.hidden = !(watching && ADMIN && PAGE === "movies");
     movie.readOnly = !!editing || !!mineEdit;
     if (mineEdit) {
       chosen = { id: it.imdbId };
@@ -1004,6 +1024,7 @@
       showReviewCount();
       withInput.value = it.watchedWith || "";
       setWhere(it.where || "");
+      setWatch(it.watch || "");
     }
     if (watching && !dateInput.value) dateInput.value = today();
     heading.textContent = mineEdit ? "Edit your suggestion" : editing ? "Edit " + it.title : watching ? "Log a " + KIND : target ? "Add a " + KIND : ADMIN ? "Submit a " + KIND : "Suggest a " + KIND;
@@ -1114,7 +1135,7 @@
       headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify(watching
         ? { page: PAGE, imdbId: chosen.id, date: dateInput.value, rating: rating, poster: pickedPoster(), review: reviewInput.value.trim(), watchedWith: PAGE === "movies" ? withInput.value.trim() : undefined,
-            where: PAGE === "movies" ? whereValue() : undefined }
+            where: PAGE === "movies" ? whereValue() : undefined, watch: PAGE === "movies" ? watchValue() : undefined }
         : { page: PAGE, imdbId: chosen.id, name: ADMIN ? "" : nameInput.value.trim(), visitorId: VID, poster: pickedPoster(),
             comment: ADMIN ? "" : commentInput.value.trim(), commentPrivate: !ADMIN && commentPrivate() }),
     })
@@ -1221,7 +1242,7 @@
       method: "PATCH",
       headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ date: dateInput.value, rating: rating, review: reviewInput.value.trim(), watchedWith: PAGE === "movies" ? withInput.value.trim() : undefined,
-        where: PAGE === "movies" ? whereValue() : undefined }),
+        where: PAGE === "movies" ? whereValue() : undefined, watch: PAGE === "movies" ? watchValue() : undefined }),
     })
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
       .then(function (res) {
