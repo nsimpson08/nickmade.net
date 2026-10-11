@@ -16,6 +16,7 @@
 //   NMCardRead.bigOf(dataURL)  -> the same card up to 3200 px (this session only; else the dataURL itself)
 //   NMCardRead.textOf(dataURL) -> the PDF page's own printed text ("" for a photo), sent along to the reader
 //   NMCardRead.ninePieces(dataURL) -> Promise<[dataURL per nine] | null>   a 27-hole card cut into its nines
+//   NMCardRead.fromHalves(frontRead, backRead) -> read   an 18-hole card read nine by nine (part "nine")
 //   NMCardRead.fromNines(read, names) -> read | null   a 27-hole card's nines (part "nines") -> the one or two played
 //   NMCardRead.half(dataURL, "front"|"back") -> Promise<dataURL>   that nine, close up
 //   NMCardRead.closeUps(read, holes) -> ["front"?, "back"?]   the nines whose par/handicap rows don't hold up
@@ -249,6 +250,27 @@
       tees: (r.tees || []).map(function (t) { return { name: t.name, color: t.color, yards: t.yards, total: t.out }; }) };
   }
 
+  // an 18-hole card read as its two nines (a long, thin card, Stone River's: shrunk whole, its numbers are too small to
+  // read) -> one ordinary read: the front nine's tees with the back nine's beside them (by name, else row color);
+  // handicaps as printed (they're already 1-18)
+  function fromHalves(a, b) {
+    if (!a || !b) return null;
+    var low = function (v) { return String(v || "").toLowerCase().trim(); };
+    var colorOf = function (t) { return low(t && t.color).split(/\s+/).pop(); };
+    var tees = (a.tees || []).map(function (t) {
+      var u = (b.tees || []).filter(function (x) { return low(x.name) && low(x.name) === low(t.name); })[0] ||
+        (b.tees || []).filter(function (x) { return colorOf(x) && colorOf(x) === colorOf(t); })[0];
+      if (!u) return null;
+      var out = int(first(t.out), 100, 5000), inn = int(first(u.out), 100, 5000);
+      return { name: t.name, color: t.color, rating: t.rating, slope: t.slope, yards: list(t.yards, 9, 30, 800).concat(list(u.yards, 9, 30, 800)),
+        out: out, "in": inn, total: out != null && inn != null ? out + inn : null };
+    }).filter(Boolean);
+    var both = function (x, y) { return x && y && x.length && y.length ? list(x, 9, 0, 99).concat(list(y, 9, 0, 99)) : null; };
+    var parOut = int(first(a.parOut), 27, 45), parIn = int(first(b.parOut), 27, 45);
+    return { tees: tees, par: both(a.par, b.par), hcp: both(a.hcp, b.hcp), hcpWomen: both(a.hcpWomen, b.hcpWomen),
+      parOut: parOut, parIn: parIn, parTotal: parOut != null && parIn != null ? parOut + parIn : null };
+  }
+
   // ---------- a 27-hole club's card: the nines being played, as one ordinary read ----------
   // names: the nines played, in order ("Bear", "Elk"). Each nine ranks its handicaps on its own (1-9, or odd 1-17);
   // two played as an 18: the first takes the odd numbers and the second the even. The rating and slope come from the
@@ -308,5 +330,5 @@
     return res;
   }
 
-  window.NMCardRead = { ninePieces: ninePieces, asNine: asNine, bigOf: bigOf, textOf: textOf, fromNines: fromNines, fromFile: fromFile, half: half, closeUps: closeUps, mergeCloseUp: mergeCloseUp, toCourse: toCourse, slug: slug };
+  window.NMCardRead = { fromHalves: fromHalves, ninePieces: ninePieces, asNine: asNine, bigOf: bigOf, textOf: textOf, fromNines: fromNines, fromFile: fromFile, half: half, closeUps: closeUps, mergeCloseUp: mergeCloseUp, toCourse: toCourse, slug: slug };
 })();

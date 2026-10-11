@@ -458,7 +458,7 @@
     var extra = Math.max(0, roles.length - rows.length), rowH = 0, gap = extra ? 6 : 0;
     if (extra) {
       var hs = g.rows.map(function (r) { return (r[1] - r[0]) * H; }).sort(function (a, b) { return a - b; });
-      rowH = Math.max(34, Math.min(60, hs[hs.length >> 1] || 40));
+      rowH = Math.max(18, Math.min(60, hs[hs.length >> 1] || 40));
       for (var e = 0; e < extra; e++) rows.push([(H + gap + e * rowH) / H, (H + gap + (e + 1) * rowH) / H]);
     }
     var EH = extra ? gap + extra * rowH + 6 : 0;

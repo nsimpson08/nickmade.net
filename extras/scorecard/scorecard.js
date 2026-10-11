@@ -592,7 +592,21 @@
         return read;
       });
     }
-    return ask(img, "all").then(function (res) {
+    // a long, thin card (Stone River's four panels in a row; Holiday Hills' table): shrunk whole, its numbers are too
+    // small to read, so its two nines are cut out (with the row names) and read side by side
+    var wide = new Promise(function (res) { var im = new Image(); im.onload = function () { res(im.naturalWidth / im.naturalHeight > 2.6); }; im.onerror = function () { res(false); }; im.src = img; });
+    return wide.then(function (isWide) {
+      if (!isWide || holes !== 18) return null;
+      return NMCardRead.ninePieces(img).then(function (pieces) {
+        if (!pieces || pieces.length !== 2) return null;
+        ccPaint("Reading the card's two nines…");
+        return Promise.all(pieces.map(function (p) { return ask(p, "nine").then(function (r) { return r.read; }); }))
+          .then(function (reads) { return NMCardRead.fromHalves(reads[0], reads[1]); }, function () { return null; });
+      });
+    }).then(function (halves) {
+      return halves || readWhole();
+    });
+    function readWhole() { return ask(img, "all").then(function (res) {
       var sides = NMCardRead.closeUps(res.read, holes);
       if (sides.length) ccPaint("Taking a closer look at the par and handicap rows…");
       // both nines at once when both need it
@@ -601,7 +615,7 @@
       })).then(function (closes) {
         return closes.reduce(function (read, close, i) { return close ? NMCardRead.mergeCloseUp(read, sides[i], close) : read; }, res.read);
       });
-    });
+    }); }
   }
 
   // the course's own card from its website: found by the Worker, read once (and kept here by its address)

@@ -67,7 +67,7 @@
     // horizontal lines: a rule or a row's colored edge running a quarter of the width or more
     var hm = lineMap(im, 0, 1, true);
     var hp = longest(hm, w, h, true);
-    var ys = peaks(hp, w * 0.25, 6);
+    var ys = peaks(hp, w * 0.15, 6);
     if (ys.length < 6) return null;
     // the grid's height: from the first to the last of those lines
     var gy0 = Math.round(ys[0]), gy1 = Math.round(ys[ys.length - 1]);
@@ -118,7 +118,7 @@
       // it than cross the holes
       var runCross = run.map(function (c) { return c[2]; }).sort(function (a, b) { return a - b; })[run.length >> 1];
       while (run.length > 9 && run[0][2] < runCross * 0.85) { run.shift(); i2++; }
-      if (run.length >= 9 && med > w * 0.018) {
+      if (run.length >= 9 && med > 14) {
         // nine holes, then that nine's total (Out / In / TOT 9), and again for a second nine in the same run
         var k = 0;
         while (k + 9 <= run.length) {
@@ -130,7 +130,7 @@
           // the first hole, and the round's total column (Total) from the last line to the edge, when there's room
           if (!label && at === 0 && holes[0][0] > med * 1.6) label = [2, holes[0][0]];
           if (!after && w - total[1] > med * 0.8) after = [total[1], Math.min(w - 2, total[1] + Math.max(wid(total), med))];
-          nines.push({ holes: holes, total: total, after: after, label: label });
+          nines.push({ holes: holes, total: total, after: after, label: label, next: cols[at + 11] || null });
           k += 10;
           if (run[k] && cols[i2 + k] && Math.abs(wid(cols[i2 + k]) - med) > med * 0.16) break;
           // a divider column ("Players Initials") between the nines is a different width: the run carries on after it
@@ -140,6 +140,19 @@
     }
     // a front and back nine split by a divider column of another width: the second run's nine is already found above
     if (!nines.length) return null;
+    // a back nine's "In, Out, Tot" (Stone River): the column after In repeats the front's Out, so the round's total
+    // goes in the one after that. A repeat: the two columns' pixels, down the grid, nearly the same
+    var same = function (a, b) {
+      var n = 0, diff = 0, aw = wid(a), bw = wid(b);
+      for (var yy = gy0; yy <= gy1; yy += 2) for (var f = 0.15; f <= 0.85; f += 0.07) {
+        diff += Math.abs(im.g[yy * w + Math.round(a[0] + aw * f)] - im.g[yy * w + Math.round(b[0] + bw * f)]); n++;
+      }
+      return n && diff / n < 10;
+    };
+    for (var q = 1; q < nines.length; q++) {
+      var bk = nines[q], fr = nines[q - 1];
+      if (bk.after && bk.next && fr.total && Math.abs(wid(bk.after) - wid(fr.total)) < wid(fr.total) * 0.2 && same(bk.after, fr.total)) bk.after = bk.next;
+    }
 
     // rows, and which of them are blank and light across a nine's hole cells (the rows a player writes in)
     var rows = [];
