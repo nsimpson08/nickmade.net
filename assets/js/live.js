@@ -203,6 +203,7 @@
     var yours = !ADMIN && !watched && !l && it.mine;
     var fig = document.createElement("figure");
     fig.className = "poster suggested";
+    if (watched) fig.nmItem = it; // reviews.js lists it in the Archive when it's past the newest 8 (6 on a phone)
     fig.dataset.imdb = it.imdbId;
     fig.dataset.filmTitle = it.title; // for film-dialog.js (not data-title: that marks list.js items for owner Remove)
     if (it.year) fig.dataset.year = it.year;

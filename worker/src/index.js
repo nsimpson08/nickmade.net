@@ -81,7 +81,13 @@ function cleanWith(w) { return String(w == null ? "" : w).replace(/\s+/g, " ").t
 function cleanWhere(w) { return w === "home" || w === "theater" ? w : ""; }
 // first time seeing it or a rewatch (Movies, public): "first" or "rewatch"
 function cleanWatch(w) { return w === "first" || w === "rewatch" ? w : ""; }
-function withoutPrivate(it) { if (!it.watchedWith) return it; const { watchedWith, ...rest } = it; return rest; }
+// what visitors don't see of a watched movie: who Nick watched it with, and a suggester's note marked "just Nick"
+function withoutPrivate(it) {
+  if (!it.watchedWith && !it.commentPrivate) return it;
+  const { watchedWith, ...rest } = it;
+  if (rest.commentPrivate) { delete rest.comment; delete rest.commentPrivate; }
+  return rest;
+}
 const MOVIE_TYPES = new Set(["movie", "tvMovie", "video"]);
 const GAME_TYPES = new Set(["videoGame"]);
 const PAGES = { movies: "movie", games: "game" }; // page -> kind of title it lists
@@ -658,6 +664,9 @@ function archived(it, owner) {
   if (it.review) out.review = it.review;
   if (it.where) out.where = it.where;
   if (it.watch) out.watch = it.watch;
+  if (it.suggestedBy) out.suggestedBy = it.suggestedBy;
+  if (it.comment && (!it.commentPrivate || owner)) out.comment = it.comment;
+  if (it.comment && it.commentPrivate && owner) out.commentPrivate = true;
   if (it.archivedAt) out.archivedAt = it.archivedAt;
   return out;
 }
@@ -720,12 +729,20 @@ async function addWatched(request, env, cors) {
   const watch = page === "movies" ? cleanWatch(body.watch) : "";
   if (watch) item.watch = watch;
 
+  // Watching/playing something from the queue takes it out of the queue, and its suggestion comes along: who
+  // suggested it and their note (kept private if they chose "just Nick"), on the card and in the Archive
+  const queue = await getQueue(env, page);
+  const was = queue.find((it) => it.imdbId === imdbId);
+  if (was && was.suggestedBy) {
+    item.suggestedBy = was.suggestedBy;
+    if (was.comment) item.comment = was.comment;
+    if (was.comment && was.commentPrivate) item.commentPrivate = true;
+  }
+
   const items = (await getList(env, watchedKey(page))).filter((it) => it.id !== item.id);
   items.push(item);
   await saveWatched(env, page, items); // a 13th pushes the oldest out
 
-  // Watching/playing something from the queue takes it out of the queue
-  const queue = await getQueue(env, page);
   const kept = queue.filter((it) => it.imdbId !== imdbId);
   if (kept.length !== queue.length) await env.QUEUE.put(queueKey(page), JSON.stringify(kept));
 

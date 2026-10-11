@@ -164,7 +164,8 @@
   function renderArchive(el) {
     var a = el.nmArchive;
     var seen = {};
-    var all = a.live.filter(function (it) {
+    // the section's own posters past its newest 8 (6 on a phone) come first, then what the Worker has archived
+    var all = (a.overflow || []).concat(a.live).filter(function (it) {
       var k = String(it.title).toLowerCase() + "|" + (it.year || "") + "|" + (it.date || "");
       return seen[k] ? false : (seen[k] = true);
     });
@@ -176,6 +177,7 @@
             (it.year ? ' data-year="' + esc(it.year) + '"' : "") + (it.image ? ' data-image="' + esc(it.image) + '"' : "") +
             (it.rating ? ' data-rating="' + esc(it.rating) + '"' : "") + (it.review ? ' data-review="' + esc(it.review) + '"' : "") +
             (it.where ? ' data-where="' + esc(it.where) + '"' : "") + (it.watch ? ' data-watch="' + esc(it.watch) + '"' : "") +
+            (it.suggestedBy ? ' data-by="' + esc(it.suggestedBy) + '"' : "") + (it.comment ? ' data-note="' + esc(it.comment) + '"' + (it.commentPrivate ? " data-note-private" : "") : "") +
             (it.watchedWith ? ' data-with="' + esc(it.watchedWith) + '"' : "") : ""; // (only the owner's Archive has it)
           return "<li" + data + "><span class=\"t\">" + esc(it.title) + "</span>" + (it.year ? ' <span class="y">' + esc(it.year) + "</span>" : "") +
             (it.date ? ' <span class="d">' + esc(archiveDate(it.date)) + "</span>" : "") + "</li>";
@@ -206,6 +208,15 @@
     var open = el.classList.contains("cap-open");
     var cols = grid ? getComputedStyle(grid).gridTemplateColumns.split(" ").length : 4;
     var cap = cols <= 2 ? CAP_NARROW : CAP;
+    // A section with an Archive (Recently Watched) has no Expand: past the newest 8 (6 on a phone) goes in the Archive
+    if (el.nmArchive) {
+      posters.forEach(function (c, i) { c.classList.toggle("capped", i >= cap); });
+      more.hidden = true;
+      var over = posters.slice(cap).map(function (c) { return c.nmItem; }).filter(Boolean);
+      var key = over.map(function (it) { return it.id || it.title; }).join("|");
+      if (key !== el.nmArchive.overKey) { el.nmArchive.overKey = key; el.nmArchive.overflow = over; renderArchive(el); }
+      return;
+    }
     posters.forEach(function (c, i) { c.classList.toggle("capped", !open && i >= cap); });
     var extra = posters.length - cap;
     more.hidden = extra <= 0;
@@ -224,7 +235,7 @@
     applyCap(el);
     var queued = false;
     new MutationObserver(function (list) {
-      if (queued || list.every(function (m) { return m.target.closest && m.target.closest(".cap-more"); })) return;
+      if (queued || list.every(function (m) { return m.target.closest && m.target.closest(".cap-more, .archive"); })) return;
       queued = true;
       requestAnimationFrame(function () { queued = false; applyCap(el); });
     }).observe(el, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden"] });

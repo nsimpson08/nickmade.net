@@ -62,6 +62,7 @@
       return {
         fig: row, title: rt, year: row.dataset.year || "", imdb: row.dataset.imdb || "", image: posterSrc(row.dataset.image),
         rating: row.dataset.rating || "", mine: row.dataset.review || "", with: row.dataset.with || "", where: row.dataset.where || "", watch: row.dataset.watch || "",
+        by: row.dataset.by || "", note: row.dataset.note || "", notePrivate: row.hasAttribute("data-note-private"),
         review: rr && rr.classList.contains("entry") ? rr.id : "",
       };
     }
@@ -78,6 +79,10 @@
       with: (fig.querySelector(".watched-with") || { textContent: "" }).textContent.replace(/^With /, "").trim(), // owner mode only
       where: (fig.querySelector("[data-where]") || { dataset: {} }).dataset.where || "", // home or theater
       watch: (fig.querySelector("[data-watch]") || { dataset: {} }).dataset.watch || "", // 1st watch or rewatch
+      // who suggested it from the queue, and their note (a watched card keeps them, live.js)
+      by: fig.classList.contains("poster") ? (fig.querySelector(".suggested-by") || { textContent: "" }).textContent.replace(/^Suggested by /, "").trim() : "",
+      note: fig.classList.contains("poster") ? (fig.querySelector(".suggest-comment") || { textContent: "" }).textContent.trim() : "",
+      notePrivate: !!fig.querySelector(".suggest-comment.private"),
       fig: fig, title: title.trim(), year: year, imdb: fig.dataset.imdb || "",
       image: img ? img.currentSrc || img.src : "",
       review: review && review.classList.contains("entry") && review !== fig ? review.id : "",
@@ -103,12 +108,14 @@
           return i === facts.length - 1 && d && d.rated && x === d.rated ? '<span class="rated">' + esc(x) + "</span>" : esc(x);
         }).join(" · ") + "</p>" : "") +
         // Nick's own rating and short review (Recently Watched and its Archive)
-        (f.rating || f.mine || f.with || where || watch ? '<div class="film-mine"><p class="film-mine-head">My take' +
+        (f.rating || f.mine || f.with || where || watch || f.by ? '<div class="film-mine"><p class="film-mine-head">My take' +
           (/^[\d.]+$/.test(f.rating) ? " " + stars(f.rating) : "") + "</p>" +
           (f.mine ? "<p>" + esc(f.mine) + "</p>" : "") +
           (watch || where ? '<p class="film-where">' + (watch ? watch.icon + "<span>" + watch.label + "</span>" : "") +
             (watch && where ? '<span class="film-where-sep" aria-hidden="true">·</span>' : "") + (where ? where.icon + "<span>" + where.label + "</span>" : "") + "</p>" : "") +
-          (f.with ? '<p class="film-with" title="Only you see this">Watched with ' + esc(f.with) + "</p>" : "") + "</div>" : "") +
+          (f.with ? '<p class="film-with" title="Only you see this">Watched with ' + esc(f.with) + "</p>" : "") +
+          (f.by ? '<p class="film-sugg">Suggested by ' + esc(f.by) + (f.note ? ': <q>' + esc(f.note) + "</q>" + (f.notePrivate ? ' <span class="film-sugg-private">(just for you)</span>' : "") : "") + "</p>" : "") +
+          "</div>" : "") +
         (d && d.tagline ? '<p class="lib-tagline">' + esc(d.tagline) + "</p>" : "") +
         (!d ? '<p class="film-loading">Loading…</p>' : d.error ? '<p class="film-loading">Couldn’t load the details right now.</p>' : "") +
         (paras.length ? '<div class="lib-about-box"><div class="lib-about-text">' +
