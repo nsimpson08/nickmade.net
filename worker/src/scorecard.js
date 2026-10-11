@@ -25,7 +25,9 @@
 //   GET    /scorecard/lookup?site=&name=  the course's own scorecard on its website (phase 3): reads the homepage and the
 //                                         pages it links that look like course or scorecard pages, and lists the PDFs
 //                                         and images that look like the card, best first: { candidates: [{ url, label,
-//                                         dated, kind }] }. Checks robots.txt; never third-party sites. Cached 7 days
+//                                         dated, kind }] }. Checks robots.txt; never third-party sites. Cached 7 days.
+//                                         &given=1: a link the player pasted: the page it names (its cards from any
+//                                         site), or a card image/PDF itself. { blocked: true } when the site refuses
 //   GET    /scorecard/file?u=             one of those files, passed through (course sites don't allow a browser to
 //                                         read them directly); only URLs a lookup found
 //   POST   /scorecard/read                { visitorId, image: "data:image/jpeg;base64,...", part: "all"|"front"|"back",
@@ -49,7 +51,8 @@ const ID = /^[0-9a-f-]{36}$/;
 
 const VID = /^[a-z0-9-]{8,64}$/i;
 const RID = /^[a-z0-9-]{8,64}$/i;
-const CID = /^(api:[0-9a-f-]{36}|[a-z0-9-]{3,60})$/;
+const ONE = "(?:api:[0-9a-f-]{36}|[a-z0-9-]{3,60})";
+const CID = new RegExp("^(" + ONE + "|nines:" + ONE + "\\+" + ONE + ")$"); // nines:<front>+<back>: two nines played as one 18
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const CODES = 6;  // recovery codes a player can have
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -237,6 +240,24 @@ const ASK = {
     `and reply with JSON in this shape:\n` + SHAPE(9, 10, { tee: ', "in": <number>, "total": <number>', par: ', "parIn": <number>, "parTotal": <number>' }) + "\n" + RULES,
 };
 
+// A 27-hole club's card (Breckenridge: Beaver, Bear, Elk side by side, each numbered 1-9 with its own par and handicap
+// rows, and a rating table per pair of nines): every nine, for the app to take the one or two being played
+ASK.nines = () => `This golf scorecard shows one or more nines side by side. Each nine has holes numbered 1 to 9, a TOT 9 column, and its own Par and Handicap rows. ` +
+  `A nine usually has a name: a big faded word printed across it, or the names in a rating table (like "NORTH / SOUTH"). ` +
+  `The tee names are often written only on the leftmost nine; on the other nines use the name of the leftmost row with the same color. ` +
+  `Read every number exactly as printed and reply with JSON in this shape:\n` +
+  `{"nines": [{"name": "<the nine's name or null>", "tees": [{"name": "<tee name>", "color": "<color>", "yards": [<9 numbers>], "total": <the TOT 9 number>}], ` +
+  `"par": [<9 numbers>], "parTotal": <number>, "hcp": [<9 numbers>], "hcpWomen": [<9 numbers>] or null}], ` +
+  `"ratings": [{"nines": "<the heading as printed, like NORTH / SOUTH>", "tees": [{"color": "<the row's color>", "rating": <number>, "slope": <number>, "women": <true if marked W>}]}]}\n` +
+  `Rules:
+- List the nines left to right as printed. Every nine has the same tee rows: give each nine every one of them, top to bottom, including the row printed below the Par row (often a forward tee in red), even where its name is only written on the leftmost nine.
+- hcp is the Handicap row just under the upper tee rows. A second Handicap row, under the lower tee row, is hcpWomen; give it for every nine that has one.
+- ratings: every rating / slope table on the card, one entry per heading. A table has one row per tee color, in the same colors as the tee rows (gold, blue, green, silver or gray, red...), then rows whose numbers end in W (women). List every row top to bottom, including the silver or gray one; women is true only for the rows marked W. Use [] if there is no table.
+- Every list has exactly one value per hole, in hole order. If a cell is blank or you can't read it, put null in its place; never skip a cell.
+- color is the row's background color in one plain word.
+- Never guess a number.
+Reply with the JSON only, no other words.`;
+
 // the first {...} block in the model's reply (some wrap it in ```json fences or add a sentence)
 function firstJson(text) {
   const t = String(text || "").replace(/```(?:json)?/g, "");
@@ -271,8 +292,11 @@ async function readCard(request, env, cors, h) {
     return h.json({ error: "The card reader has done all it can for today. Type the numbers in, or try again tomorrow." }, 429, cors);
   }
   let out, err;
-  const ask = { messages: [{ role: "user", content: [{ type: "text", text: ASK[part](n) }, { type: "image_url", image_url: { url: b.image } }] }],
-    max_tokens: 2500, temperature: 0 };
+  // a PDF's own printed text (the app pulls it from the file): exact numbers for the model to place
+  const text = typeof b.text === "string" && b.text.trim() ? b.text.replace(/\s+/g, " ").trim().slice(0, 4000) : "";
+  const prompt = ASK[part](n) + (text ? "\n\nThe card's own printed text, taken exactly from the file in reading order. Use these numbers; the picture shows where each belongs:\n" + text : "");
+  const ask = { messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: b.image } }] }],
+    max_tokens: part === "nines" ? 5000 : 2500, temperature: 0 };
   for (let tries = 0; tries < 2 && !out; tries++) { // Workers AI sometimes fails a request outright; once more usually works
     if (tries) await new Promise((r) => setTimeout(r, 1500));
     try { out = await env.AI.run(model, ask); } catch (e) { err = e; }
@@ -281,11 +305,11 @@ async function readCard(request, env, cors, h) {
   const ops = [env.QUEUE.put(allKey, String(+all + 1), { expirationTtl: 2 * DAY })];
   if (!me.owner) ops.push(env.QUEUE.put(myKey, String(+mine + 1), { expirationTtl: 2 * DAY }));
   await Promise.all(ops);
-  const text = out && (out.response ?? (out.choices && out.choices[0] && out.choices[0].message && out.choices[0].message.content));
-  const read = typeof text === "object" && text ? text : firstJson(text);
-  if (!read) return h.json({ error: "The card reader couldn't make sense of that photo. Try a straighter, closer one.", raw: me.owner ? text : undefined }, 502, cors);
+  const reply = out && (out.response ?? (out.choices && out.choices[0] && out.choices[0].message && out.choices[0].message.content));
+  const read = typeof reply === "object" && reply ? reply : firstJson(reply);
+  if (!read) return h.json({ error: "The card reader couldn't make sense of that photo. Try a straighter, closer one.", raw: me.owner ? reply : undefined }, 502, cors);
   if (fileKey && !b.model) await env.QUEUE.put(fileKey, JSON.stringify({ read, part, model }), { expirationTtl: 30 * DAY });
-  return h.json({ read, part, model, raw: me.owner && b.raw ? text : undefined }, 200, cors);
+  return h.json({ read, part, model, raw: me.owner && b.raw ? reply : undefined }, 200, cors);
 }
 
 // ---------- finding the course's own card on its website ----------
@@ -322,9 +346,10 @@ async function robots(origin) {
   return (path) => !rules.some((d) => d && path.startsWith(d));
 }
 
-// every link and image on a page: [{ url, text }]
+// every link and image on a page: [{ url, text }]; throws when the site refuses (403 etc.) or can't be reached
 async function linksOf(pageUrl) {
   const r = await fetch(pageUrl, { headers: { "User-Agent": UA, Accept: "text/html" }, redirect: "follow" });
+  if (r.status === 401 || r.status === 403 || r.status === 429 || r.status >= 500) throw new Error("refused " + r.status);
   if (!r.ok || !/html/i.test(r.headers.get("Content-Type") || "")) return [];
   const out = [];
   let cur = null;
@@ -339,30 +364,43 @@ async function linksOf(pageUrl) {
 
 async function lookup(url, env, cors, h) {
   const site = publicHost(url.searchParams.get("site") || "");
-  if (!site) return h.json({ error: "No website for this course." }, 400, cors);
+  const given = url.searchParams.get("given") === "1";
+  if (!site) return h.json({ error: given ? "That doesn't look like a web address." : "No website for this course." }, 400, cors);
   const name = (url.searchParams.get("name") || "").toLowerCase();
-  const key = "scorecard:lookup:" + (await h.sha256(host(site) + site.pathname + "|" + name));
+  const key = "scorecard:lookup:" + (await h.sha256(host(site) + site.pathname + site.search + "|" + name + (given ? "|given" : "")));
   const hit = await env.QUEUE.get(key);
   if (hit) return h.json(JSON.parse(hit), 200, cors);
 
   const allowed = await robots(site.origin);
   if (!allowed(site.pathname)) return h.json({ candidates: [], note: "This course's website asks not to be read." }, 200, cors);
+  // a pasted link straight to the card's picture or PDF
+  if (given && FILE.test(site.pathname)) {
+    const f = { url: site.href, label: "", dated: null, kind: /\.pdf/i.test(site.pathname) ? "pdf" : "image", page: site.href, score: 10 };
+    await env.QUEUE.put("scorecard:file:" + (await h.sha256(f.url)), "1", { expirationTtl: 30 * DAY });
+    return h.json({ candidates: [f], site: site.origin }, 200, cors);
+  }
   const words = name.split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !/golf|course|club|country|park|the/.test(w));
   const files = new Map();
   const add = (l, page) => {
     const u = publicHost(l.url);
     if (!u || !FILE.test(u.pathname)) return;
     const hay = u.pathname + " " + l.text;
-    if (!CARDISH.test(hay) && !/\bcard\b/i.test(hay)) return;
-    if (host(u) !== host(site) && !/\.(wp\.com|wordpress\.com|amazonaws\.com|cloudfront\.net|squarespace-cdn\.com|wixstatic\.com)$/.test(u.hostname)) return;
+    // a page the player pasted: its PDFs count too (a card is often just "Elk.pdf")
+    if (!CARDISH.test(hay) && !/\bcard\b/i.test(hay) && !(given && /\.pdf/i.test(u.pathname))) return;
+    if (!given && host(u) !== host(site) && !/\.(wp\.com|wordpress\.com|amazonaws\.com|cloudfront\.net|squarespace-cdn\.com|wixstatic\.com)$/.test(u.hostname)) return;
     const date = /\/(20\d\d)\/(\d\d)\//.exec(u.pathname);
     const f = files.get(u.href) || { url: u.href, label: "", dated: date ? date[1] + "-" + date[2] : null, kind: /\.pdf/i.test(u.pathname) ? "pdf" : "image", page, score: 0 };
     f.label = f.label || l.text;
     f.score = Math.max(f.score, (CARDISH.test(hay) ? 10 : 3) + (words.some((w) => hay.toLowerCase().includes(w)) ? 6 : 0) + (date ? +date[1] - 2000 : 0) / 10);
     files.set(u.href, f);
   };
-  let home = [];
-  try { home = await linksOf(site.href); } catch (e) {}
+  let home = [], refused = false;
+  try { home = await linksOf(site.href); } catch (e) { refused = true; }
+  if (refused) {
+    const out = { candidates: [], blocked: true, site: site.origin };
+    await env.QUEUE.put(key, JSON.stringify(out), { expirationTtl: DAY });
+    return h.json(out, 200, cors);
+  }
   home.forEach((l) => add(l, site.href));
   // the course's own pages that might hold the card (a named course's page first, e.g. /old-course/)
   const pages = [...new Set(home.map((l) => l.url).filter((u) => {
@@ -388,6 +426,7 @@ async function passFile(url, env, cors, h) {
   const r = await fetch(u.href, { headers: { "User-Agent": UA }, redirect: "follow" });
   if (!r.ok) return h.json({ error: "The course's website didn't send it." }, 502, cors);
   if (Number(r.headers.get("Content-Length") || 0) > 15000000) return h.json({ error: "That file is too big." }, 413, cors);
+  if (!/^(image\/|application\/pdf|application\/octet-stream)/i.test(r.headers.get("Content-Type") || "")) return h.json({ error: "That link isn't a picture or a PDF." }, 415, cors);
   return new Response(r.body, { headers: { "Content-Type": r.headers.get("Content-Type") || "application/octet-stream", "Cache-Control": "private, max-age=3600", ...cors } });
 }
 

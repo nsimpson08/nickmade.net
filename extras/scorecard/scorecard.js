@@ -211,6 +211,67 @@
     });
   }
 
+  // OpenGolfAPI's search through the Worker (cached there); OpenGolfAPI turns the Worker away at times, but it answers
+  // a browser, so then it's asked straight from here
+  function ogaSearch(term) {
+    var q = encodeURIComponent(term);
+    return api("/scorecard/courses/search?q=" + q).catch(function (err) {
+      if (err.status === 0) throw err;
+      return fetch(OGA + "/v1/courses/search?q=" + q).then(function (r) {
+        if (!r.ok) throw err;
+        return r.json();
+      }).then(function (d) {
+        return { courses: (d.courses || []).slice(0, 25).map(function (c) {
+          return { apiId: c.id, name: c.course_name || c.name, place: [c.city, c.state].filter(Boolean).join(", "), par: c.par || null, holes: c.holes || null };
+        }) };
+      }, function () { throw err; });
+    });
+  }
+
+  // ---------- two nines played as one 18 (a 27-hole club like Breckenridge: Bear, Elk, Beaver) ----------
+  // The pair is its own course, "nines:<front id>+<back id>": its own approved file, kept copy and rounds.
+  var NINES = /^nines:([^+]+)\+(.+)$/;
+  function clubOf(c) { var m = /\bat\s+(.+)$/i.exec(c.fullName || c.name); return m ? m[1] : c.fullName || c.name; }
+  function nineName(c) { return (c.name || "").replace(/\s+at\s+.+$/i, "").replace(/\s+(course|nine|9)$/i, "").trim() || c.name; }
+  function joinNines(a, b) {
+    // each nine ranks its own holes; played as an 18 the first nine takes the odd handicaps and the second the even
+    var rank = function (h, odd) {
+      if (!h || h.some(function (v) { return v == null; })) return Array(9).fill(null);
+      var order = h.map(function (v, i) { return [v, i]; }).sort(function (x, y) { return x[0] - y[0]; }), out = Array(9);
+      order.forEach(function (o, r) { out[o[1]] = 2 * r + (odd ? 1 : 2); });
+      return out;
+    };
+    var tees = a.tees.map(function (t, i) {
+      var name = t.name.toLowerCase();
+      var u = b.tees.filter(function (x) { return x.key === t.key || x.name.toLowerCase() === name; })[0];
+      if (!u) return null;
+      var both = function (x, y) { return x != null && y != null ? x + y : null; };
+      var tee = { key: t.key, name: t.name, color: t.color, rating: t.rating && u.rating ? Math.round((t.rating + u.rating) * 10) / 10 : null,
+        slope: t.slope && u.slope ? Math.round((t.slope + u.slope) / 2) : null, total: both(t.total || null, u.total || null),
+        yards: t.yards.concat(u.yards) };
+      if (t.ink) tee.ink = t.ink;
+      if (t.women) tee.women = true;
+      return tee;
+    }).filter(Boolean);
+    var c = {
+      id: "nines:" + a.id + "+" + b.id, name: nineName(a) + " + " + nineName(b), fullName: nineName(a) + " + " + nineName(b) + " at " + clubOf(a),
+      place: a.place, holes: 18, par: a.par.concat(b.par), hcp: rank(a.hcp, true).concat(rank(b.hcp, false)), tees: tees,
+      nines: [a.id, b.id], source: a.source, credit: a.credit,
+    };
+    if (a.hcpWomen && b.hcpWomen) c.hcpWomen = rank(a.hcpWomen, true).concat(rank(b.hcpWomen, false));
+    if (a.website) c.website = a.website;
+    return c;
+  }
+  // the club's other nines, to play after this one: OpenGolfAPI's 9-hole listings under the same club name
+  function otherNines(c) {
+    var club = clubOf(c).toLowerCase();
+    return ogaSearch(clubOf(c)).then(function (d) {
+      return (d.courses || []).filter(function (x) {
+        return "api:" + x.apiId !== c.id && x.holes !== 18 && x.name.toLowerCase().indexOf(club) >= 0;
+      }).map(function (x) { return { id: "api:" + x.apiId, name: x.name }; });
+    });
+  }
+
   // A course's numbers: its approved file on the server (checked once, then reused with no lookups); with no signal,
   // the copy kept on this phone; with no file yet, the copy checked here, else Nick's hand-made file or OpenGolfAPI
   function loadCourse(id) {
@@ -221,6 +282,8 @@
       var kept = load(K.course + id, null);
       if (kept) return kept;
       if (id.indexOf("api:") === 0) return apiCourse(id.slice(4));
+      var pair = NINES.exec(id);
+      if (pair) return Promise.all([loadCourse(pair[1]), loadCourse(pair[2])]).then(function (ab) { return joinNines(ab[0], ab[1]); });
       return fetch("courses/" + encodeURIComponent(id) + ".json").then(function (r) {
         if (!r.ok) throw new Error(err.status === 0 ? "No signal, and this course isn't saved on this phone yet." : "Couldn't load that course.");
         return r.json();
@@ -288,19 +351,7 @@
     // matches whole names, so a search it finds nothing for is tried again with fewer words: "firewheel lakes" finds
     // its single "Firewheel Golf Park" listing.
     function apiSearch(words) {
-      var q = encodeURIComponent(words.join(" "));
-      return api("/scorecard/courses/search?q=" + q).catch(function (err) {
-        // OpenGolfAPI turns the Worker away at times; it answers a browser, so ask it straight from here
-        if (err.status === 0) throw err;
-        return fetch(OGA + "/v1/courses/search?q=" + q).then(function (r) {
-          if (!r.ok) throw err;
-          return r.json();
-        }).then(function (d) {
-          return { courses: (d.courses || []).slice(0, 25).map(function (c) {
-            return { apiId: c.id, name: c.course_name || c.name, place: [c.city, c.state].filter(Boolean).join(", "), par: c.par || null, holes: c.holes || null };
-          }) };
-        }, function () { throw err; });
-      }).then(function (d) {
+      return ogaSearch(words.join(" ")).then(function (d) {
         return (d.courses || []).length || words.length < 2 ? d : apiSearch(words.slice(0, -1));
       });
     }
@@ -414,6 +465,8 @@
       '<section class="sc-pad">' +
         '<p class="sc-place">' + esc(draft.place || "") + "</p>" + trust + cardPanel() +
         (blank ? "" : '<h3 class="sc-sub">Tee</h3><div class="sc-tees">' + draft.tees.map(teeBtn).join("") + "</div>") +
+        (draft.holes === 9 && !blank ? '<h3 class="sc-sub">Holes</h3><div class="sc-nines"><p class="sc-muted small">Playing 18 here with another nine?</p>' +
+          '<button type="button" class="sc-cc-btn" data-act="nines">Add a second nine</button></div>' : "") +
         (draft.holes > 9 && !blank ? '<h3 class="sc-sub">Holes</h3><div class="sc-seg" role="radiogroup">' +
           [["18", "18"], ["front", "Front 9"], ["back", "Back 9"]].map(function (o) {
             return '<button type="button" role="radio" data-nine="' + o[0] + '" aria-checked="' + (o[0] === setupNine) + '">' + o[1] + "</button>";
@@ -450,10 +503,16 @@
       '<div class="sc-cc-actions">' +
         '<label class="sc-cc-btn"><input type="file" id="sc-snap" accept="image/*,application/pdf" capture="environment" hidden>' +
           '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg> Snap the card</label>' +
+        // a card saved from a website (or a photo already taken): no camera
+        '<label class="sc-cc-btn"><input type="file" id="sc-upload" accept="image/*,application/pdf" hidden>' +
+          '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M5 14v5h14v-5"/></svg> Upload</label>' +
         (waiting ? '<button type="button" class="sc-cc-btn" data-act="readsnap">Read the photo</button>' : "") +
         (draft.website && !cc.looked ? '<button type="button" class="sc-cc-btn" data-act="lookup">Find the website\'s card</button>' : "") +
         (cc.sources.length && draft.tees.length ? '<button type="button" class="sc-cc-btn go" data-act="compare">Compare' + (diffs ? " (" + diffs + ")" : "") + "</button>" : "") +
-      "</div></section>";
+      "</div>" +
+      '<form class="sc-cc-link" novalidate><input type="url" id="sc-cc-url" inputmode="url" autocomplete="off" placeholder="Or paste a link to the card" value="' + esc(cc.link || "") + '">' +
+        '<button type="submit" class="sc-cc-btn">Read it</button></form>' +
+      "</section>";
   }
   function ccPaint(status) {
     if (status != null) cc.status = status;
@@ -466,8 +525,22 @@
   // of that nine for just those rows (cardread.js closeUps)
   function readImage(img, holes, source) {
     var ask = function (image, part) {
-      return api("/scorecard/read", { method: "POST", body: { visitorId: VID, image: image, part: part, holes: holes, source: source } });
+      return api("/scorecard/read", { method: "POST", body: { visitorId: VID, image: image, part: part, holes: holes, source: source,
+        text: part === "all" || part === "nines" ? NMCardRead.textOf(image) : undefined } });
     };
+    // a single nine, or two played as one 18: the card may hold the club's other nines too, so every nine is read and
+    // the ones being played are taken out (by name, as printed on the card)
+    if (draft && (draft.nines || draft.holes === 9)) {
+      var names = draft.nines ? draft.name.split(" + ") : [nineName(draft)];
+      return ask(img, "nines").then(function (res) {
+        var read = NMCardRead.fromNines(res.read, names);
+        if (!read) {
+          var found = ((res.read && res.read.nines) || []).map(function (x) { return x && x.name; }).filter(Boolean);
+          throw new Error("Couldn't find " + names.join(" and ") + " on that card" + (found.length ? " (it shows " + found.join(", ") + ")" : "") + ".");
+        }
+        return read;
+      });
+    }
     return ask(img, "all").then(function (res) {
       var sides = NMCardRead.closeUps(res.read, holes);
       if (sides.length) ccPaint("Taking a closer look at the par and handicap rows…");
@@ -481,19 +554,27 @@
   }
 
   // the course's own card from its website: found by the Worker, read once (and kept here by its address)
-  function lookupCard() {
-    cc.looked = true;
-    ccPaint("Looking for the course's card on " + hostOf(draft.website) + "…");
+  // link: a page or card file the player pasted (else the course's website from its listing)
+  function lookupCard(link) {
+    var site = link || draft.website, where = hostOf(site);
+    if (!link) cc.looked = true;
+    ccPaint(link ? "Looking for the card at " + where + "…" : "Looking for the course's card on " + where + "…");
     var id = cc.id;
-    api("/scorecard/lookup?site=" + encodeURIComponent(draft.website) + "&name=" + encodeURIComponent(draft.fullName || draft.name)).then(function (d) {
+    api("/scorecard/lookup?site=" + encodeURIComponent(site) + "&name=" + encodeURIComponent(draft.fullName || draft.name) + (link ? "&given=1" : "")).then(function (d) {
       var all = d.candidates || [], c = all[0];
       if (cc.id !== id) return;
-      if (!c) { ccPaint(d.note || "No card on the course's website. Snap the one in the clubhouse instead."); return; }
+      if (!c) {
+        ccPaint(d.note || (d.blocked
+          ? where + " turns away apps like this one, so its card can't be read from here. Save the card from the site and upload it, or snap the one in the clubhouse."
+          : link ? "No card found on that page. Paste the card picture's own link (press and hold it, then Copy), or save it and upload it."
+          : "Couldn't find a card on " + where + ". If it's there, paste its link below, or snap the one in the clubhouse."));
+        return;
+      }
       // several cards that fit equally well (a park with three courses, under one name): ask which is this one
       var close = all.filter(function (x) { return x.score >= c.score - 1; });
       if (close.length > 1) {
         cc.choices = close;
-        ccPaint("The course's website has " + close.length + " cards. Which one is this course?");
+        ccPaint((link ? "That page has " : "The course's website has ") + close.length + " cards. Which one is this course?");
         return;
       }
       readWebCard(c, id);
@@ -508,12 +589,13 @@
     var when = c.dated ? " (" + monthYear(c.dated) + ")" : "";
     (function () {
       ccPaint("Found the course's card" + when + ". Reading it…");
-      var kept = load(K_READ + c.url, null);
+      var readKey = K_READ + c.url + (draft.nines || draft.holes === 9 ? "|" + draft.name : ""); // a 27-hole card: one read per nine or pair
+      var kept = load(readKey, null);
       var reading = kept ? Promise.resolve(kept) : fetch(API + "/scorecard/file?u=" + encodeURIComponent(c.url), { headers: auth() })
-        .then(function (r) { if (!r.ok) throw new Error("The course's website didn't send its card."); return r.blob(); })
+        .then(function (r) { if (!r.ok) throw new Error("That website wouldn't send its card here. Save the card from the site and upload it instead."); return r.blob(); })
         .then(function (blob) { return NMCardRead.fromFile(new File([blob], c.url.split("/").pop(), { type: blob.type })); })
         .then(function (img) { return readImage(img, draft.holes, c.url); })
-        .then(function (read) { save(K_READ + c.url, read); return read; });
+        .then(function (read) { save(readKey, read); return read; });
       return reading.then(function (read) {
         if (cc.id !== id) return;
         addSource("web", "the website card" + when, read, { kind: "website", url: c.url, dated: c.dated, label: "the course's website card" + when });
@@ -530,11 +612,11 @@
   }
 
   // a photo of the card (or a PDF/picture of it): read now, or kept until there's signal
-  function snap(file) {
+  function snap(file, uploaded) {
     var id = cc.id;
     ccPaint("Getting the photo ready…");
     NMCardRead.fromFile(file).then(function (img) {
-      if (!save(K_SNAP + id, { img: img, at: Date.now() })) throw new Error("The phone is out of room for the photo.");
+      if (!save(K_SNAP + id, { img: img, at: Date.now(), up: !!uploaded })) throw new Error("The phone is out of room for the photo.");
       return readSnap();
     }).catch(function (err) { ccPaint(err.message); });
   }
@@ -546,7 +628,8 @@
     return readImage(waiting.img, draft.holes).then(function (read) {
       drop(K_SNAP + id);
       if (cc.id !== id) return;
-      addSource("photo", "your photo", read, { kind: "photo", dated: today(), label: "your photo of the card (" + fmtDate(new Date()) + ")" });
+      var what = waiting.up ? "the card you uploaded" : "your photo";
+      addSource("photo", what, read, { kind: "photo", dated: today(), label: what + (waiting.up ? "" : " of the card") + " (" + fmtDate(new Date()) + ")" });
     }).catch(function (err) {
       ccPaint(err.status === 0 ? "Saved. The photo will be read when there's signal." : err.message);
     });
@@ -753,6 +836,23 @@
     box.querySelector("span").textContent = !chk
       ? "Save these numbers as this course's card, so next time it's ready with no checking"
       : "Save my changes as the course's card (version " + (chk.version + 1) + ")";
+  }
+
+  // the club's other nines as buttons: tap one and the round is this nine, then that one
+  function pickNine(btn) {
+    var box = app.querySelector(".sc-nines"), id = draft.id;
+    btn.classList.add("busy");
+    otherNines(draft).then(function (list) {
+      if (draft.id !== id || !box.isConnected) return;
+      box.innerHTML = list.length
+        ? '<p class="sc-muted small">After ' + esc(nineName(draft)) + ", which nine?</p>" + list.map(function (x) {
+            return '<button type="button" class="sc-cc-btn" data-then-nine="' + esc(x.id) + '">Then ' + esc(nineName(x)) + "</button>";
+          }).join("")
+        : '<p class="sc-muted small">No other nines found for ' + esc(clubOf(draft)) + ".</p>";
+    }).catch(function (err) {
+      btn.classList.remove("busy");
+      alert(err.status === 0 ? "No signal to look for the other nines." : err.message);
+    });
   }
 
   function startRound() {
@@ -1271,6 +1371,15 @@
     var b = e.target.closest("button, [data-course], [data-past]");
     if (!b) return;
     var d = b.dataset;
+    if (d.thenNine) {
+      b.classList.add("busy");
+      var front = copy(draft);
+      loadCourse(d.thenNine).then(function (back) {
+        if (back.holes !== 9) throw new Error("That one isn't a nine.");
+        setup(joinNines(front, back));
+      }).catch(function (err) { b.classList.remove("busy"); alert(err.message || "Couldn't load that nine."); });
+      return;
+    }
     if (d.course) {
       b.classList.add("busy");
       loadCourse(d.course).then(setup).catch(function (err) { b.classList.remove("busy"); alert(err.message || "Couldn't load that course."); });
@@ -1320,6 +1429,7 @@
     if (act === "resume") return holeScreen();
     if (act === "newcourse") { var qv = app.querySelector("#sc-q"); return newCourse(qv ? qv.value.trim() : ""); }
     if (act === "lookup") return lookupCard();
+    if (act === "nines") return pickNine(b);
     if (act === "readsnap") return readSnap();
     if (act === "compare") return compareScreen(cc.inRound ? "round" : "setup");
     if (act === "cmpback") {
@@ -1428,10 +1538,21 @@
     }
   });
 
+  // a pasted link to a course's card (or the page it's on)
+  app.addEventListener("submit", function (e) {
+    if (!e.target.classList.contains("sc-cc-link")) return;
+    e.preventDefault();
+    var v = e.target.querySelector("#sc-cc-url").value.trim();
+    if (!v) return;
+    if (!/^https?:\/\//i.test(v)) v = "https://" + v;
+    cc.link = v;
+    lookupCard(v);
+  });
+
   // the check table's number boxes
   app.addEventListener("change", function (e) {
     var el = e.target, d = el.dataset;
-    if (el.id === "sc-snap") { if (el.files && el.files[0]) snap(el.files[0]); return; }
+    if (el.id === "sc-snap" || el.id === "sc-upload") { if (el.files && el.files[0]) snap(el.files[0], el.id === "sc-upload"); return; }
     if (el.id === "sc-date") {
       setupDay = /^\d{4}-\d{2}-\d{2}$/.test(el.value) && el.value <= today() ? el.value : today();
       el.value = setupDay;

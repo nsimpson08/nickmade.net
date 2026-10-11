@@ -11,7 +11,10 @@
 //     up to the card's own Out / In); the app then reads just that half close up, which gets those rows right, and
 //     mergeCloseUp() takes only those rows from it (close up, the model is worse at yardages)
 //
-//   NMCardRead.fromFile(file)  -> Promise<dataURL>        (camera photo, or a file the Worker passed through)
+//   NMCardRead.fromFile(file)  -> Promise<dataURL>        (camera photo, or a file the Worker passed through; for a PDF,
+//                                                         the page with the most numbers on it, not just page 1)
+//   NMCardRead.textOf(dataURL) -> the PDF page's own printed text ("" for a photo), sent along to the reader
+//   NMCardRead.fromNines(read, names) -> read | null   a 27-hole card's nines (part "nines") -> the one or two played
 //   NMCardRead.half(dataURL, "front"|"back") -> Promise<dataURL>   that nine, close up
 //   NMCardRead.closeUps(read, holes) -> ["front"?, "back"?]   the nines whose par/handicap rows don't hold up
 //   NMCardRead.mergeCloseUp(read, side, closeRead) -> read
@@ -46,16 +49,37 @@
       var lib = r[0];
       lib.GlobalWorkerOptions.workerSrc = PDFJS + "pdf.worker.min.mjs";
       return lib.getDocument({ data: r[1] }).promise;
-    }).then(function (doc) { return doc.getPage(1); }).then(function (page) {
+    }).then(function (doc) {
+      // a card PDF can start with its cover (Breckenridge's page 1 is a photo): take the page with the most numbers
+      var pages = [];
+      for (var i = 1; i <= Math.min(doc.numPages, 6); i++) pages.push(i);
+      return Promise.all(pages.map(function (i) {
+        return doc.getPage(i).then(function (page) {
+          return page.getTextContent().then(function (tc) {
+            var text = tc.items.map(function (x) { return x.str; }).join(" ").replace(/\s+/g, " ").trim();
+            return { page: page, text: text, nums: (text.match(/\d+/g) || []).length };
+          }, function () { return { page: page, text: "", nums: 0 }; });
+        });
+      })).then(function (all) {
+        return all.reduce(function (a, b) { return b.nums > a.nums ? b : a; }, all[0]);
+      });
+    }).then(function (best) {
+      var page = best.page;
       var v1 = page.getViewport({ scale: 1 });
       var view = page.getViewport({ scale: 2000 / Math.max(v1.width, v1.height) });
       var c = document.createElement("canvas");
       c.width = Math.round(view.width); c.height = Math.round(view.height);
       var ctx = c.getContext("2d");
       ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
-      return page.render({ canvasContext: ctx, viewport: view }).promise.then(function () { return jpeg(shrink(c, c.width, c.height)); });
+      return page.render({ canvasContext: ctx, viewport: view }).promise.then(function () {
+        var url = jpeg(shrink(c, c.width, c.height));
+        if (best.nums >= 20) texts.set(url, best.text);
+        return url;
+      });
     });
   }
+  var texts = new Map();
+  function textOf(dataUrl) { return texts.get(dataUrl) || ""; }
   // one nine of the card, close up: the left or right half (with a little overlap), 1400 px wide
   function half(dataUrl, side) {
     return new Promise(function (resolve, reject) {
@@ -178,5 +202,64 @@
     return { course: course, checks: checks, unread: unread };
   }
 
-  window.NMCardRead = { fromFile: fromFile, half: half, closeUps: closeUps, mergeCloseUp: mergeCloseUp, toCourse: toCourse, slug: slug };
+  // ---------- a 27-hole club's card: the nines being played, as one ordinary read ----------
+  // names: the nines played, in order ("Bear", "Elk"). Each nine ranks its handicaps on its own (1-9, or odd 1-17);
+  // two played as an 18: the first takes the odd numbers and the second the even. The rating and slope come from the
+  // card's table for that pair (either order), matched to each tee by its row color.
+  function fromNines(read, names) {
+    var nines = (read && read.nines) || [];
+    var low = function (v) { return String(v || "").toLowerCase(); };
+    var pick = names.map(function (nm, i) {
+      var hit = nines.filter(function (x) { return x && low(x.name).indexOf(low(nm)) >= 0; })[0];
+      return hit || (nines.length === names.length ? nines[i] : null); // unnamed nines: by position when the count fits
+    });
+    if (pick.some(function (x) { return !x; })) return null;
+    var rank = function (h, odd) {
+      h = list(h, 9, 1, 18);
+      if (h.some(function (v) { return v == null; })) return h;
+      if (pick.length === 1) return h;
+      var order = h.map(function (v, i) { return [v, i]; }).sort(function (x, y) { return x[0] - y[0]; }), out = Array(9);
+      order.forEach(function (o, r) { out[o[1]] = 2 * r + (odd ? 1 : 2); });
+      return out;
+    };
+    var a = pick[0], b = pick[1];
+    var tabs = (read.ratings || []).filter(function (r) {
+      return names.length === 2 && names.every(function (nm) { return low(r && r.nines).indexOf(low(nm)) >= 0; });
+    })[0];
+    var colorOf = function (t) { return low(t && t.color).split(/\s+/).pop(); };
+    var tees = (a.tees || []).map(function (t) {
+      var out = { name: t.name, color: t.color, yards: list(t.yards, 9, 30, 800), out: int(t.total, 100, 5000), rating: null, slope: null };
+      if (b) {
+        var u = (b.tees || []).filter(function (x) { return low(x.name) === low(t.name); })[0] ||
+          (b.tees || []).filter(function (x) { return colorOf(x) === colorOf(t); })[0];
+        if (!u) return null;
+        out.yards = out.yards.concat(list(u.yards, 9, 30, 800));
+        out["in"] = int(u.total, 100, 5000);
+        out.total = out.out != null && out["in"] != null ? out.out + out["in"] : null;
+      } else out.total = out.out;
+      if (tabs) {
+        var women = /^(red|forward|ladies|lady|women)/i.test(t.name || "");
+        var rows = (tabs.tees || []).filter(function (r) { return colorOf(r) === colorOf(t); });
+        var row = rows.filter(function (r) { return !!r.women === women; })[0] || rows[0];
+        if (row) { out.rating = num(row.rating, 50, 90); out.slope = int(row.slope, 55, 155); }
+      }
+      return out;
+    }).filter(Boolean);
+    var res = { tees: tees, par: list(a.par, 9, 3, 6), hcp: rank(a.hcp, true), parOut: int(first(a.parTotal), 27, 45) };
+    var wa = a.hcpWomen && a.hcpWomen.length ? rank(a.hcpWomen, true) : null;
+    if (b) {
+      res.par = res.par.concat(list(b.par, 9, 3, 6));
+      res.hcp = res.hcp.concat(rank(b.hcp, false));
+      res.parIn = int(first(b.parTotal), 27, 45);
+      res.parTotal = res.parOut != null && res.parIn != null ? res.parOut + res.parIn : null;
+      var wb = b.hcpWomen && b.hcpWomen.length ? rank(b.hcpWomen, false) : null;
+      res.hcpWomen = wa && wb ? wa.concat(wb) : null;
+    } else {
+      res.parTotal = res.parOut;
+      res.hcpWomen = wa;
+    }
+    return res;
+  }
+
+  window.NMCardRead = { textOf: textOf, fromNines: fromNines, fromFile: fromFile, half: half, closeUps: closeUps, mergeCloseUp: mergeCloseUp, toCourse: toCourse, slug: slug };
 })();
