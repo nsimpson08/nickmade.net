@@ -12,6 +12,7 @@
 //   GET    /scorecard/courses/:id         a course's newest approved file, with checked: { version, owner, at }
 //   POST   /scorecard/courses/:id/approve { visitorId, course } -> a new version of its course file. Nick's approvals
 //                                         always count; a visitor's only while the course has no file yet
+//   DELETE /scorecard/courses/:id         Nick only: removes a saved card (every version); rounds keep their own copy
 //   GET    /scorecard/rounds?visitorId=   this player's rounds (summaries, newest first)
 //   GET    /scorecard/rounds/:id?visitorId=  one round in full (the course as played, every hole)
 //   PUT    /scorecard/rounds/:id          { visitorId, round, course?, scores, present } -> saves a round: the header,
@@ -120,6 +121,15 @@ export async function scorecardRoute(request, url, env, cors, h) {
   if (parts[1] === "courses" && parts.length === 2 && m === "GET") return listCourses(env, cors, h);
   if (parts[1] === "courses" && parts.length === 3 && m === "GET") return getCourse(parts[2], env, cors, h);
   if (parts[1] === "courses" && parts.length === 4 && parts[3] === "approve" && m === "POST") return approve(request, parts[2], env, cors, h);
+  if (parts[1] === "courses" && parts.length === 3 && m === "DELETE") { // Nick only: a saved card goes, every version of it
+    if (!owner) return h.json({ error: "Only Nick can remove a saved card." }, 403, cors);
+    if (!CID.test(parts[2])) return h.json({ error: "Unknown course." }, 404, cors);
+    await env.GOLF.batch([
+      env.GOLF.prepare("DELETE FROM course_records WHERE course_id = ?").bind(parts[2]),
+      env.GOLF.prepare("DELETE FROM courses WHERE id = ?").bind(parts[2]),
+    ]);
+    return h.json({ removed: true }, 200, cors);
+  }
   if (parts[1] === "rounds" && parts.length === 2 && m === "GET") return listRounds(request, url, env, cors, h);
   if (parts[1] === "rounds" && parts.length === 3) {
     if (m === "GET") return getRound(request, url, parts[2], env, cors, h);

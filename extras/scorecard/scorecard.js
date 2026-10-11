@@ -449,7 +449,8 @@
     var src = draft.source || {}, chk = draft.checked, blank = !draft.tees.length;
     var trust = chk
       ? '<p class="sc-trust ok">✓ Card checked ' + (chk.owner ? (OWNER ? "by you" : "by Nick") : "by a player") + " on " + esc(fmtDate(chk.at)) +
-        (chk.version > 1 ? " (version " + chk.version + ")" : "") + ". It's ready as is.</p>"
+        (chk.version > 1 ? " (version " + chk.version + ")" : "") + ". It's ready as is." +
+        (OWNER ? ' <button type="button" class="sc-link" data-act="uncard">Remove saved card</button>' : "") + "</p>"
       : src.read
       ? '<p class="sc-trust ok">✓ Read from ' + esc(src.name) + ". Look over the numbers below.</p>"
       : src.kind === "website"
@@ -852,6 +853,23 @@
     }).catch(function (err) {
       btn.classList.remove("busy");
       alert(err.status === 0 ? "No signal to look for the other nines." : err.message);
+    });
+  }
+
+  // Nick only: the course's saved card goes from the server (rounds already played keep their own copy), and the course
+  // opens again from what's left: Nick's repo file, OpenGolfAPI, or its two nines
+  function removeCard(btn) {
+    var id = draft.id;
+    if (!confirm("Remove the saved card for " + draft.name + "? Rounds already played keep their numbers.")) return;
+    btn.disabled = true;
+    api("/scorecard/courses/" + encodeURIComponent(id), { method: "DELETE" }).then(function () {
+      drop(K.course + id);
+      save(K.approve, load(K.approve, []).filter(function (x) { return x.id !== id; }));
+      filed = null;
+      return loadCourse(id).then(function (c) { delete c.checked; setup(c); }, function () { home(); });
+    }).catch(function (err) {
+      btn.disabled = false;
+      alert(err.status === 0 ? "No signal to remove it." : err.message);
     });
   }
 
@@ -1429,6 +1447,7 @@
     if (act === "resume") return holeScreen();
     if (act === "newcourse") { var qv = app.querySelector("#sc-q"); return newCourse(qv ? qv.value.trim() : ""); }
     if (act === "lookup") return lookupCard();
+    if (act === "uncard") return removeCard(b);
     if (act === "nines") return pickNine(b);
     if (act === "readsnap") return readSnap();
     if (act === "compare") return compareScreen(cc.inRound ? "round" : "setup");
