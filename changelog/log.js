@@ -18,6 +18,7 @@ window.CHANGELOG = [
     title: "Scorecard",
     changes: [
       { page: "extras", text: "Scorecard: keep score on a real golf course one hole at a time, even with no signal, and finish with your round written onto the course's own scorecard." },
+      { page: "extras", text: "It's yours to use too: track your own rounds, save your scorecards as images, and keep them on your phone or move them to another with a code." },
       { page: "movies", text: "Recently Watched now shows whether it was my first watch or a rewatch, and whether I saw it at home or in a theater." }
     ]
   },

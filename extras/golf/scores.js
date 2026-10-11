@@ -48,7 +48,7 @@ window.GOLF = {
   ],
   // The X-Golf app's Stats screen, shown above the rounds (replaces the computed summary line)
   xgolfStats: {
-    headline: [["Handicap", "-16.33"], ["Best 18-hole", "87"], ["Best 9-hole", "40"]],
+    headline: [["Handicap", "16.33"], ["Best 18-hole", "87"], ["Best 9-hole", "40"]],
     stats: [
       ["Driving accuracy", "53.91%"], ["Avg. driving distance", "163.65 yd"],
       ["Up & down 30 yds", "86.79%"], ["Up & down 50 yds", "81.98%"],

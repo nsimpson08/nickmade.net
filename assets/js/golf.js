@@ -116,7 +116,13 @@
       rounds.forEach(function (r, i) { r._id = "round-" + s.key + "-" + i; r._source = s.title; }); // the chart links to these
       return '<section class="subsection" id="' + slug(s.title) + '">' + head(s.title, s.sub, s.href && scorecardOpen ? s.href : null) +
         (rounds.length
-          ? summary(rounds, data[s.key + "Stats"]) + '<div class="rounds">' + rounds.map(card).join("") + "</div>"
+          ? summary(rounds, data[s.key + "Stats"]) + (s.key === "course"
+            // the scorecards themselves (Nick): the newest 6 on a desktop, 4 on a phone, the rest behind Archive
+            ? '<div class="rounds rounds-cards' + (rounds.length <= 6 ? " few-wide" : "") + '">' + rounds.map(cardTile).join("") + "</div>" +
+              (rounds.length > 4 ? '<button type="button" class="tiles-more' + (rounds.length <= 6 ? " few-wide" : "") + '" aria-expanded="false">Archive</button>' : "")
+            // Trackman and X-Golf: the newest 8, the rest behind Archive (Nick)
+            : '<div class="rounds capped" data-cap="8">' + rounds.map(card).join("") + "</div>" +
+              (rounds.length > 8 ? '<button type="button" class="tiles-more" aria-expanded="false">Archive</button>' : ""))
           : '<p class="empty">Coming soon.</p>') +
       "</section>";
     });
@@ -151,7 +157,20 @@
     series = buildSeries();
     all = [].concat.apply([], series.map(function (x) { return x.pts; }));
     drawChart();
+    drawTiles();
+    labelMore();
   }
+  // Archive counts the rounds it hides: On the course past the newest 6 on a desktop, 4 on a phone; Trackman and
+  // X-Golf past 8 (matches site.css)
+  function labelMore() {
+    root.querySelectorAll(".tiles-more").forEach(function (b) {
+      var grid = b.previousElementSibling;
+      var shown = grid.dataset.cap ? +grid.dataset.cap : window.matchMedia("(max-width: 600px)").matches ? 4 : 6;
+      var hidden = Math.max(0, grid.children.length - shown);
+      b.textContent = grid.classList.contains("show-all") ? "Show fewer" : "Archive (" + hidden + ")";
+    });
+  }
+  window.addEventListener("resize", labelMore);
 
   // ---------- Score Trend chart: 18-hole Trackman and X-Golf scores over time ----------
   // One strokes axis fitted to the scores. Each round is a dot (with a surface ring); the line is each source's rolling
@@ -372,6 +391,12 @@
     function open(p) {
       var card = document.getElementById(p.r._id);
       if (!card) return;
+      if (getComputedStyle(card).display === "none" && card.parentNode) { // behind Archive: open that section first
+        card.parentNode.classList.add("show-all");
+        var btn = card.parentNode.nextElementSibling;
+        if (btn && btn.classList.contains("tiles-more")) btn.setAttribute("aria-expanded", "true");
+        labelMore();
+      }
       card.scrollIntoView({ behavior: "smooth", block: "center" });
       card.classList.remove("flash");
       void card.offsetWidth;
@@ -435,18 +460,61 @@
     cardKit.catch(function () { cardKit = null; });
     return cardKit;
   }
+  // On the course shows each round as its scorecard (Nick, 2026-10-10: the card itself, not a box of stats), drawn as
+  // it scrolls into view; a short caption underneath; tap to open it full screen
+  function cardTile(r) {
+    var n = overPar(r);
+    return '<figure class="round-tile" id="' + r._id + '" data-sc-round="' + esc(r.id) + '" tabindex="0" role="button" aria-label="' +
+      esc(r.course + ", " + day(r.date) + ", " + r.score + ": open the scorecard") + '"><div class="round-tile-card"><canvas></canvas></div>' +
+      '<figcaption><span>' + esc(day(r.date)) + " · " + esc(r.course) + ((r.holes || 18) !== 18 ? " · " + esc(r.holes) + " holes" : "") + "</span>" +
+      '<b>' + esc(r.score) + (hasPar(r) ? ' <span class="par ' + (n < 0 ? "under" : n === 0 ? "even" : "over") + '">' + esc(toPar(r)) + "</span>" : "") + "</b></figcaption></figure>";
+  }
+  var fullRounds = {};
+  function fullRound(id) {
+    if (!fullRounds[id]) {
+      fullRounds[id] = fetch(API + "/scorecard/feed/" + encodeURIComponent(id), { headers: auth }).then(function (r) {
+        if (!r.ok) throw new Error();
+        return r.json();
+      });
+      fullRounds[id].catch(function () { delete fullRounds[id]; });
+    }
+    return fullRounds[id];
+  }
+  var tileWatch = null;
+  function drawTiles() {
+    var tiles = root.querySelectorAll(".round-tile");
+    if (!tiles.length) return;
+    if (tileWatch) tileWatch.disconnect();
+    var draw = function (el) {
+      if (el.dataset.drawn) return;
+      el.dataset.drawn = "1";
+      Promise.all([loadCardKit(), fullRound(el.dataset.scRound)]).then(function (res) {
+        if (res[1].course) return window.NMCard.draw(el.querySelector("canvas"), res[1].course, res[1], { scale: 0.75 }); // small tiles; the viewer draws it big
+      }).then(function () { el.classList.add("ready"); }).catch(function () { delete el.dataset.drawn; });
+    };
+    if (!("IntersectionObserver" in window)) { tiles.forEach(draw); return; }
+    tileWatch = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { if (e.isIntersecting) { draw(e.target); tileWatch.unobserve(e.target); } });
+    }, { rootMargin: "300px" });
+    tiles.forEach(function (t) { tileWatch.observe(t); });
+  }
+
   function openCard(el) {
     if (el.classList.contains("busy")) return;
     el.classList.add("busy");
-    Promise.all([loadCardKit(), fetch(API + "/scorecard/feed/" + encodeURIComponent(el.dataset.scRound), { headers: auth }).then(function (r) {
-      if (!r.ok) throw new Error();
-      return r.json();
-    })]).then(function (res) {
+    Promise.all([loadCardKit(), fullRound(el.dataset.scRound)]).then(function (res) {
       el.classList.remove("busy");
       if (res[1].course) window.NMCardViewer.open(res[1]);
     }).catch(function () { el.classList.remove("busy"); });
   }
   root.addEventListener("click", function (e) {
+    var more = e.target.closest(".tiles-more");
+    if (more) {
+      var grid = more.previousElementSibling, open = grid.classList.toggle("show-all"); // not "open": that's the site's pill-button class
+      more.setAttribute("aria-expanded", String(open));
+      labelMore();
+      return;
+    }
     var el = e.target.closest("[data-sc-round]");
     if (el && !e.target.closest("a")) openCard(el);
   });

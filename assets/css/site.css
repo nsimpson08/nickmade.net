@@ -499,6 +499,39 @@ html.wall-bg-on .topbar nav a[href="/play/"]::before { background: rgba(255, 255
 .trend-tip-meta { display: flex; align-items: center; gap: 6px; font-size: 0.72rem; }
 .trend-tip-meta i { width: 12px; height: 2px; border-radius: 1px; }
 .round.flash { animation: round-flash 1.6s ease-out; }
+/* Golf page On the course: each round as its scorecard image (golf.js cardTile), tap to open it full screen */
+.rounds.rounds-cards { grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 18px; }
+/* Trackman and X-Golf: the newest 8, the rest behind Archive (golf.js) */
+.rounds.capped:not(.show-all) > :nth-child(n+9) { display: none; }
+/* the newest 6 (4 on a phone), the rest behind Archive */
+.rounds-cards:not(.show-all) .round-tile:nth-child(n+7) { display: none; }
+.tiles-more {
+  display: block; margin: 16px auto 0; padding: 9px 18px; border: 1px solid var(--line); border-radius: 999px;
+  background: transparent; color: var(--muted); font: 500 0.9rem/1 var(--body); cursor: pointer;
+}
+.tiles-more:hover { color: var(--fg); border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+.tiles-more.few-wide { display: none; }
+@media (max-width: 600px) {
+  .rounds-cards:not(.show-all) .round-tile:nth-child(n+5) { display: none; }
+  .tiles-more.few-wide { display: block; }
+}
+.round-tile { margin: 0; cursor: pointer; }
+.round-tile-card {
+  aspect-ratio: 1250 / 1015; border-radius: 10px; overflow: hidden; border: 1px solid var(--line);
+  background: linear-gradient(90deg, var(--panel), color-mix(in srgb, var(--accent) 6%, var(--panel)), var(--panel)) 0 0 / 200% 100%;
+  animation: tile-wait 1.4s linear infinite; transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.round-tile.ready .round-tile-card { animation: none; background: none; aspect-ratio: auto; }
+.round-tile canvas { display: block; width: 100%; height: auto; }
+.round-tile:hover .round-tile-card, .round-tile:focus-visible .round-tile-card { border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); transform: translateY(-2px); }
+.round-tile:focus-visible { outline: none; }
+.round-tile figcaption { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-top: 6px; font-size: 0.8rem; color: var(--muted); }
+.round-tile figcaption span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.round-tile figcaption b { font: 700 1.05rem/1 var(--display); color: var(--fg); white-space: nowrap; }
+.round-tile figcaption .par { margin-left: 4px; font: 500 0.8rem/1 var(--body); }
+.round-tile figcaption .par.under { color: var(--accent); }
+@keyframes tile-wait { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .round-tile-card { animation: none; } }
 /* a Scorecard round (Golf page, golf.js): tap for its scorecard, full screen */
 .round.opens-card { cursor: pointer; transition: border-color 0.15s ease, transform 0.15s ease; }
 .round.opens-card:hover, .round.opens-card:focus-visible { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); outline: none; }
