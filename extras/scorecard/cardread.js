@@ -13,7 +13,9 @@
 //
 //   NMCardRead.fromFile(file)  -> Promise<dataURL>        (camera photo, or a file the Worker passed through; for a PDF,
 //                                                         the page with the most numbers on it, not just page 1)
+//   NMCardRead.bigOf(dataURL)  -> the same card up to 3200 px (this session only; else the dataURL itself)
 //   NMCardRead.textOf(dataURL) -> the PDF page's own printed text ("" for a photo), sent along to the reader
+//   NMCardRead.ninePieces(dataURL) -> Promise<[dataURL per nine] | null>   a 27-hole card cut into its nines
 //   NMCardRead.fromNines(read, names) -> read | null   a 27-hole card's nines (part "nines") -> the one or two played
 //   NMCardRead.half(dataURL, "front"|"back") -> Promise<dataURL>   that nine, close up
 //   NMCardRead.closeUps(read, holes) -> ["front"?, "back"?]   the nines whose par/handicap rows don't hold up
@@ -27,8 +29,8 @@
     copper: "#b87333", tan: "#c4a46a", brown: "#7a5230", teal: "#2a8c8c", maroon: "#7a1f2b", navy: "#24346b", pink: "#e58bb0" };
 
   function jpeg(canvas) { return canvas.toDataURL("image/jpeg", 0.88); }
-  function shrink(src, w, h) {
-    var k = Math.min(1, MAX / Math.max(w, h));
+  function shrink(src, w, h, max) {
+    var k = Math.min(1, (max || MAX) / Math.max(w, h));
     var c = document.createElement("canvas");
     c.width = Math.round(w * k); c.height = Math.round(h * k);
     var x = c.getContext("2d");
@@ -39,7 +41,12 @@
   function fromImage(blob) {
     return new Promise(function (resolve, reject) {
       var img = new Image(), url = URL.createObjectURL(blob);
-      img.onload = function () { URL.revokeObjectURL(url); resolve(jpeg(shrink(img, img.naturalWidth, img.naturalHeight))); };
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        var small = jpeg(shrink(img, img.naturalWidth, img.naturalHeight));
+        bigs.set(small, function () { return jpeg(shrink(img, img.naturalWidth, img.naturalHeight, BIG)); });
+        resolve(small);
+      };
       img.onerror = function () { URL.revokeObjectURL(url); reject(new Error("That picture couldn't be opened.")); };
       img.src = url;
     });
@@ -66,7 +73,7 @@
     }).then(function (best) {
       var page = best.page;
       var v1 = page.getViewport({ scale: 1 });
-      var view = page.getViewport({ scale: 2000 / Math.max(v1.width, v1.height) });
+      var view = page.getViewport({ scale: BIG / Math.max(v1.width, v1.height) });
       var c = document.createElement("canvas");
       c.width = Math.round(view.width); c.height = Math.round(view.height);
       var ctx = c.getContext("2d");
@@ -74,12 +81,16 @@
       return page.render({ canvasContext: ctx, viewport: view }).promise.then(function () {
         var url = jpeg(shrink(c, c.width, c.height));
         if (best.nums >= 20) texts.set(url, best.text);
+        bigs.set(url, function () { return jpeg(c); });
         return url;
       });
     });
   }
   var texts = new Map();
   function textOf(dataUrl) { return texts.get(dataUrl) || ""; }
+  // the same card at up to 3200 px, made only when asked (the Card look screen cuts its pictures from it)
+  var BIG = 3200, bigs = new Map();
+  function bigOf(dataUrl) { var f = bigs.get(dataUrl); return f ? f() : dataUrl; }
   // one nine of the card, close up: the left or right half (with a little overlap), 1400 px wide
   function half(dataUrl, side) {
     return new Promise(function (resolve, reject) {
@@ -202,6 +213,42 @@
     return { course: course, checks: checks, unread: unread };
   }
 
+  // ---------- a 27-hole club's card cut into its nines (cardgrid.js), each a 9-hole card of its own ----------
+  // Each piece: the card's row names (the first nine's label column) with that nine's holes and total beside them.
+  // null when the grid isn't found or holds fewer than two nines.
+  function ninePieces(dataUrl) {
+    if (!window.NMCardGrid) return Promise.resolve(null);
+    return new Promise(function (res) {
+      var img = new Image();
+      img.onload = function () {
+        var g = NMCardGrid.find(img);
+        if (!g || g.nines.length < 2) return res(null);
+        var W = img.naturalWidth, H = img.naturalHeight, lab = g.nines[0].label;
+        var y0 = Math.max(0, Math.round(g.rows[0][0] * H) - 4), y1 = Math.min(H, Math.round(g.rows[g.rows.length - 1][1] * H) + 4);
+        res(g.nines.map(function (n) {
+          var parts = [lab, [n.holes[0][0], n.total[1]]].filter(Boolean).map(function (p) {
+            return [Math.max(0, Math.round(p[0] * W) - 3), Math.min(W, Math.round(p[1] * W) + 3)];
+          });
+          var pw = parts.reduce(function (a, p) { return a + p[1] - p[0]; }, 0), k = Math.min(1, MAX / pw);
+          var c = document.createElement("canvas");
+          c.width = Math.round(pw * k); c.height = Math.round((y1 - y0) * k);
+          var x = c.getContext("2d"), at = 0;
+          x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height);
+          parts.forEach(function (p) { x.drawImage(img, p[0], y0, p[1] - p[0], y1 - y0, at, 0, (p[1] - p[0]) * k, c.height); at += (p[1] - p[0]) * k; });
+          return jpeg(c);
+        }));
+      };
+      img.onerror = function () { res(null); };
+      img.src = bigOf(dataUrl);
+    });
+  }
+  // a piece's read (part "nine") in the shape fromNines() takes
+  function asNine(r) {
+    r = r || {};
+    return { name: r.nine || null, par: r.par, parTotal: r.parOut, hcp: r.hcp, hcpWomen: r.hcpWomen,
+      tees: (r.tees || []).map(function (t) { return { name: t.name, color: t.color, yards: t.yards, total: t.out }; }) };
+  }
+
   // ---------- a 27-hole club's card: the nines being played, as one ordinary read ----------
   // names: the nines played, in order ("Bear", "Elk"). Each nine ranks its handicaps on its own (1-9, or odd 1-17);
   // two played as an 18: the first takes the odd numbers and the second the even. The rating and slope come from the
@@ -261,5 +308,5 @@
     return res;
   }
 
-  window.NMCardRead = { textOf: textOf, fromNines: fromNines, fromFile: fromFile, half: half, closeUps: closeUps, mergeCloseUp: mergeCloseUp, toCourse: toCourse, slug: slug };
+  window.NMCardRead = { ninePieces: ninePieces, asNine: asNine, bigOf: bigOf, textOf: textOf, fromNines: fromNines, fromFile: fromFile, half: half, closeUps: closeUps, mergeCloseUp: mergeCloseUp, toCourse: toCourse, slug: slug };
 })();

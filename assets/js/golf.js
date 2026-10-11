@@ -430,10 +430,17 @@
   var auth = token ? { Authorization: "Bearer " + token } : {};
   function getJson(path) { return fetch(API + path, { headers: auth }).then(function (r) { return r.ok ? r.json() : {}; }).catch(function () { return {}; }); }
   if (API) {
-    Promise.all([getJson("/scorecard/feed"), getJson("/scorecard/status")]).then(function (res) {
-      var rounds = res[0].rounds || [], open = !!(res[1].public || res[1].owner);
+    Promise.all([getJson("/scorecard/feed"), getJson("/scorecard/status"), getJson("/scorecard/handicap")]).then(function (res) {
+      var rounds = res[0].rounds || [], open = !!(res[1].public || res[1].owner), hc = res[2];
       if (!rounds.length && !open) return;
       data.course = rounds;
+      // the handicap index from these rounds (World Handicap System, worked out by the Worker): over the On the
+      // course summary, like X-Golf's
+      if (hc && hc.index != null) {
+        var latest = (hc.rounds || []).filter(function (x) { return x.differential != null; })[0];
+        data.courseStats = { headline: [["Handicap", hc.index.toFixed(1)]],
+          stats: [["Counting", "best " + hc.counted + " of " + hc.of + " rounds"]].concat(latest ? [["Latest differential", String(latest.differential)]] : []) };
+      }
       scorecardOpen = open;
       render();
       lastW = chartBox ? chartBox.clientWidth : 0;
@@ -456,7 +463,16 @@
       l.onload = res; l.onerror = res;
       document.head.appendChild(l);
     });
-    cardKit = Promise.all([fonts, js("/extras/scorecard/card.js").then(function () { return js("/extras/scorecard/viewer.js"); })]);
+    cardKit = Promise.all([fonts, js("/extras/scorecard/card.js").then(function () {
+      // a course's look (its real card's pictures and colors) from its saved course file, for rounds played before it
+      var looks = {};
+      window.NMCard.lookup = function (id) {
+        if (!looks[id]) looks[id] = fetch(API + "/scorecard/courses/" + encodeURIComponent(id)).then(function (r) { return r.ok ? r.json() : {}; })
+          .then(function (c) { return c.card || null; }, function () { return null; });
+        return looks[id];
+      };
+      return js("/extras/scorecard/viewer.js");
+    })]);
     cardKit.catch(function () { cardKit = null; });
     return cardKit;
   }

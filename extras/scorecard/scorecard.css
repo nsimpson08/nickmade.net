@@ -228,6 +228,8 @@ a { color: inherit; }
 .sc-sum-head span { font: 600 1.6rem/1 var(--display); color: var(--accent); }
 .sc-sum-sub { margin: 8px 0 0; color: var(--muted); }
 .sc-kinds { margin: 4px 0 0; font-size: 0.9rem; }
+.sc-hcp { margin: 4px 0 0; font-size: 0.9rem; color: var(--muted); }
+.sc-hcp:empty { display: none; }
 .sc-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; }
 .sc-stat { padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
 .sc-stat span { display: block; font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
@@ -347,3 +349,6 @@ a { color: inherit; }
 .sc-nines p { margin: 0 2px; }
 .sc-nines .sc-cc-btn { justify-content: flex-start; }
 .sc-trust .sc-link { margin: 0 0 0 4px; padding: 0; border: 0; background: none; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
+.sc-cc-prev { display: block; width: 100%; margin: 0 0 10px; padding: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: none; color: inherit; text-align: left; cursor: zoom-in; }
+.sc-cc-prev canvas { display: block; width: 100%; height: auto; }
+.sc-cc-prev span { display: block; padding: 8px 12px; font-size: 0.85rem; color: var(--muted, #8a8f8b); }

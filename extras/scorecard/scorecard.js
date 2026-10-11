@@ -173,6 +173,13 @@
       if (!ok) return params.has("admin") ? login() : closed();
       if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function () {});
       if (!prefs.name && ADMIN) { prefs.name = "Nick"; savePrefs(); }
+      if (OWNER) loadHandicap();
+      // a round played before its course had a look: the saved course file's look
+      var looks = {};
+      NMCard.lookup = function (id) {
+        if (!looks[id]) looks[id] = api("/scorecard/courses/" + encodeURIComponent(id)).then(function (c) { return c.card || null; }, function () { return null; });
+        return looks[id];
+      };
       ready = true;
       try { history.replaceState({ sc: 0 }, ""); } catch (e) {}
       if (round && !round.finishedAt) holeScreen(); else home();
@@ -460,7 +467,7 @@
       : src.kind === "compared"
       ? '<p class="sc-trust ok">✓ Checked against ' + esc(src.from.join(" and ")) + ". Save it below so it's ready next time.</p>"
       : blank
-      ? '<p class="sc-trust warn">This course has no numbers yet. Snap the card in the clubhouse, or find it on the course\'s website.</p>'
+      ? '<p class="sc-trust warn">This course has no numbers yet. Upload its card, or paste a link to it on the course\'s website.</p>'
       : '<p class="sc-trust warn">From OpenGolfAPI, which is often off. Check it against the real card before you start.</p>';
     app.innerHTML = bar('<button class="sc-icon sc-back" type="button" data-act="home" aria-label="Back">&larr;</button>', esc(draft.name), sunBtn) +
       '<section class="sc-pad">' +
@@ -483,6 +490,7 @@
         (draft.credit ? '<p class="sc-credit">' + esc(draft.credit) + "</p>" : "") +
       "</section>";
     if (!blank) checkTable();
+    cardPreview();
     // a course with no checked file: look for its own card on its website straight away (once per course here)
     if (!keep && !chk && draft.website && navigator.onLine !== false) lookupCard();
   }
@@ -496,18 +504,21 @@
     var waiting = load(K_SNAP + cc.id, null);
     var diffs = cc.sources.length ? countDiffs() : 0;
     return '<section class="sc-cc">' +
-      '<p class="sc-cc-status" aria-live="polite">' + esc(cc.status || (waiting ? "A card photo is waiting for signal to be read." : "")) + "</p>" +
+      '<p class="sc-cc-status" aria-live="polite">' + esc(cc.status || (waiting ? "A card is waiting for signal to be read." : "")) + "</p>" +
       (cc.choices ? '<div class="sc-cc-choices">' + cc.choices.map(function (c, i) {
         return '<button type="button" class="sc-cc-btn" data-cand="' + i + '">' + esc(cardName(c)) + "</button>";
       }).join("") + "</div>" : "") +
+      (cc.pictured ? '<p class="sc-cc-status">✓ Rounds here will be written on this card' + (draft.checked ? "." : ". Save the numbers as the course's card to keep it.") + "</p>" : "") +
+      (draft && draft.card && draft.card.kind === "photo" ? '<button type="button" class="sc-cc-prev" data-act="cardprev" aria-label="See the card full screen">' +
+        '<canvas class="sc-card"></canvas><span>An example round on this course\'s card. Tap to see it big.</span></button>' : "") +
       (cc.checks && cc.checks.length ? '<ul class="sc-cc-checks">' + cc.checks.map(function (x) { return "<li>" + esc(x.msg) + "</li>"; }).join("") + "</ul>" : "") +
       '<div class="sc-cc-actions">' +
-        '<label class="sc-cc-btn"><input type="file" id="sc-snap" accept="image/*,application/pdf" capture="environment" hidden>' +
-          '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg> Snap the card</label>' +
+        // no "Snap the card" for now (Nick, 2026-10-11): a phone photo's grid isn't found, so its rounds can't be
+        // written onto it. Upload takes a saved card (a PDF or picture from the course's website)
         // a card saved from a website (or a photo already taken): no camera
         '<label class="sc-cc-btn"><input type="file" id="sc-upload" accept="image/*,application/pdf" hidden>' +
           '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M5 14v5h14v-5"/></svg> Upload</label>' +
-        (waiting ? '<button type="button" class="sc-cc-btn" data-act="readsnap">Read the photo</button>' : "") +
+        (waiting ? '<button type="button" class="sc-cc-btn" data-act="readsnap">Read the card</button>' : "") +
         (draft.website && !cc.looked ? '<button type="button" class="sc-cc-btn" data-act="lookup">Find the website\'s card</button>' : "") +
         (cc.sources.length && draft.tees.length ? '<button type="button" class="sc-cc-btn go" data-act="compare">Compare' + (diffs ? " (" + diffs + ")" : "") + "</button>" : "") +
       "</div>" +
@@ -519,6 +530,20 @@
     if (status != null) cc.status = status;
     var el = app.querySelector(".sc-cc");
     if (el) el.outerHTML = cardPanel();
+    cardPreview();
+  }
+  // what a finished round will look like on the course's own card picture: an example round (par-ish scores)
+  function exampleRound() {
+    var holes = draft.par.map(function (p, i) { return i + 1; }), scores = {}, ups = [0, 1, 0, -1, 1, 0, 0, 1, 0];
+    holes.forEach(function (n) {
+      var par = draft.par[n - 1];
+      scores[n] = { strokes: par + ups[(n - 1) % 9], putts: n % 4 === 2 ? 1 : 2, fairway: par === 3 ? null : ["hit", "left", "hit", "right"][n % 4] };
+    });
+    return { id: "example", course: draft, tee: setupTee || defaultTee(draft), holes: holes, scores: scores, player: prefs.name || "Me", date: dayToIso(setupDay) };
+  }
+  function cardPreview() {
+    var cv = app.querySelector(".sc-cc-prev canvas");
+    if (cv && draft) NMCard.draw(cv, draft, exampleRound(), { scale: 0.8 }).catch(function () {});
   }
   function hostOf(u) { try { return new URL(u).hostname.replace(/^www\./, ""); } catch (e) { return u; } }
 
@@ -531,10 +556,35 @@
     };
     // a single nine, or two played as one 18: the card may hold the club's other nines too, so every nine is read and
     // the ones being played are taken out (by name, as printed on the card)
+    var names = draft && (draft.nines ? draft.name.split(" + ") : [nineName(draft)]);
     if (draft && (draft.nines || draft.holes === 9)) {
-      var names = draft.nines ? draft.name.split(" + ") : [nineName(draft)];
-      return ask(img, "nines").then(function (res) {
+      // A three-nine card in one read can pass a minute, past what the reader allows. So the card is cut into its nines
+      // (cardgrid.js), which are read side by side (about 15 s each). The whole card is read alongside only for its
+      // rating table (per pair of nines) and its nines' names, and isn't waited on for long.
+      var whole = ask(img, "nines").then(function (r) { return r.read; }, function () { return null; });
+      var wholeRead = function () { // the whole read, or nothing if it's still going 20 s after the nines are in
+        var late = new Promise(function (res) { setTimeout(function () { res(null); }, 20000); });
+        return Promise.race([whole, late]);
+      };
+      return NMCardRead.ninePieces(img).then(function (pieces) {
+        if (!pieces) return whole.then(function (r) { if (!r) throw new Error("The card reader couldn't read that one just now. Try again in a moment."); return { read: r }; });
+        ccPaint("Reading the card's " + pieces.length + " nines…");
+        return Promise.all(pieces.map(function (p) { return ask(p, "nine").then(function (r) { return r.read; }, function () { return null; }); }))
+          .then(function (reads) {
+            if (reads.some(function (r) { return !r; })) {
+              // a piece failed: the whole card's read is the fallback
+              return whole.then(function (r) { if (!r) throw new Error("The card reader couldn't read that one just now. Try again in a moment."); return { read: r }; });
+            }
+            return wholeRead().then(function (w) {
+              var nines = reads.map(NMCardRead.asNine);
+              // names from the whole read where a piece didn't find its own (same count, same order)
+              if (w && w.nines && w.nines.length === nines.length) nines.forEach(function (n, i) { if (!n.name && w.nines[i]) n.name = w.nines[i].name; });
+              return { read: { nines: nines, ratings: (w && w.ratings) || [] } };
+            });
+          });
+      }).then(function (res) {
         var read = NMCardRead.fromNines(res.read, names);
+        if (read) read.order = ((res.read && res.read.nines) || []).map(function (x) { return String((x && x.name) || "").toLowerCase(); }); // the card's nines, left to right
         if (!read) {
           var found = ((res.read && res.read.nines) || []).map(function (x) { return x && x.name; }).filter(Boolean);
           throw new Error("Couldn't find " + names.join(" and ") + " on that card" + (found.length ? " (it shows " + found.join(", ") + ")" : "") + ".");
@@ -566,9 +616,9 @@
       if (cc.id !== id) return;
       if (!c) {
         ccPaint(d.note || (d.blocked
-          ? where + " turns away apps like this one, so its card can't be read from here. Save the card from the site and upload it, or snap the one in the clubhouse."
+          ? where + " turns away apps like this one, so its card can't be read from here. Save the card from the site and upload it."
           : link ? "No card found on that page. Paste the card picture's own link (press and hold it, then Copy), or save it and upload it."
-          : "Couldn't find a card on " + where + ". If it's there, paste its link below, or snap the one in the clubhouse."));
+          : "Couldn't find a card on " + where + ". If it's there, paste its link below, or save it and upload it."));
         return;
       }
       // several cards that fit equally well (a park with three courses, under one name): ask which is this one
@@ -582,7 +632,7 @@
     }).catch(function (err) {
       if (cc.id !== id) return;
       cc.looked = false; // the "Find the website's card" button comes back, to try again
-      ccPaint(err.status === 0 ? "No signal to look for the card. Snap the clubhouse card instead." : err.message);
+      ccPaint(err.status === 0 ? "No signal to look for the card." : err.message);
     });
   }
   function readWebCard(c, id) {
@@ -595,21 +645,62 @@
       var reading = kept ? Promise.resolve(kept) : fetch(API + "/scorecard/file?u=" + encodeURIComponent(c.url), { headers: auth() })
         .then(function (r) { if (!r.ok) throw new Error("That website wouldn't send its card here. Save the card from the site and upload it instead."); return r.blob(); })
         .then(function (blob) { return NMCardRead.fromFile(new File([blob], c.url.split("/").pop(), { type: blob.type })); })
-        .then(function (img) { return readImage(img, draft.holes, c.url); })
+        .then(function (img) { cc.image = img; return readImage(img, draft.holes, c.url); })
         .then(function (read) { save(readKey, read); return read; });
       return reading.then(function (read) {
         if (cc.id !== id) return;
         addSource("web", "the website card" + when, read, { kind: "website", url: c.url, dated: c.dated, label: "the course's website card" + when });
+        cardPicture(kept ? null : cc.image, read, c.url);
       });
     })().catch(function (err) {
       if (cc.id !== id) return;
       cc.looked = false;
-      ccPaint(err.status === 0 ? "No signal to read the card. Snap the clubhouse card instead." : err.message);
+      ccPaint(err.status === 0 ? "No signal to read the card." : err.message);
     });
   }
   function cardName(c) {
     var f = decodeURIComponent(c.url.split("/").pop().replace(/\.[a-z]+$/i, "")).replace(/[-_]+/g, " ").replace(/\d{3,}px/i, "").trim();
     return c.label && c.label.length < 60 ? c.label : f;
+  }
+
+  // The card itself as the course's scorecard (Nick only, 2026-10-11: "take the whole image of the course card and
+  // input the round numbers directly into the boxes that exist on the card"): cardgrid.js finds its hole columns and
+  // blank rows, the picture is kept on the server, and card.js writes each round onto it. Nothing to adjust: a card
+  // whose grid isn't found (a skewed photo) keeps the plain card.
+  //   img: the card read (else it's fetched again from url); read: its numbers (read.order: a 27-hole card's nines)
+  function cardPicture(img, read, url) {
+    if (!OWNER || !window.NMCardGrid) return;
+    var id = draft.id;
+    var source = img ? Promise.resolve(img) : !url ? Promise.reject() : fetch(API + "/scorecard/file?u=" + encodeURIComponent(url), { headers: auth() })
+      .then(function (r) { if (!r.ok) throw new Error(); return r.blob(); })
+      .then(function (blob) { return NMCardRead.fromFile(new File([blob], url.split("/").pop(), { type: blob.type })); });
+    source.then(function (small) {
+      return new Promise(function (res, rej) { var im = new Image(); im.onload = function () { res(im); }; im.onerror = rej; im.src = NMCardRead.bigOf(small); });
+    }).then(function (im) {
+      var grid = NMCardGrid.find(im);
+      if (!grid) return; // a card with no blank rows (just a table, like Holiday Hills' website card) gets rows added underneath (card.js)
+      var play;
+      if (draft.nines || draft.holes === 9) {
+        var names = draft.nines ? draft.name.split(" + ") : [nineName(draft)], order = (read && read.order) || [];
+        play = names.map(function (nm, i) {
+          var k = order.length === grid.nines.length ? order.findIndex(function (x) { return x.indexOf(nm.toLowerCase()) >= 0; }) : -1;
+          return k >= 0 ? k : grid.nines.length === names.length ? i : -1;
+        });
+      } else play = grid.nines.length >= 2 ? [0, 1] : null;
+      if (!play || play.some(function (k) { return k < 0 || !grid.nines[k]; })) return;
+      // kept at up to 2400 px wide
+      var kx = Math.min(1, 2400 / im.naturalWidth), c = document.createElement("canvas");
+      c.width = Math.round(im.naturalWidth * kx); c.height = Math.round(im.naturalHeight * kx);
+      c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
+      return api("/scorecard/art", { method: "POST", body: { image: c.toDataURL("image/jpeg", 0.86) } }).then(function (r) {
+        if (!draft || draft.id !== id) return;
+        draft.card = { kind: "photo", src: API + r.path, w: c.width, h: c.height, grid: grid, play: play };
+        save(K.course + id, copy(draft));
+        if (draft.checked) queueApproval(draft); // a saved card: a new version with its picture; otherwise it goes with the card's approval
+        cc.pictured = true;
+        ccPaint();
+      });
+    }).catch(function () {});
   }
 
   // a photo of the card (or a PDF/picture of it): read now, or kept until there's signal
@@ -626,11 +717,13 @@
     if (!waiting) return;
     if (navigator.onLine === false) { ccPaint("Saved. The photo will be read when there's signal."); return; }
     ccPaint("Reading the card…");
+    cc.image = waiting.img;
     return readImage(waiting.img, draft.holes).then(function (read) {
       drop(K_SNAP + id);
       if (cc.id !== id) return;
       var what = waiting.up ? "the card you uploaded" : "your photo";
       addSource("photo", what, read, { kind: "photo", dated: today(), label: what + (waiting.up ? "" : " of the card") + " (" + fmtDate(new Date()) + ")" });
+      cardPicture(waiting.img, read);
     }).catch(function (err) {
       ccPaint(err.status === 0 ? "Saved. The photo will be read when there's signal." : err.message);
     });
@@ -651,6 +744,18 @@
       return;
     }
     var n = countDiffs();
+    // OpenGolfAPI's numbers and no saved card yet: the course's own card wins straight away (its tees, yardages, pars),
+    // since OpenGolfAPI is often off (Holiday Hills: White and Red only, at other yardages). Compare still shows
+    // OpenGolfAPI's numbers beside it, to take any of them instead.
+    if (n && !draft.checked && (draft.source || {}).kind === "api" && !cc.inRound) {
+      var card = copy(made.course);
+      ["id", "name", "fullName", "place", "apiId", "nearApiId", "website", "credit", "card"].forEach(function (k) { if (draft[k] != null) card[k] = draft[k]; else delete card[k]; });
+      cc.adopted = true;
+      cc.status = "Using " + label + "'s numbers. OpenGolfAPI's differ in " + n + (n === 1 ? " place" : " places") + ": Compare to see them." +
+        (made.checks.length ? " Some of the card's own totals don't add up." : "");
+      setup(card, true);
+      return;
+    }
     ccPaint(n ? "The numbers differ from " + label + " in " + n + (n === 1 ? " place." : " places.") + (made.checks.length ? " Some of its numbers don't add up." : "")
       : "✓ " + label.charAt(0).toUpperCase() + label.slice(1) + " matches these numbers." + (made.checks.length ? " (Some of its own totals don't add up.)" : ""));
   }
@@ -664,7 +769,7 @@
       : src.kind === "checked" ? "your last check" : "what's here now";
   }
   function columns() {
-    return [{ id: "now", label: nowLabel(), course: draft, checks: [] }].concat(cc.sources);
+    return [{ id: "now", label: nowLabel(), course: cc.adopted && cc.now ? cc.now : draft, checks: [] }].concat(cc.sources);
   }
   function teeKey(t) { return NMCardRead.slug(String(t.name).replace(/\s+tees?$/i, "")); }
   // the same tee on another source's card: by name, else by color, else by about the same length
@@ -763,7 +868,7 @@
   function compared() {
     var cols = columns(), base = cols.filter(function (c) { return c.id === cmp.baseId; })[0] || cols[0];
     var c = copy(base.course);
-    ["id", "name", "fullName", "place", "apiId", "nearApiId", "website", "credit", "checked"].forEach(function (k) { if (draft[k] != null) c[k] = draft[k]; else delete c[k]; });
+    ["id", "name", "fullName", "place", "apiId", "nearApiId", "website", "credit", "checked", "card"].forEach(function (k) { if (draft[k] != null) c[k] = draft[k]; else delete c[k]; });
     Object.keys(cmp.picks).forEach(function (key) {
       var v = +cmp.picks[key], p = key.split(":");
       if (!Number.isFinite(v)) return;
@@ -784,7 +889,7 @@
   function newCourse(name) {
     if (!at(1, function () { newCourse(name); })) return;
     app.innerHTML = bar('<button class="sc-icon sc-back" type="button" data-act="home" aria-label="Back">&larr;</button>', "Add a course", sunBtn) +
-      '<section class="sc-pad"><p class="sc-muted">Name it, then snap its card (or find the card on its website) and the numbers fill in.</p>' +
+      '<section class="sc-pad"><p class="sc-muted">Name it, then upload its card (or paste a link to it on its website) and the numbers fill in.</p>' +
       '<form class="sc-new"><label for="sc-new-name">Course name</label><input id="sc-new-name" class="sc-in" required maxlength="80" value="' + esc(name || "") + '" placeholder="Firewheel · Lakes Course">' +
       '<label for="sc-new-place">Town</label><input id="sc-new-place" class="sc-in" maxlength="80" placeholder="Garland, TX">' +
       '<label for="sc-new-site">Website <span class="sc-muted">(optional, to find its card)</span></label><input id="sc-new-site" class="sc-in" type="url" maxlength="300" placeholder="https://…">' +
@@ -800,8 +905,20 @@
     });
   }
 
+  // Nick's handicap index (GET /scorecard/handicap, worked out on the server from his Golf-page rounds): his course
+  // handicap on each tee at setup, and a finished round's differential
+  var hcp = null;
+  function loadHandicap() {
+    return api("/scorecard/handicap").then(function (d) { hcp = d; return d; }, function () { return hcp; });
+  }
+  function courseHcp(c, t) {
+    if (!hcp || hcp.index == null || !t.rating || !t.slope) return null;
+    var par = c.par.reduce(function (a, v) { return a + v; }, 0), nine = c.holes === 9 && t.rating < 50;
+    return Math.round((nine ? hcp.index / 2 : hcp.index) * t.slope / 113 + (t.rating - par));
+  }
   function teeBtn(t) {
-    var rs = t.rating ? t.rating + "/" + t.slope : "";
+    var ch = OWNER && draft ? courseHcp(draft, t) : null;
+    var rs = (t.rating ? t.rating + "/" + t.slope : "") + (ch != null ? (t.rating ? " · " : "") + "course hcp " + ch : "");
     return '<button class="sc-tee" type="button" data-tee="' + esc(t.key) + '" aria-pressed="' + (t.key === setupTee) + '">' +
       '<span class="sc-swatch" style="background:' + esc(t.color) + '"></span><span class="sc-tee-name">' + esc(t.name) + "</span>" +
       '<span class="sc-tee-yds">' + fmtYds(yardsOf(t)) + " yds</span>" + (rs ? '<span class="sc-tee-rs">' + esc(rs) + "</span>" : "") + "</button>";
@@ -1250,7 +1367,7 @@
 
   function showCard() { viewer(round); }
 
-  // During a round: snap the card (or find the website's), compare, and fix this round's numbers (and the course file)
+  // During a round: upload the card (or find the website's), compare, and fix this round's numbers (and the course file)
   function roundCheck() {
     if (!at(2, function () { roundCheck(); })) return;
     draft = copy(round.course);
@@ -1258,7 +1375,7 @@
     setupTee = round.tee;
     cc = { id: draft.id, sources: [], status: "", now: copy(round.course), inRound: true };
     app.innerHTML = bar('<button class="sc-icon sc-back" type="button" data-act="cmpback" aria-label="Back">&larr;</button>', "Check the card", sunBtn) +
-      '<section class="sc-pad"><p class="sc-muted">Snap the card in the clubhouse (or find the course\'s own), then compare it with the numbers this round is using.</p>' +
+      '<section class="sc-pad"><p class="sc-muted">Upload the course\'s card (or find its own), then compare it with the numbers this round is using.</p>' +
       cardPanel() + "</section>";
     if (load(K_SNAP + cc.id, null) && navigator.onLine !== false) readSnap();
   }
@@ -1295,6 +1412,7 @@
         '<p class="sc-sum-sub">' + esc(c.name) + " · " + esc(tee.name) + " tees · " + esc(fmtDate(r.date)) +
           (s.done < r.holes.length ? " · " + s.done + " of " + r.holes.length + " holes" : r.holes.length === 9 ? " · 9 holes" : "") + "</p>" +
         (kinds ? '<p class="sc-kinds">' + esc(kinds) + "</p>" : "") +
+        (OWNER ? '<p class="sc-hcp" aria-live="polite"></p>' : "") +
         '<div class="sc-stats">' +
           tile("Putts", s.puttsHoles ? s.putts : "–", s.puttsHoles ? (s.putts / s.puttsHoles).toFixed(1) + " a hole" : "") +
           tile("Fairways", s.fwN ? s.fw + "/" + s.fwN : "–", s.fwN ? "missed " + s.fwL + " left, " + s.fwR + " right" : "") +
@@ -1315,6 +1433,22 @@
       "</section>";
     app.dataset.round = r.id;
     NMCard.draw(app.querySelector(".sc-card"), c, r, { scale: 2 });
+    if (OWNER) roundHcp(r, 0);
+  }
+  // this round's differential and the index after it, once the round has reached the server (asked again a few times
+  // while it syncs)
+  function roundHcp(r, tries) {
+    var el = app.querySelector(".sc-hcp");
+    if (!el || app.dataset.round !== r.id) return;
+    if (!r.onSite) { el.textContent = "Not on your Golf page, so it doesn't count toward your handicap."; return; }
+    loadHandicap().then(function (d) {
+      if (!el.isConnected || app.dataset.round !== r.id) return;
+      var x = d && (d.rounds || []).filter(function (y) { return y.id === r.id; })[0];
+      if (!x) { if (tries < 4) setTimeout(function () { roundHcp(r, tries + 1); }, 2500); return; }
+      el.textContent = x.differential != null
+        ? "Differential " + x.differential + (x.used ? " (counting)" : "") + (d.index != null ? " · handicap index " + d.index : "")
+        : x.note || "";
+    });
   }
 
   function sourceLine(c) {
@@ -1447,6 +1581,7 @@
     if (act === "resume") return holeScreen();
     if (act === "newcourse") { var qv = app.querySelector("#sc-q"); return newCourse(qv ? qv.value.trim() : ""); }
     if (act === "lookup") return lookupCard();
+    if (act === "cardprev") return NMCardViewer.open(exampleRound());
     if (act === "uncard") return removeCard(b);
     if (act === "nines") return pickNine(b);
     if (act === "readsnap") return readSnap();
@@ -1571,7 +1706,7 @@
   // the check table's number boxes
   app.addEventListener("change", function (e) {
     var el = e.target, d = el.dataset;
-    if (el.id === "sc-snap" || el.id === "sc-upload") { if (el.files && el.files[0]) snap(el.files[0], el.id === "sc-upload"); return; }
+    if (el.id === "sc-upload") { if (el.files && el.files[0]) snap(el.files[0], true); return; }
     if (el.id === "sc-date") {
       setupDay = /^\d{4}-\d{2}-\d{2}$/.test(el.value) && el.value <= today() ? el.value : today();
       el.value = setupDay;
@@ -1599,6 +1734,8 @@
       r.updatedAt = Date.now();
       save(K.rounds, past);
       queueSync(0);
+      var line = app.querySelector(".sc-hcp");
+      if (line) { line.textContent = ""; setTimeout(function () { roundHcp(r, 0); }, 1500); }
       return;
     }
     if (!draft || (d.yds == null && d.hcp == null)) return;

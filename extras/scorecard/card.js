@@ -2,6 +2,8 @@
 // A course file can carry `card`, a template of its real card copied from the course's own (row order, colors, labels,
 // divider column, logo, fonts: see courses/pecan-hollow.json), so the saved image looks like that course's card with
 // the round written in by hand. Courses without one get a generic card built from their data (generic() below).
+// A card can also be the course's own card picture (kind "photo", made in scorecard.js from a card Nick read, with
+// cardgrid.js finding its boxes): the round is written straight into its blank rows (paintPhoto() below).
 // Drawn on a canvas so the page's web fonts work in the saved PNG. SCORECARD-PLAN.md section 7.
 //
 //   NMCard.draw(canvas, course, round, { scale })   -> Promise (after the fonts load)
@@ -71,7 +73,16 @@
   // The card's look always comes from the course's own file in the repo when it has one (Nick's hand-tuned cards),
   // so a round saved with an older copy of it (or a course file approved before the look changed) gets the new look
   var FILES = "/extras/scorecard/courses/", fresh = {};
+  function fits(card, course) {
+    return card && (card.rows || []).every(function (r) { return r.kind !== "tee" || course.tees.some(function (x) { return x.key === r.tee; }); });
+  }
   function freshTemplate(course) {
+    if (course.card && course.card.kind === "photo") return Promise.resolve(course.card);
+    // a course with no look of its own here (a round played before its look was made): its saved course file's look,
+    // when the page has said where to ask (NMCard.lookup, set by the Scorecard and the Golf page)
+    if (!course.card && course.id && NMCard.lookup) {
+      return NMCard.lookup(course.id).then(function (card) { return fits(card, course) ? card : generic(course); }, function () { return generic(course); });
+    }
     if (!course.card || /^api:/.test(course.id || "") || !course.id) return Promise.resolve(template(course));
     if (!fresh[course.id]) {
       fresh[course.id] = fetch(FILES + encodeURIComponent(course.id) + ".json").then(function (r) { return r.ok ? r.json() : null; })
@@ -79,8 +90,7 @@
     }
     return fresh[course.id].then(function (card) {
       // only if it still fits this course's tees (a card drawn around tees the round doesn't have would be wrong)
-      var fits = card && (card.rows || []).every(function (r) { return r.kind !== "tee" || course.tees.some(function (x) { return x.key === r.tee; }); });
-      return fits ? card : template(course);
+      return fits(card, course) ? card : template(course);
     });
   }
   // the course's own hole drawings for the header (tools/scorecard_art.py cuts them from the real card)
@@ -90,6 +100,7 @@
       if (!pics[a.src]) {
         pics[a.src] = new Promise(function (res) {
           var img = new Image();
+          if (/^https?:/.test(a.src) && a.src.indexOf(location.origin) !== 0) img.crossOrigin = "anonymous"; // kept drawable for Save image
           img.onload = function () { res(img); };
           img.onerror = function () { res(null); };
           img.src = a.src;
@@ -101,6 +112,7 @@
 
   function draw(canvas, course, round, opts) {
     return freshTemplate(course).then(function (t) {
+      if (t.kind === "photo") return photoCard(canvas, course, round, t, (opts && opts.scale) || 2);
       return Promise.all([fonts(t), art(t)]).then(function (r) { paint(canvas, course, round, t, (opts && opts.scale) || 2, r[1]); return canvas; });
     });
   }
@@ -400,6 +412,151 @@
     }
   }
 
+  // ---------- the course's own card picture, with the round written in ----------
+  //   card: { kind: "photo", src, w, h, grid: NMCardGrid.find(), play: [the grid's nine for holes 1-9, for 10-18] }
+  // The strokes go in the card's first blank row and the putts in the next, each nine's total in its Out / In / TOT 9
+  // box, the round's total in the box after the second nine's (TOT / TOTAL 18). A strip underneath gives the date, tee
+  // and score.
+  function photoCard(canvas, course, round, card, scale) {
+    var load = new Promise(function (res, rej) {
+      var img = new Image();
+      if (/^https?:/.test(card.src) && card.src.indexOf(location.origin) !== 0) img.crossOrigin = "anonymous";
+      img.onload = function () { res(img); };
+      img.onerror = rej;
+      img.src = card.src;
+    });
+    var faces = ["700 20px '" + HAND.font + "'", "400 20px 'Roboto Condensed'", "700 20px 'Roboto Condensed'"];
+    var fontsReady = document.fonts && document.fonts.load ? Promise.all(faces.map(function (f) { return document.fonts.load(f).catch(function () {}); })) : Promise.resolve();
+    return Promise.all([load, fontsReady]).then(function (r) { paintPhoto(canvas, course, round, card, scale, r[0]); return canvas; },
+      function () { paint(canvas, course, round, generic(course), scale, []); return canvas; }); // no picture (offline): the plain card
+  }
+  function paintPhoto(canvas, course, round, card, scale, img) {
+    var W = 1250, k = W / card.w, H = card.h * k, F = 64, g = card.grid;
+    var ctx = canvas.getContext("2d");
+    var write = function (s, x, y, size, align) {
+      ctx.font = "700 " + size + "px '" + HAND.font + "', cursive";
+      ctx.fillStyle = HAND.color; ctx.textAlign = align || "center"; ctx.textBaseline = "middle";
+      ctx.fillText(String(s), x, y + 1);
+    };
+    var cell = function (c, row) { return { x: (c[0] + c[1]) / 2 * W, y: (row[0] + row[1]) / 2 * H, w: (c[1] - c[0]) * W, h: (row[1] - row[0]) * H }; };
+    var nineOf = function (h) { return g.nines[card.play[h <= 9 || card.play.length < 2 ? 0 : 1]]; };
+    var n = course.holes || 18, any = function (f) { for (var h = 1; h <= n; h++) if (f(h) != null) return true; return false; };
+    var S = function (h) { return played(round, h) ? sc(round, h) : {}; };
+    var spans = card.play.length > 1 && n > 9 ? [[1, 9, 0], [10, n, 1]] : [[1, n, 0]];
+    // the rows, like the drawn card's: the score, putts, fairways, greens, penalties (each only if the round has any),
+    // in the card's blank rows from the top
+    var roles = [
+      { label: round.player || "", v: function (h) { return S(h).strokes; }, total: "sum", marks: true },
+      { label: "Putts", v: function (h) { return S(h).putts; }, total: "sum" },
+      { label: "Fairways", v: function (h) { return course.par[h - 1] === 3 ? null : S(h).fairway || null; }, total: "hits", hit: function (v) { return v === "hit"; }, draw: fairway },
+      { label: "Greens", v: function (h) { return played(round, h) ? girOf(course, round, h) : null; }, total: "hits", hit: function (v) { return v === true; }, draw: green },
+      { label: "Penalties", v: function (h) { return S(h).penalties || null; }, total: "sum" },
+    ].filter(function (r, i) { return i === 0 || any(r.v); });
+    var rows = (g.blank[0] || []).map(function (ri) { return g.rows[ri]; });
+    // more rows than the card has blank ones (a card that's only a table has none): added underneath, the card's own
+    // row height, ruled at its columns
+    var extra = Math.max(0, roles.length - rows.length), rowH = 0, gap = extra ? 6 : 0;
+    if (extra) {
+      var hs = g.rows.map(function (r) { return (r[1] - r[0]) * H; }).sort(function (a, b) { return a - b; });
+      rowH = Math.max(34, Math.min(60, hs[hs.length >> 1] || 40));
+      for (var e = 0; e < extra; e++) rows.push([(H + gap + e * rowH) / H, (H + gap + (e + 1) * rowH) / H]);
+    }
+    var EH = extra ? gap + extra * rowH + 6 : 0;
+    canvas.width = Math.round(W * scale);
+    canvas.height = Math.round((H + EH + F) * scale);
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H + EH);
+    ctx.drawImage(img, 0, 0, W, H);
+    if (extra) {
+      var onCard = card.play.map(function (i) { return g.nines[i]; }).filter(Boolean), xs = [];
+      onCard.forEach(function (nine, i) {
+        if (nine.label && i === 0) xs.push(nine.label[0], nine.label[1]);
+        nine.holes.forEach(function (c) { xs.push(c[0], c[1]); });
+        if (nine.total) xs.push(nine.total[1]);
+        if (nine.after && i === onCard.length - 1) xs.push(nine.after[1]);
+      });
+      if (!onCard[0].label) { var other = g.nines.map(function (x) { return x.label; }).filter(Boolean)[0]; if (other) xs.push(other[0], other[1]); }
+      xs = xs.map(function (x) { return Math.round(x * W) + 0.5; });
+      var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), top = H + gap, bottom = H + gap + extra * rowH;
+      ctx.strokeStyle = "#9a9a96"; ctx.lineWidth = 1;
+      ctx.beginPath();
+      xs.forEach(function (x) { ctx.moveTo(x, top); ctx.lineTo(x, bottom); });
+      for (var e2 = 0; e2 <= extra; e2++) { var yy = Math.round(top + e2 * rowH) + 0.5; ctx.moveTo(x0, yy); ctx.lineTo(x1, yy); }
+      ctx.stroke();
+    }
+    // the name and row labels: the played nine's own label box, else the card's (a 27-hole card's labels are on its
+    // first nine)
+    var labCol = (nineOf(1) && nineOf(1).label) || g.nines.map(function (x) { return x.label; }).filter(Boolean)[0];
+    roles.forEach(function (role, ri) {
+      var row = rows[ri];
+      if (!row) return;
+      for (var h = 1; h <= n; h++) {
+        var v = role.v(h), nine = nineOf(h);
+        if (v == null || !nine) continue;
+        var c = cell(nine.holes[(h - 1) % 9], row), size = Math.min(c.w, c.h) * 0.86;
+        if (role.draw) { role.draw(v, c, size); continue; }
+        write(v, c.x, c.y, size);
+        if (role.marks) {
+          var d = v - course.par[h - 1], rr = size * 0.42;
+          ctx.strokeStyle = HAND.color; ctx.lineWidth = Math.max(1.4, size * 0.05);
+          var ring = function (rad) { ctx.beginPath(); ctx.ellipse(c.x, c.y, rad * 1.02, rad * 0.98, -0.2, 0, Math.PI * 2); ctx.stroke(); };
+          var box = function (rad) { ctx.beginPath(); ctx.rect(c.x - rad, c.y - rad, rad * 2, rad * 2); ctx.stroke(); };
+          if (d <= -1) { ring(rr); if (d <= -2) ring(rr * 0.78); } else if (d >= 1) { box(rr * 0.95); if (d >= 2) box(rr * 0.75); }
+        }
+      }
+      // each nine's total, then the round's: a sum, or hits out of tries ("5/7")
+      var tally = function (a, b) {
+        var s = 0, tries = 0, hits = 0;
+        for (var h2 = a; h2 <= b; h2++) { var v2 = role.v(h2); if (v2 == null) continue; tries++; if (role.total === "sum") s += v2; else if (role.hit(v2)) hits++; }
+        return !tries ? null : role.total === "sum" ? s : hits + "/" + tries;
+      };
+      var put = function (col, v) {
+        if (!col || v == null) return;
+        var c2 = cell(col, row), str = String(v);
+        write(str, c2.x, c2.y, Math.min(c2.h * 0.8, c2.w * (str.length > 3 ? 0.36 : 0.55)));
+      };
+      spans.forEach(function (sp) { var nine = g.nines[card.play[sp[2]]]; put(nine && nine.total, tally(sp[0], sp[1])); });
+      var last = g.nines[card.play[spans.length - 1]];
+      if (spans.length > 1 && last) put(last.after, tally(1, n));
+      if (labCol) { var c3 = cell(labCol, row); write(role.label, labCol[0] * W + c3.h * 0.3, c3.y, c3.h * (ri ? 0.62 : 0.72), "left"); }
+    });
+
+    // a fairway: a check for hit, an arrow for a miss left or right; a green: a filled dot hit, an open one missed
+    function fairway(f, c, size) {
+      var s2 = size * 0.62;
+      ctx.strokeStyle = HAND.color; ctx.lineWidth = Math.max(2, size * 0.08); ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.beginPath();
+      if (f === "hit") {
+        ctx.moveTo(c.x - s2 * 0.42, c.y); ctx.lineTo(c.x - s2 * 0.1, c.y + s2 * 0.32); ctx.lineTo(c.x + s2 * 0.45, c.y - s2 * 0.38);
+      } else {
+        var dir = f === "left" ? -1 : 1;
+        ctx.moveTo(c.x - dir * s2 * 0.45, c.y); ctx.lineTo(c.x + dir * s2 * 0.45, c.y);
+        ctx.moveTo(c.x + dir * s2 * 0.12, c.y - s2 * 0.28); ctx.lineTo(c.x + dir * s2 * 0.45, c.y); ctx.lineTo(c.x + dir * s2 * 0.12, c.y + s2 * 0.28);
+      }
+      ctx.stroke();
+    }
+    function green(hit, c, size) {
+      var r = size * 0.16;
+      ctx.strokeStyle = ctx.fillStyle = HAND.color; ctx.lineWidth = Math.max(1.6, size * 0.06);
+      ctx.beginPath(); ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
+      if (hit) ctx.fill(); else ctx.stroke();
+    }
+    // underneath: the date, the tee and the score
+    var tee = course.tees.filter(function (x) { return x.key === round.tee; })[0];
+    var strokes = 0, par = 0, putts = 0, done = 0;
+    round.holes.forEach(function (h) { var s = sc(round, h); if (s.strokes == null) return; strokes += s.strokes; par += course.par[h - 1]; done++; if (s.putts != null) putts += s.putts; });
+    var FY = H + EH;
+    ctx.fillStyle = "#f4efe2"; ctx.fillRect(0, FY, W, F);
+    ctx.fillStyle = "#22302a"; ctx.textBaseline = "middle";
+    ctx.font = "400 24px 'Roboto Condensed', sans-serif"; ctx.textAlign = "left";
+    ctx.fillText([dateText(round.date), tee ? tee.name + " tees" : "", round.holes.length === 9 ? (round.holes[0] === 1 ? "Front 9" : "Back 9") : ""].filter(Boolean).join("  ·  "), 24, FY + F / 2);
+    if (done) {
+      ctx.textAlign = "right";
+      ctx.font = "700 30px 'Roboto Condensed', sans-serif";
+      ctx.fillText(strokes + "  " + toPar(strokes - par) + (putts ? "  ·  " + putts + " putts" : "") + (done < round.holes.length ? "  ·  thru " + done : ""), W - 24, FY + F / 2);
+    }
+  }
+
   function dateText(d) {
     if (!d) return "";
     var x = new Date(d);
@@ -496,5 +653,5 @@
     },
   };
 
-  window.NMCard = { draw: draw, template: template, girOf: girOf };
+  window.NMCard = { draw: draw, template: template, girOf: girOf, lookup: null };
 })();

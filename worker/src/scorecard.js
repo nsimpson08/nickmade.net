@@ -12,6 +12,9 @@
 //   GET    /scorecard/courses/:id         a course's newest approved file, with checked: { version, owner, at }
 //   POST   /scorecard/courses/:id/approve { visitorId, course } -> a new version of its course file. Nick's approvals
 //                                         always count; a visitor's only while the course has no file yet
+//   POST   /scorecard/art                 Nick only: { image: data URL } -> { path }: a course's card picture, kept in R2
+//                                         (scorecard/art/<hash>.png in nickmade-photos); GET /scorecard/art/<name> serves it
+//   GET    /scorecard/handicap            Nick's handicap index from his Golf-page rounds (see handicap())
 //   DELETE /scorecard/courses/:id         Nick only: removes a saved card (every version); rounds keep their own copy
 //   GET    /scorecard/rounds?visitorId=   this player's rounds (summaries, newest first)
 //   GET    /scorecard/rounds/:id?visitorId=  one round in full (the course as played, every hole)
@@ -64,8 +67,32 @@ export async function scorecardRoute(request, url, env, cors, h) {
   if (url.pathname === "/scorecard/status" && request.method === "GET") return h.json({ public: open, owner }, 200, cors);
   if (!url.pathname.startsWith("/scorecard/")) return null;
   if (url.pathname === "/scorecard/feed" && request.method === "GET" && !open && !owner) return h.json({ rounds: [] }, 200, cors);
+  if (url.pathname === "/scorecard/handicap" && request.method === "GET" && !open && !owner) return h.json({ index: null, rounds: [] }, 200, cors);
+  // a course's own card picture (Nick's rounds there are written onto it, card.js): anyone can load it
+  if (url.pathname.startsWith("/scorecard/art/") && request.method === "GET") {
+    const name = url.pathname.slice(15);
+    if (!env.PHOTOS || !/^[0-9a-f]{24}\.(png|webp|jpg)$/.test(name)) return new Response("Not found", { status: 404, headers: cors });
+    const obj = await env.PHOTOS.get("scorecard/art/" + name);
+    if (!obj) return new Response("Not found", { status: 404, headers: cors });
+    return new Response(obj.body, { headers: { "Content-Type": obj.httpMetadata?.contentType || "image/png",
+      "Cache-Control": "public, max-age=31536000, immutable", "Access-Control-Allow-Origin": "*" } });
+  }
+  if (url.pathname === "/scorecard/art" && request.method === "POST") {
+    if (!owner) return h.json({ error: "Only Nick can save a card's picture." }, 403, cors);
+    if (!env.PHOTOS) return h.json({ error: "Picture storage isn't set up." }, 503, cors);
+    const b = await body(request, 6000000);
+    const m = b && /^data:image\/(png|webp|jpeg);base64,([A-Za-z0-9+/=]+)$/.exec(b.image || "");
+    if (!m) return h.json({ error: "Send a PNG, WebP or JPEG." }, 400, cors);
+    const bytes = Uint8Array.from(atob(m[2]), (c) => c.charCodeAt(0));
+    if (bytes.length > 4000000) return h.json({ error: "That picture is too big." }, 413, cors);
+    const ext = m[1] === "jpeg" ? "jpg" : m[1];
+    const name = (await h.sha256(m[2])).slice(0, 24) + "." + ext; // named by its contents: the same picture is stored once
+    await env.PHOTOS.put("scorecard/art/" + name, bytes, { httpMetadata: { contentType: "image/" + m[1] } });
+    return h.json({ path: "/scorecard/art/" + name }, 200, cors);
+  }
   if (!open && !owner) return h.json({ error: "Not available." }, 401, cors);
   if (url.pathname === "/scorecard/feed" && request.method === "GET") return feed(env, cors, h);
+  if (url.pathname === "/scorecard/handicap" && request.method === "GET") return h.json(await handicap(env), 200, cors);
   if (url.pathname.startsWith("/scorecard/feed/") && request.method === "GET") {
     const id = decodeURIComponent(url.pathname.split("/")[3] || "");
     if (!env.GOLF || !RID.test(id)) return h.json({ error: "Not found." }, 404, cors);
@@ -252,6 +279,12 @@ const ASK = {
 
 // A 27-hole club's card (Breckenridge: Beaver, Bear, Elk side by side, each numbered 1-9 with its own par and handicap
 // rows, and a rating table per pair of nines): every nine, for the app to take the one or two being played
+// One nine of a 27-hole card, cut out by the app (cardgrid.js finds the grid) with the card's row names put back on its
+// left: a short read (about 15 s), so the nines are read side by side instead of in one read that can pass a minute
+ASK.nine = () => `This is one nine of a golf course scorecard: the row names on the left, then holes 1 to 9 and the nine's total column. ` +
+  `Read every number exactly as printed and reply with JSON in this shape:\n` +
+  SHAPE(9, 1, { tee: ', "out": <number>', par: ', "parOut": <number>' }).replace(/}$/, ', "nine": "<the nine\'s name: a big faded word printed across it, or null>"}') + "\n" + RULES;
+
 ASK.nines = () => `This golf scorecard shows one or more nines side by side. Each nine has holes numbered 1 to 9, a TOT 9 column, and its own Par and Handicap rows. ` +
   `A nine usually has a name: a big faded word printed across it, or the names in a rating table (like "NORTH / SOUTH"). ` +
   `The tee names are often written only on the leftmost nine; on the other nines use the name of the leftmost row with the same color. ` +
@@ -496,7 +529,7 @@ function cleanCourse(c, id, owner) {
   if (/^https?:\/\//.test(c.website || "")) out.website = str(c.website, 300);
   if (c.source && typeof c.source === "object") out.source = JSON.parse(JSON.stringify(c.source).slice(0, 2000));
   if (c.credit) out.credit = str(c.credit, 200);
-  if (owner && c.card && typeof c.card === "object") out.card = c.card; // the card's look: Nick's files only
+  if (owner && c.card && typeof c.card === "object") out.card = c.card; // the card's look or picture: Nick's files only
   return JSON.stringify(out).length <= 80000 ? out : null;
 }
 
@@ -656,6 +689,82 @@ async function feed(env, cors, h) {
       return { id: r.id, date: r.played_on, course: r.course_name, holes: r.holes_done, par: r.par, score: r.strokes, stats };
     }),
   }, 200, cors);
+}
+
+// ---------- Nick's handicap index (World Handicap System), from the rounds on his Golf page ----------
+// Each finished round, oldest first: its adjusted score (each hole capped at net double bogey: par + 2 + the strokes
+// the hole gets from his course handicap at the time; par + 5 before he has an index), its score differential
+// (113 / slope x (adjusted score - course rating)), and his index after it: the average of the best of his last 20
+// differentials (8 of 20; fewer rounds use the WHS table, with its adjustments), to one decimal.
+// 9 holes: the nine's rating (the card's own 9-hole rating, else half the 18's) and the same slope; the differential
+// is made an 18-hole one by adding the expected score on the other nine (WHS 2024: 0.52 x index + 1.2). A 9-hole round
+// before there's an index waits (it can't be expected-scored yet). A round with no rating or slope for its tee, or with
+// holes not scored, doesn't count. Soft and hard caps (which need a year of history) aren't applied.
+//   -> { index, counted, of, rounds: [{ id, date, course, tee, holes, score, adjusted, rating, slope, differential,
+//         used, index, note }] (newest first), history: [{ date, index }] }
+const WHS = { 3: [1, -2], 4: [1, -1], 5: [1, 0], 6: [2, -1], 7: [2, 0], 8: [2, 0], 9: [3, 0], 10: [3, 0], 11: [3, 0], 12: [4, 0],
+  13: [4, 0], 14: [4, 0], 15: [5, 0], 16: [5, 0], 17: [6, 0], 18: [6, 0], 19: [7, 0], 20: [8, 0] };
+function indexOf(diffs) { // diffs: the newest 20 or fewer, as numbers -> { index, best: [positions used] } | null
+  const rule = WHS[Math.min(20, diffs.length)];
+  if (!rule) return null;
+  const order = diffs.map((d, i) => [d, i]).sort((a, b) => a[0] - b[0]).slice(0, rule[0]);
+  const avg = order.reduce((s, x) => s + x[0], 0) / rule[0] + rule[1];
+  return { index: Math.min(54, Math.round(avg * 10) / 10), best: order.map((x) => x[1]) };
+}
+function strokesOn(holes, ch) { // course handicap -> strokes received per hole (by the holes' handicap order)
+  const order = holes.map((x, i) => [x.hcp == null ? 99 : x.hcp, i]).sort((a, b) => a[0] - b[0]);
+  const n = holes.length, out = holes.map(() => 0), give = Math.max(0, ch);
+  order.forEach((o, rank) => { out[o[1]] = Math.floor(give / n) + (rank < give % n ? 1 : 0); });
+  return out;
+}
+async function handicap(env) {
+  if (!env.GOLF) return { index: null, rounds: [], history: [] };
+  const { results } = await env.GOLF.prepare("SELECT id, course_name, course, tee, tee_name, holes, played_on, updated_at FROM rounds " +
+    "WHERE player_id = 'owner' AND on_site = 1 AND finished_at IS NOT NULL ORDER BY played_on, updated_at").all();
+  const { results: hs } = await env.GOLF.prepare("SELECT h.round_id, h.hole, h.par, h.hcp, h.strokes FROM round_holes h JOIN rounds r ON r.id = h.round_id " +
+    "WHERE r.player_id = 'owner' AND r.on_site = 1 AND r.finished_at IS NOT NULL").all();
+  const byRound = {};
+  hs.forEach((x) => { (byRound[x.round_id] = byRound[x.round_id] || {})[x.hole] = x; });
+  const diffs = [], rounds = [], history = [];
+  let index = null;
+  for (const r of results) {
+    let course = {}, played = [];
+    try { course = JSON.parse(r.course || "{}"); played = JSON.parse(r.holes || "[]"); } catch (e) {}
+    const tee = (course.tees || []).find((t) => t.key === r.tee) || {};
+    const holes = played.map((n) => {
+      const x = (byRound[r.id] || {})[n] || {};
+      return { n, par: x.par || (course.par || [])[n - 1], hcp: x.hcp ?? (course.hcp || [])[n - 1], strokes: x.strokes };
+    });
+    const nine = played.length === 9, out = { id: r.id, date: r.played_on, course: r.course_name, tee: r.tee_name, holes: played.length };
+    rounds.push(out);
+    const score = holes.reduce((s, x) => s + (x.strokes || 0), 0);
+    out.score = score;
+    if ((played.length !== 9 && played.length !== 18) || holes.some((x) => !x.strokes || !x.par)) { out.note = "Not every hole has a score."; continue; }
+    if (!(tee.rating > 20) || !(tee.slope >= 55 && tee.slope <= 155)) { out.note = "No rating and slope for the " + (r.tee_name || "") + " tees."; continue; }
+    // the rating for what was played: a 9-hole course's rating is a nine's when it's under 50; an 18's is halved
+    const rating = nine ? (tee.rating < 50 ? tee.rating : tee.rating / 2) : tee.rating >= 50 ? tee.rating : null;
+    if (!rating) { out.note = "Its rating is for nine holes."; continue; }
+    if (nine && index == null) { out.note = "Nine holes count once there's an index."; continue; }
+    const par = holes.reduce((s, x) => s + x.par, 0);
+    const ch = index == null ? null : Math.round((nine ? index / 2 : index) * tee.slope / 113 + (rating - par));
+    const get = ch == null ? null : strokesOn(holes, ch);
+    const adjusted = holes.reduce((s, x, i) => s + Math.min(x.strokes, ch == null ? x.par + 5 : x.par + 2 + get[i]), 0);
+    let diff = (113 / tee.slope) * (adjusted - rating);
+    if (nine) diff += 0.52 * index + 1.2; // the expected score on the other nine
+    diff = Math.round(diff * 10) / 10;
+    Object.assign(out, { adjusted, rating: Math.round(rating * 10) / 10, slope: tee.slope, differential: diff });
+    diffs.push({ d: diff, out });
+    const last = diffs.slice(-20), got = indexOf(last.map((x) => x.d));
+    if (got) {
+      index = got.index;
+      history.push({ date: r.played_on, index });
+    }
+    out.index = index;
+  }
+  // which differentials the current index uses
+  const last = diffs.slice(-20), got = indexOf(last.map((x) => x.d));
+  if (got) got.best.forEach((i) => { last[i].out.used = true; });
+  return { index: got ? got.index : null, counted: got ? got.best.length : 0, of: last.length, rounds: rounds.reverse(), history };
 }
 
 async function oga(path) {
