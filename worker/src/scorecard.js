@@ -88,6 +88,16 @@ export async function scorecardRoute(request, url, env, cors, h) {
     return h.json(out, 200, cors);
   }
 
+  // OpenGolfAPI's Cloudflare shield turns this Worker away (403 "Attention Required"), so when the GET above fails the
+  // app fetches the course from OpenGolfAPI itself and sends it here to be put in the app's shape. Not cached: it
+  // came from a browser, not from OpenGolfAPI directly.
+  if (url.pathname.startsWith("/scorecard/courses/api/") && request.method === "POST") {
+    const id = url.pathname.split("/")[4] || "";
+    const d = await body(request);
+    if (!ID.test(id) || !d || d.id !== id) return h.json({ error: "Couldn't load that course." }, 400, cors);
+    return h.json(clean(d), 200, cors);
+  }
+
   if (url.pathname.startsWith("/scorecard/courses/api/") && request.method === "GET") {
     const id = url.pathname.split("/")[4] || "";
     if (!ID.test(id)) return h.json({ error: "Unknown course." }, 404, cors);
@@ -602,8 +612,11 @@ async function feed(env, cors, h) {
 async function oga(path) {
   try {
     const r = await fetch(OGA + path, { headers: { "User-Agent": "nickmade.net scorecard (https://nickmade.net)", Accept: "application/json" } });
-    return r.ok ? await r.json() : null;
+    if (r.ok) return await r.json();
+    console.log("OpenGolfAPI " + r.status + " " + path);
+    return null;
   } catch (e) {
+    console.log("OpenGolfAPI failed " + path + " " + e.message);
     return null;
   }
 }

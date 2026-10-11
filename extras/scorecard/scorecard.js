@@ -64,6 +64,7 @@
   } catch (e) {}
   function auth(h) { h = h || {}; if (ADMIN) h.Authorization = "Bearer " + ADMIN; return h; }
   // a call to the Worker; errors carry the HTTP status (0: no signal)
+  var OGA = "https://api.opengolfapi.org";
   function api(path, opts) {
     opts = opts || {};
     return fetch(API + path, { method: opts.method || "GET", headers: auth(opts.body ? { "Content-Type": "application/json" } : {}),
@@ -197,6 +198,19 @@
     if (filed) return Promise.resolve(filed);
     return api("/scorecard/courses").then(function (d) { filed = d.courses || []; return filed; }).catch(function () { return []; });
   }
+  // An OpenGolfAPI course through the Worker (cached there); when OpenGolfAPI turns the Worker away, fetched from here
+  // and sent to the Worker only to be put in the app's shape
+  function apiCourse(apiId) {
+    var path = "/scorecard/courses/api/" + encodeURIComponent(apiId);
+    return api(path).catch(function (err) {
+      if (err.status === 0) throw err;
+      return fetch(OGA + "/api/v1/courses/" + encodeURIComponent(apiId)).then(function (r) {
+        if (!r.ok) throw err;
+        return r.json();
+      }, function () { throw err; }).then(function (raw) { return api(path, { method: "POST", body: raw }); });
+    });
+  }
+
   // A course's numbers: its approved file on the server (checked once, then reused with no lookups); with no signal,
   // the copy kept on this phone; with no file yet, the copy checked here, else Nick's hand-made file or OpenGolfAPI
   function loadCourse(id) {
@@ -206,7 +220,7 @@
     }, function (err) {
       var kept = load(K.course + id, null);
       if (kept) return kept;
-      if (id.indexOf("api:") === 0) return api("/scorecard/courses/api/" + encodeURIComponent(id.slice(4)));
+      if (id.indexOf("api:") === 0) return apiCourse(id.slice(4));
       return fetch("courses/" + encodeURIComponent(id) + ".json").then(function (r) {
         if (!r.ok) throw new Error(err.status === 0 ? "No signal, and this course isn't saved on this phone yet." : "Couldn't load that course.");
         return r.json();
@@ -274,7 +288,19 @@
     // matches whole names, so a search it finds nothing for is tried again with fewer words: "firewheel lakes" finds
     // its single "Firewheel Golf Park" listing.
     function apiSearch(words) {
-      return api("/scorecard/courses/search?q=" + encodeURIComponent(words.join(" "))).then(function (d) {
+      var q = encodeURIComponent(words.join(" "));
+      return api("/scorecard/courses/search?q=" + q).catch(function (err) {
+        // OpenGolfAPI turns the Worker away at times; it answers a browser, so ask it straight from here
+        if (err.status === 0) throw err;
+        return fetch(OGA + "/v1/courses/search?q=" + q).then(function (r) {
+          if (!r.ok) throw err;
+          return r.json();
+        }).then(function (d) {
+          return { courses: (d.courses || []).slice(0, 25).map(function (c) {
+            return { apiId: c.id, name: c.course_name || c.name, place: [c.city, c.state].filter(Boolean).join(", "), par: c.par || null, holes: c.holes || null };
+          }) };
+        }, function () { throw err; });
+      }).then(function (d) {
         return (d.courses || []).length || words.length < 2 ? d : apiSearch(words.slice(0, -1));
       });
     }
