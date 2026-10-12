@@ -66,6 +66,24 @@
     if (s.strokes == null || s.putts == null) return null;
     return s.strokes - s.putts <= course.par[n - 1] - 2;
   }
+  // a hole's green in regulation as it counts: marked, or worked out from putts; or, once any hole in the round has one,
+  // a scored hole without is a miss (Nick, 2026-10-12: greens are out of every hole played, not just the ones ticked)
+  function greenOf(course, round, n) {
+    if (!played(round, n) || sc(round, n).strokes == null) return null;
+    var g = girOf(course, round, n);
+    if (g != null) return g;
+    var any = round.holes.some(function (k) { return sc(round, k).strokes != null && girOf(course, round, k) != null; });
+    return any ? false : null;
+  }
+  // a hole's fairway as it counts: what was marked; or, once any fairway in the round was marked, a scored par 4 or 5
+  // left unmarked is a miss (Nick, 2026-10-12: so a round doesn't read 2/2 when only two were marked); par 3s: none
+  function fairwayOf(course, round, n) {
+    var s = sc(round, n);
+    if (!played(round, n) || course.par[n - 1] === 3 || s.strokes == null) return null;
+    if (s.fairway) return s.fairway;
+    var any = round.holes.some(function (k) { return course.par[k - 1] !== 3 && sc(round, k).fairway; });
+    return any ? "miss" : null;
+  }
   function toPar(v) { return v === 0 ? "E" : (v > 0 ? "+" : "") + v; }
 
   // ---------- drawing ----------
@@ -365,19 +383,19 @@
         var hits = [0, 0, 0];
         for (k = 1; k <= n; k++) {
           if (!played(round, k) || course.par[k - 1] === 3) continue;
-          var f = sc(round, k).fairway, p = at(k);
+          var f = fairwayOf(course, round, k), p = at(k);
           if (!f) continue;
           glyph(f, p[0], p[1], Math.min(colOf[k].w, h) * 0.5);
           hits[k <= 9 ? 0 : 1] += f === "hit" ? 1 : 0;
         }
-        var tries = function (a, b) { var c2 = 0, h2 = 0; for (var j = a; j <= b; j++) { if (played(round, j) && course.par[j - 1] !== 3 && sc(round, j).fairway) { c2++; if (sc(round, j).fairway === "hit") h2++; } } return c2 ? h2 + "/" + c2 : null; };
+        var tries = function (a, b) { var c2 = 0, h2 = 0; for (var j = a; j <= b; j++) { var fj = fairwayOf(course, round, j); if (fj) { c2++; if (fj === "hit") h2++; } } return c2 ? h2 + "/" + c2 : null; };
         nines.forEach(function (nn) { write(nn[2], tries(nn[0], nn[1]), hs * 0.66); });
         write("tot", tries(1, n), hs * 0.66);
       } else if (r.role === "greens") {
-        var gcount = function (a, b) { var c2 = 0, h2 = 0; for (var j = a; j <= b; j++) { var gv = played(round, j) ? girOf(course, round, j) : null; if (gv != null) { c2++; if (gv) h2++; } } return c2 ? h2 + "/" + c2 : null; };
+        var gcount = function (a, b) { var c2 = 0, h2 = 0; for (var j = a; j <= b; j++) { var gv = greenOf(course, round, j); if (gv != null) { c2++; if (gv) h2++; } } return c2 ? h2 + "/" + c2 : null; };
         for (k = 1; k <= n; k++) {
           // a check for a green in regulation; a missed one is left empty (Nick, 2026-10-12: no filled / open dots)
-          var gv = played(round, k) ? girOf(course, round, k) : null;
+          var gv = greenOf(course, round, k);
           if (!gv) continue;
           var q = at(k);
           glyph("hit", q[0], q[1], Math.min(colOf[k].w, h) * 0.6);
@@ -410,7 +428,7 @@
     function glyph(f, x0, y0, s) {
       ctx.strokeStyle = hand.color; ctx.lineWidth = 1.7; ctx.lineCap = "round"; ctx.lineJoin = "round";
       ctx.beginPath();
-      if (f === "miss") { ctx.moveTo(x0 - s * 0.3, y0); ctx.lineTo(x0 + s * 0.3, y0); } // missed, side not known
+      if (f === "miss") { var m = s * 0.26; ctx.moveTo(x0 - m, y0 - m); ctx.lineTo(x0 + m, y0 + m); ctx.moveTo(x0 + m, y0 - m); ctx.lineTo(x0 - m, y0 + m); } // missed, side not known: an X
       else if (f === "hit") {
         ctx.moveTo(x0 - s * 0.42, y0); ctx.lineTo(x0 - s * 0.1, y0 + s * 0.32); ctx.lineTo(x0 + s * 0.45, y0 - s * 0.38);
       } else {
@@ -464,8 +482,8 @@
     var roles = [
       { label: round.player || "", v: function (h) { return S(h).strokes; }, total: "sum", marks: true },
       { label: "Putts", v: function (h) { return S(h).putts; }, total: "sum" },
-      { label: "Fairways", v: function (h) { return course.par[h - 1] === 3 ? null : S(h).fairway || null; }, total: "hits", hit: function (v) { return v === "hit"; }, draw: fairway },
-      { label: "Greens", v: function (h) { return played(round, h) ? girOf(course, round, h) : null; }, total: "hits", hit: function (v) { return v === true; }, draw: green },
+      { label: "Fairways", v: function (h) { return fairwayOf(course, round, h); }, total: "hits", hit: function (v) { return v === "hit"; }, draw: fairway },
+      { label: "Greens", v: function (h) { return greenOf(course, round, h); }, total: "hits", hit: function (v) { return v === true; }, draw: green },
       { label: "Penalties", v: function (h) { return S(h).penalties || null; }, total: "sum" },
     ].filter(function (r, i) { return i === 0 || any(r.v); });
     var rows = (g.blank[0] || []).map(function (ri) { return g.rows[ri]; });
@@ -546,12 +564,12 @@
       if (labCol) { var c3 = cell(labCol, row); write(role.label, labCol[0] * W + c3.h * 0.3, c3.y, c3.h * (ri ? 0.62 : 0.72), "left"); }
     });
 
-    // a fairway: a check for hit, an arrow for a miss left or right (a dash when the side isn't known)
+    // a fairway: a check for hit, an arrow for a miss left or right (an X when the side isn't known)
     function fairway(f, c, size) {
       var s2 = size * 0.62;
       ctx.strokeStyle = HAND.color; ctx.lineWidth = Math.max(1.2, size * 0.05); // a pen line, not a marker (Nick, 2026-10-12) ctx.lineCap = "round"; ctx.lineJoin = "round";
       ctx.beginPath();
-      if (f === "miss") { ctx.moveTo(c.x - s2 * 0.3, c.y); ctx.lineTo(c.x + s2 * 0.3, c.y); } // missed, side not known
+      if (f === "miss") { var m2 = s2 * 0.26; ctx.moveTo(c.x - m2, c.y - m2); ctx.lineTo(c.x + m2, c.y + m2); ctx.moveTo(c.x + m2, c.y - m2); ctx.lineTo(c.x - m2, c.y + m2); } // missed, side not known: an X
       else if (f === "hit") {
         ctx.moveTo(c.x - s2 * 0.42, c.y); ctx.lineTo(c.x - s2 * 0.1, c.y + s2 * 0.32); ctx.lineTo(c.x + s2 * 0.45, c.y - s2 * 0.38);
       } else {
@@ -677,5 +695,5 @@
     },
   };
 
-  window.NMCard = { draw: draw, template: template, girOf: girOf, lookup: null };
+  window.NMCard = { draw: draw, template: template, girOf: girOf, greenOf: greenOf, fairwayOf: fairwayOf, lookup: null };
 })();

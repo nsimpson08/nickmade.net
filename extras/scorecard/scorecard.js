@@ -1124,7 +1124,7 @@
       if (!x || x.strokes == null) return;
       present.push(n);
       if ((x.at || 0) <= (r.ackAt || 0)) return;
-      scores[n] = { strokes: x.strokes, putts: x.putts, fairway: x.fairway, gir: x.gir, girShown: NMCard.girOf(r.course, r, n),
+      scores[n] = { strokes: x.strokes, putts: x.putts, fairway: x.fairway, gir: x.gir, girShown: NMCard.greenOf(r.course, r, n),
         penalties: x.penalties || 0, par: r.course.par[n - 1], yards: tee.yards[n - 1], hcp: hc[n - 1], at: x.at || r.updatedAt };
     });
     return {
@@ -1212,8 +1212,9 @@
       var p = c.par[n - 1], d = s.strokes - p;
       o.done++; o.strokes += s.strokes; o.par += p;
       if (s.putts != null) { o.putts += s.putts; o.puttsHoles++; }
-      if (p !== 3 && s.fairway) { o.fwN++; if (s.fairway === "hit") o.fw++; else if (s.fairway === "left") o.fwL++; else if (s.fairway === "right") o.fwR++; }
-      var g = NMCard.girOf(c, r, n);
+      var fw = NMCard.fairwayOf(c, r, n); // an unmarked par 4 or 5 is a miss once any fairway was marked
+      if (fw) { o.fwN++; if (fw === "hit") o.fw++; else if (fw === "left") o.fwL++; else if (fw === "right") o.fwR++; }
+      var g = NMCard.greenOf(c, r, n); // out of every hole played once any green is known
       if (g != null) { o.girN++; if (g) o.gir++; }
       o.pen += s.penalties || 0;
       var kind = d <= -2 ? "eagle" : d === -1 ? "birdie" : d === 0 ? "par" : d === 1 ? "bogey" : "double";
@@ -1485,7 +1486,7 @@
         (OWNER ? '<p class="sc-hcp" aria-live="polite"></p>' : "") +
         '<div class="sc-stats">' +
           tile("Putts", s.puttsHoles ? s.putts : "–", s.puttsHoles ? (s.putts / s.puttsHoles).toFixed(1) + " a hole" : "") +
-          tile("Fairways", s.fwN ? s.fw + "/" + s.fwN : "–", s.fwN ? (s.fwL + s.fwR ? "missed " + s.fwL + " left, " + s.fwR + " right" : "missed " + (s.fwN - s.fw)) : "") +
+          tile("Fairways", s.fwN ? s.fw + "/" + s.fwN : "–", s.fwN ? (s.fwL + s.fwR ? "missed " + s.fwL + " left, " + s.fwR + " right" + (s.fwN - s.fw - s.fwL - s.fwR ? ", " + (s.fwN - s.fw - s.fwL - s.fwR) + " unmarked" : "") : "missed " + (s.fwN - s.fw)) : "") +
           tile("Greens", s.girN ? s.gir + "/" + s.girN : "–", s.girN ? Math.round(s.gir / s.girN * 100) + "% in regulation" : "") +
           tile("Penalties", s.pen, "") +
         "</div>" +
@@ -1569,9 +1570,9 @@
     var q = function (v) { v = v == null ? "" : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
     var lines = ["date,course,tee,hole,par,yards,handicap,strokes,putts,fairway,green_in_regulation,penalties"];
     r.holes.forEach(function (n) {
-      var s = r.scores[n] || {}, g = NMCard.girOf(r.course, r, n);
+      var s = r.scores[n] || {}, g = NMCard.greenOf(r.course, r, n);
       lines.push([String(r.date).slice(0, 10), r.course.name, tee.name, n, r.course.par[n - 1], tee.yards[n - 1], hc[n - 1],
-        s.strokes, s.putts, r.course.par[n - 1] === 3 ? "" : s.fairway || "", g == null ? "" : g ? "yes" : "no", s.penalties || 0].map(q).join(","));
+        s.strokes, s.putts, NMCard.fairwayOf(r.course, r, n) || "", g == null ? "" : g ? "yes" : "no", s.penalties || 0].map(q).join(","));
     });
     return lines.join("\n") + "\n";
   }
