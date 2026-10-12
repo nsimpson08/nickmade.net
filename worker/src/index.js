@@ -123,16 +123,21 @@ export default {
       if (url.pathname === "/xbox/import" && request.method === "POST") return await xboxImport(request, env, cors);
       if (url.pathname === "/xbox/sync" && request.method === "POST") {
         if (!isAdmin(request, env)) return json({ error: "Unauthorized" }, 401, cors);
-        try {
-          const result = await syncRecentlyPlayed(env);
-          const score = gamerscoreView(env, await recordGamerscore(env));
+        // the gamerscore and the games each on their own: one failing doesn't stop the other
+        const [synced, scored] = await Promise.allSettled([syncRecentlyPlayed(env), recordGamerscore(env)]);
+        const failed = [synced, scored].filter((x) => x.status === "rejected").map((x) => x.reason);
+        failed.forEach((e) => console.log("Xbox refresh failed:", e && e.message));
+        if (failed.length === 2) {
+          if (failed[0] instanceof XblError) return json({ error: failed[0].message }, 502, cors);
+          throw failed[0];
+        }
+        const result = synced.status === "fulfilled" ? synced.value : { checked: 0, linked: 0, updated: 0, error: synced.reason.message };
+        if (scored.status === "fulfilled") {
+          const score = gamerscoreView(env, scored.value);
           result.gamerscore = score.total;
           result.gained = score.gained;
-          return json(result, 200, cors);
-        } catch (e) {
-          if (e instanceof XblError) return json({ error: e.message }, 502, cors);
-          throw e;
-        }
+        } else result.gamerscoreError = scored.reason.message;
+        return json(result, 200, cors);
       }
       if (url.pathname === "/xbox/gamerscore" && request.method === "GET") return await gamerscore(env, cors);
       if (url.pathname === "/lists" && request.method === "GET") return await getLists(url, env, cors);
@@ -207,8 +212,11 @@ export default {
   // (/titles, /player/stats, /account), 21 a day, well inside the free plan's 150 an hour (shared with the Montage app).
   async scheduled(event, env, ctx) {
     if (event.cron !== EVERY_4H && hourIn(env.TIMEZONE, new Date(event.scheduledTime)) !== 0) return;
-    ctx.waitUntil(syncRecentlyPlayed(env).catch((e) => console.log("Xbox sync failed:", e.message)));
-    ctx.waitUntil(recordGamerscore(env).catch((e) => console.log("gamerscore failed:", e.message)));
+    // each step tried twice (a minute apart) before it's given up on, and a failure kept in KV xbox:lastError, since
+    // a scheduled run's log isn't kept (2026-10-12: the gamerscore step failed at 23:00 and midnight Chicago, so the
+    // night's snapshot was missed and "last 24h" showed +0)
+    ctx.waitUntil(twice(env, "sync", () => syncRecentlyPlayed(env)));
+    ctx.waitUntil(twice(env, "gamerscore", () => recordGamerscore(env)));
   },
 };
 
@@ -1136,6 +1144,16 @@ async function syncRecentlyPlayed(env) {
 // banner's total is always the latest. The gains ("+75G in the last 24h", 7 days, 30 days) are whole days and only
 // change once a day: the first check of each day (the midnight cron) saves that night's snapshot {date, total}, and
 // each gain is the difference between nights. Later checks that day never touch the snapshots.
+async function twice(env, step, run) {
+  for (let i = 0; i < 2; i++) {
+    try { return await run(); } catch (e) {
+      console.log("Xbox " + step + " failed (try " + (i + 1) + "):", e.message);
+      await env.QUEUE.put("xbox:lastError", JSON.stringify({ step, message: String(e.message || e), at: new Date().toISOString() }), { expirationTtl: 30 * 86400 });
+      if (i === 0) await new Promise((r) => setTimeout(r, 60000));
+    }
+  }
+}
+
 async function recordGamerscore(env) {
   const account = await xbl(env, "/account");
   const settings = ((account.profileUsers || [])[0] || {}).settings || [];

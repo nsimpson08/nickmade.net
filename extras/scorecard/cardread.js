@@ -17,7 +17,7 @@
 //   NMCardRead.textOf(dataURL) -> the PDF page's own printed text ("" for a photo), sent along to the reader
 //   NMCardRead.ninePieces(dataURL) -> Promise<[dataURL per nine] | null>   a 27-hole card cut into its nines
 //   NMCardRead.fromHalves(frontRead, backRead) -> read   an 18-hole card read nine by nine (part "nine")
-//   NMCardRead.fromNines(read, names) -> read | null   a 27-hole card's nines (part "nines") -> the one or two played
+//   NMCardRead.fromNines(read, names, others?) -> read | null   (others: all the club's nines' names, to rule out)   a 27-hole card's nines (part "nines") -> the one or two played
 //   NMCardRead.half(dataURL, "front"|"back") -> Promise<dataURL>   that nine, close up
 //   NMCardRead.closeUps(read, holes) -> ["front"?, "back"?]   the nines whose par/handicap rows don't hold up
 //   NMCardRead.mergeCloseUp(read, side, closeRead) -> read
@@ -275,13 +275,39 @@
   // names: the nines played, in order ("Bear", "Elk"). Each nine ranks its handicaps on its own (1-9, or odd 1-17);
   // two played as an 18: the first takes the odd numbers and the second the even. The rating and slope come from the
   // card's table for that pair (either order), matched to each tee by its row color.
-  function fromNines(read, names) {
+  function fromNines(read, names, others) {
     var nines = (read && read.nines) || [];
     var low = function (v) { return String(v || "").toLowerCase(); };
-    var pick = names.map(function (nm, i) {
-      var hit = nines.filter(function (x) { return x && low(x.name).indexOf(low(nm)) >= 0; })[0];
-      return hit || (nines.length === names.length ? nines[i] : null); // unnamed nines: by position when the count fits
+    // a nine's name as read (and x.alt, a second reading) against a wanted name: contained in it, or a word of it off
+    // by a letter or two ("BEVER" is Beaver; Breckenridge's faded ELK was once read as "RIDGE", so a second reading helps)
+    var near = function (a, b) {
+      if (Math.abs(a.length - b.length) > 2) return false;
+      var d = []; for (var i = 0; i <= a.length; i++) { d[i] = [i]; for (var j = 1; j <= b.length; j++) d[i][j] = i ? Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)) : j; }
+      return d[a.length][b.length] <= (b.length >= 5 ? 2 : 1);
+    };
+    var is = function (x, nm) {
+      var want = low(nm);
+      return [x && x.name, x && x.alt].some(function (v) {
+        var got = low(v);
+        return got && (got.indexOf(want) >= 0 || got.split(/[^a-z0-9]+/).some(function (w) { return w && near(w, want); }));
+      });
+    };
+    var used = [];
+    var pick = names.map(function (nm) {
+      var hit = nines.filter(function (x) { return used.indexOf(x) < 0 && is(x, nm); })[0];
+      if (hit) used.push(hit);
+      return hit || null;
     });
+    // unnamed or unreadable: by position when the count fits, else the one nine left when only one is missing
+    if (pick.some(function (x) { return !x; })) {
+      if (nines.length === names.length) pick = pick.map(function (x, i) { return x || (used.indexOf(nines[i]) < 0 ? nines[i] : null); });
+      // ruling out the club's other nines ("BEVER" is Beaver, not played), when the course knows them
+      var left = nines.filter(function (x) {
+        return x && used.indexOf(x) < 0 && !(others || []).some(function (o) { return names.indexOf(o) < 0 && is(x, o); });
+      });
+      var missing = pick.filter(function (x) { return !x; }).length;
+      if (missing === 1 && left.length === 1) pick = pick.map(function (x) { return x || left[0]; });
+    }
     if (pick.some(function (x) { return !x; })) return null;
     var rank = function (h, odd) {
       h = list(h, 9, 1, 18);

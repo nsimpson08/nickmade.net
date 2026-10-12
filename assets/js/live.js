@@ -598,7 +598,10 @@
         ]).then(function (out) {
           renderWatched(out[0].items || [], out[0].archive);
           var n = res.d.updated || 0;
-          status.textContent = "Updated just now · " + (n ? n + (n === 1 ? " game" : " games") + " changed" : "no changes");
+          // the Worker runs the games and the gamerscore separately: say which half didn't work
+          status.textContent = res.d.error ? "Gamerscore updated · the games didn't: " + res.d.error
+            : "Updated just now · " + (n ? n + (n === 1 ? " game" : " games") + " changed" : "no changes") +
+              (res.d.gamerscoreError ? " · the gamerscore didn't update: " + res.d.gamerscoreError : "");
         });
       })
       .catch(function (e) { status.textContent = (e && e.said) || "Couldn't reach the server. Try again in a bit."; })

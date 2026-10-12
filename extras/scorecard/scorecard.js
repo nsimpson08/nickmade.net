@@ -568,30 +568,31 @@
       // A three-nine card in one read can pass a minute, past what the reader allows. So the card is cut into its nines
       // (cardgrid.js), which are read side by side (about 15 s each). The whole card is read alongside only for its
       // rating table (per pair of nines) and its nines' names, and isn't waited on for long.
-      var wholeErr = null;
-      var whole = ask(img, "nines").then(function (r) { return r.read; }, function (e) { wholeErr = e; return null; });
-      var wholeRead = function () { // the whole read, or nothing if it's still going 20 s after the nines are in
-        var late = new Promise(function (res) { setTimeout(function () { res(null); }, 20000); });
-        return Promise.race([whole, late]);
+      // The nines are read side by side, one piece each (about 15 s), with a short read of the whole card for the
+      // nines' names and its rating tables. Only if a piece fails is the whole card read in one go (which can pass a
+      // minute and fail).
+      var whole = function () {
+        return ask(img, "nines").then(function (r) { return { read: r.read }; });
       };
       return NMCardRead.ninePieces(img).then(function (pieces) {
-        if (!pieces) return whole.then(function (r) { if (!r) throw wholeErr || new Error("The card reader couldn't read that one just now. Try again in a moment."); return { read: r }; });
+        if (!pieces) return whole();
         ccPaint("Reading the card's " + pieces.length + " nines…");
-        return Promise.all(pieces.map(function (p) { return ask(p, "nine").then(function (r) { return r.read; }, function () { return null; }); }))
-          .then(function (reads) {
-            if (reads.some(function (r) { return !r; })) {
-              // a piece failed: the whole card's read is the fallback
-              return whole.then(function (r) { if (!r) throw wholeErr || new Error("The card reader couldn't read that one just now. Try again in a moment."); return { read: r }; });
-            }
-            return wholeRead().then(function (w) {
-              var nines = reads.map(NMCardRead.asNine);
-              // names from the whole read where a piece didn't find its own (same count, same order)
-              if (w && w.nines && w.nines.length === nines.length) nines.forEach(function (n, i) { if (!n.name && w.nines[i]) n.name = w.nines[i].name; });
-              return { read: { nines: nines, ratings: (w && w.ratings) || [] } };
+        var meta = ask(img, "meta").then(function (r) { return r.read || {}; }, function () { return {}; });
+        return Promise.all([Promise.all(pieces.map(function (p) { return ask(p, "nine").then(function (r) { return r.read; }, function () { return null; }); })), meta])
+          .then(function (got) {
+            var reads = got[0], m = got[1];
+            if (reads.some(function (r) { return !r; })) return whole(); // a piece failed
+            var nines = reads.map(NMCardRead.asNine), named = Array.isArray(m.nines) ? m.nines : [];
+            // each nine's name: the short whole-card read's first (it sees the rating table headings too), the piece's own
+            // reading kept as a second try (Breckenridge's pieces once read BEVER, BEAR, RIDGE)
+            if (named.length === nines.length) nines.forEach(function (n, i) {
+              var m2 = typeof named[i] === "string" ? named[i] : named[i] && named[i].name;
+              if (m2) { n.alt = n.name; n.name = m2; }
             });
+            return { read: { nines: nines, ratings: Array.isArray(m.ratings) ? m.ratings : [] } };
           });
       }).then(function (res) {
-        var read = NMCardRead.fromNines(res.read, names);
+        var read = NMCardRead.fromNines(res.read, names, draft.clubNines);
         if (read) read.order = ((res.read && res.read.nines) || []).map(function (x) { return String((x && x.name) || "").toLowerCase(); }); // the card's nines, left to right
         if (!read) {
           var found = ((res.read && res.read.nines) || []).map(function (x) { return x && x.name; }).filter(Boolean);
@@ -979,13 +980,15 @@
   }
 
   // the club's other nines as buttons: tap one and the round is this nine, then that one
+  var clubNines = [];
   function pickNine(btn) {
     var box = app.querySelector(".sc-nines"), id = draft.id;
     btn.classList.add("busy");
     otherNines(draft).then(function (list) {
       if (draft.id !== id || !box.isConnected) return;
       box.innerHTML = list.length
-        ? '<p class="sc-muted small">After ' + esc(nineName(draft)) + ", which nine?</p>" + list.map(function (x) {
+        ? (clubNines = [nineName(draft)].concat(list.map(function (x) { return nineName(x); })), "") +
+          '<p class="sc-muted small">After ' + esc(nineName(draft)) + ", which nine?</p>" + list.map(function (x) {
             return '<button type="button" class="sc-cc-btn" data-then-nine="' + esc(x.id) + '">Then ' + esc(nineName(x)) + "</button>";
           }).join("")
         : '<p class="sc-muted small">No other nines found for ' + esc(clubOf(draft)) + ".</p>";
@@ -1550,7 +1553,9 @@
       var front = copy(draft);
       loadCourse(d.thenNine).then(function (back) {
         if (back.holes !== 9) throw new Error("That one isn't a nine.");
-        setup(joinNines(front, back));
+        var joined = joinNines(front, back);
+        if (clubNines.length > 2) joined.clubNines = clubNines.slice(0, 6); // to tell the nines apart on the club's card
+        setup(joined);
       }).catch(function (err) { b.classList.remove("busy"); alert(err.message || "Couldn't load that nine."); });
       return;
     }

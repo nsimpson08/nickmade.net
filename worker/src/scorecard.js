@@ -285,6 +285,14 @@ ASK.nine = () => `This is one nine of a golf course scorecard: the row names on 
   `Read every number exactly as printed and reply with JSON in this shape:\n` +
   SHAPE(9, 1, { tee: ', "out": <number>', par: ', "parOut": <number>' }).replace(/}$/, ', "nine": "<the nine\'s name: a big faded word printed across it, or null>"}') + "\n" + RULES;
 
+// Beside the nine-by-nine reads of a 27-hole card: just the nines' names (left to right) and the rating / slope tables.
+// A short reply, so it comes back in seconds (the whole card's every number in one read can pass the minute Workers
+// AI allows, and did on Breckenridge's JPG, 2026-10-12)
+ASK.meta = () => `This golf scorecard shows one or more nines side by side. Reply with JSON only:\n` +
+  `{"nines": ["<each nine's name, left to right: a big faded word printed across it, or from a rating table heading like NORTH / SOUTH>"], ` +
+  `"ratings": [{"nines": "<the heading as printed, like NORTH / SOUTH>", "tees": [{"color": "<the row's color>", "rating": <number>, "slope": <number>, "women": <true if marked W>}]}]}\n` +
+  `ratings: every rating / slope table on the card, one entry per heading. A table has one row per tee color (gold, blue, green, silver or gray, red...), then rows whose numbers end in W (women). List every row top to bottom, including the silver or gray one. Use [] if there is no table. Never guess a number.`;
+
 ASK.nines = () => `This golf scorecard shows one or more nines side by side. Each nine has holes numbered 1 to 9, a TOT 9 column, and its own Par and Handicap rows. ` +
   `A nine usually has a name: a big faded word printed across it, or the names in a rating table (like "NORTH / SOUTH"). ` +
   `The tee names are often written only on the leftmost nine; on the other nines use the name of the leftmost row with the same color. ` +
@@ -533,6 +541,7 @@ function cleanCourse(c, id, owner) {
   if (/^https?:\/\//.test(c.website || "")) out.website = str(c.website, 300);
   if (c.source && typeof c.source === "object") out.source = JSON.parse(JSON.stringify(c.source).slice(0, 2000));
   if (c.credit) out.credit = str(c.credit, 200);
+  if (Array.isArray(c.clubNines)) out.clubNines = c.clubNines.filter((x) => typeof x === "string").slice(0, 6).map((x) => x.slice(0, 30)); // a 27-hole club's nines
   if (owner && c.card && typeof c.card === "object") out.card = c.card; // the card's look or picture: Nick's files only
   return JSON.stringify(out).length <= 80000 ? out : null;
 }
