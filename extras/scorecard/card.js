@@ -77,11 +77,13 @@
     return card && (card.rows || []).every(function (r) { return r.kind !== "tee" || course.tees.some(function (x) { return x.key === r.tee; }); });
   }
   function freshTemplate(course) {
-    // a card picture: the course's saved one when there is one (a card made again later, e.g. with the right nines'
-    // columns, 2026-10-12, applies to rounds already played), else the round's own copy
+    // a card picture: the newest one made for the course (card.made), so a card made again later (e.g. with the right
+    // nines' columns, 2026-10-12) applies to rounds already played; NMCard.lookup gives the newest the page knows of
     if (course.card && course.card.kind === "photo") {
       if (!NMCard.lookup || !course.id) return Promise.resolve(course.card);
-      return NMCard.lookup(course.id).then(function (c) { return c && c.kind === "photo" ? c : course.card; }, function () { return course.card; });
+      return NMCard.lookup(course.id).then(function (c) {
+        return c && c.kind === "photo" && (c.made || 0) > (course.card.made || 0) ? c : course.card;
+      }, function () { return course.card; });
     }
     // a course with no look of its own here (a round played before its look was made): its saved course file's look,
     // when the page has said where to ask (NMCard.lookup, set by the Scorecard and the Golf page)

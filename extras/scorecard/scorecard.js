@@ -175,10 +175,15 @@
       if (!prefs.name && ADMIN) { prefs.name = "Nick"; savePrefs(); }
       if (OWNER) loadHandicap();
       // a round played before its course had a look: the saved course file's look
+      // the newest card for a course: the server's saved one or the copy kept on this phone (a card made again here
+      // before it's saved), by when each was made
       var looks = {};
       NMCard.lookup = function (id) {
         if (!looks[id]) looks[id] = api("/scorecard/courses/" + encodeURIComponent(id)).then(function (c) { return c.card || null; }, function () { return null; });
-        return looks[id];
+        return looks[id].then(function (server) {
+          var kept = (load(K.course + id, null) || {}).card;
+          return kept && kept.kind === "photo" && (kept.made || 0) > ((server && server.made) || 0) ? kept : server;
+        });
       };
       ready = true;
       try { history.replaceState({ sc: 0 }, ""); } catch (e) {}
@@ -748,7 +753,7 @@
       c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
       return api("/scorecard/art", { method: "POST", body: { image: c.toDataURL("image/jpeg", 0.86) } }).then(function (r) {
         if (!draft || draft.id !== id) return;
-        draft.card = { kind: "photo", src: API + r.path, w: c.width, h: c.height, grid: grid, play: play };
+        draft.card = { kind: "photo", src: API + r.path, w: c.width, h: c.height, grid: grid, play: play, made: Date.now() };
         save(K.course + id, copy(draft));
         if (draft.checked) queueApproval(draft); // a saved card: a new version with its picture; otherwise it goes with the card's approval
         cc.pictured = true;
