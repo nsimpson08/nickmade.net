@@ -289,7 +289,7 @@ ASK.nine = () => `This is one nine of a golf course scorecard: the row names on 
 // A short reply, so it comes back in seconds (the whole card's every number in one read can pass the minute Workers
 // AI allows, and did on Breckenridge's JPG, 2026-10-12)
 ASK.meta = () => `This golf scorecard shows one or more nines side by side. Reply with JSON only:\n` +
-  `{"nines": ["<each nine's name, left to right: a big faded word printed across it, or from a rating table heading like NORTH / SOUTH>"], ` +
+  `{"nines": ["<each nine's own name, left to right, one word: the big faded word printed across it; if there is none, the FIRST name of the rating heading printed under that nine (under NORTH / SOUTH, give NORTH)>"], ` +
   `"ratings": [{"nines": "<the heading as printed, like NORTH / SOUTH>", "tees": [{"color": "<the row's color>", "rating": <number>, "slope": <number>, "women": <true if marked W>}]}]}\n` +
   `ratings: every rating / slope table on the card, one entry per heading. A table has one row per tee color (gold, blue, green, silver or gray, red...), then rows whose numbers end in W (women). List every row top to bottom, including the silver or gray one. Use [] if there is no table. Never guess a number.`;
 

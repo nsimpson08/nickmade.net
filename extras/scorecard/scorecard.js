@@ -571,7 +571,14 @@
   // A card picture read into numbers: the whole card, then (only if its par or handicap rows don't hold up) a close-up
   // of that nine for just those rows (cardread.js closeUps)
   function readImage(img, holes, source) {
+    // each AI reading kept on this phone by the picture's contents and the part asked: the same card uploaded again
+    // costs no reads (only the matching runs again, 2026-10-12)
     var ask = function (image, part) {
+      var key = "nm-scorecard-ask:" + part + ":" + fnv(image), kept = load(key, null);
+      if (kept) return Promise.resolve(kept);
+      return askAI(image, part).then(function (r) { save(key, { read: r.read }); return r; });
+    };
+    var askAI = function (image, part) {
       return api("/scorecard/read", { method: "POST", body: { visitorId: VID, image: image, part: part, holes: holes, source: source,
         text: part === "all" || part === "nines" ? NMCardRead.textOf(image) : undefined } });
     };
@@ -639,6 +646,13 @@
         return closes.reduce(function (read, close, i) { return close ? NMCardRead.mergeCloseUp(read, sides[i], close) : read; }, res.read);
       });
     }); }
+  }
+
+  // a quick fingerprint of a picture's data (FNV-1a), to know a card uploaded before
+  function fnv(str) {
+    var h = 0x811c9dc5;
+    for (var i = 0; i < str.length; i += 7) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+    return h.toString(36) + "-" + str.length.toString(36);
   }
 
   // the course's own card from its website: found by the Worker, read once (and kept here by its address)

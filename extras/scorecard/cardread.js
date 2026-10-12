@@ -293,7 +293,10 @@
       [x && x.name, x && x.alt].forEach(function (v) {
         var got = low(v), words = got.split(/[^a-z0-9]+/).filter(Boolean);
         if (!got) return;
-        var sc = words.indexOf(want) >= 0 ? 3 : words.some(function (w) { return near(w, want); }) ? 2 : got.indexOf(want) >= 0 ? 1 : 0;
+        // a rating heading names the nine it sits under first ("BEAR / ELK" is under Bear): a later word counts less
+        var at = words.indexOf(want), nearAt = -1;
+        words.some(function (w, k) { if (near(w, want)) { nearAt = k; return true; } return false; });
+        var sc = at === 0 ? 3 : at > 0 ? 2.2 : nearAt === 0 ? 2 : nearAt > 0 ? 1.4 : got.indexOf(want) >= 0 ? 1 : 0;
         if (sc) best = Math.max(best, sc - 0.5 * (words.length - 1));
       });
       return best;
