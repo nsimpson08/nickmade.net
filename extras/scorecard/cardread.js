@@ -285,18 +285,29 @@
       var d = []; for (var i = 0; i <= a.length; i++) { d[i] = [i]; for (var j = 1; j <= b.length; j++) d[i][j] = i ? Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)) : j; }
       return d[a.length][b.length] <= (b.length >= 5 ? 2 : 1);
     };
-    var is = function (x, nm) {
-      var want = low(nm);
-      return [x && x.name, x && x.alt].some(function (v) {
-        var got = low(v);
-        return got && (got.indexOf(want) >= 0 || got.split(/[^a-z0-9]+/).some(function (w) { return w && near(w, want); }));
+    // how well a nine's name (or its second reading, x.alt) fits a wanted name: an exact word best, then a word off by
+    // a letter or two, then the name merely containing it; less for a name of several words (Breckenridge's first nine
+    // was once named from the rating heading below it, "BEAVER / BEAR", and took Bear's place)
+    var fit = function (x, nm) {
+      var want = low(nm), best = 0;
+      [x && x.name, x && x.alt].forEach(function (v) {
+        var got = low(v), words = got.split(/[^a-z0-9]+/).filter(Boolean);
+        if (!got) return;
+        var sc = words.indexOf(want) >= 0 ? 3 : words.some(function (w) { return near(w, want); }) ? 2 : got.indexOf(want) >= 0 ? 1 : 0;
+        if (sc) best = Math.max(best, sc - 0.5 * (words.length - 1));
       });
+      return best;
     };
-    var used = [];
-    var pick = names.map(function (nm) {
-      var hit = nines.filter(function (x) { return used.indexOf(x) < 0 && is(x, nm); })[0];
-      if (hit) used.push(hit);
-      return hit || null;
+    var is = function (x, nm) { return fit(x, nm) > 0; };
+    // every (wanted name, nine) pair by how well it fits, the best taken first, each nine used once
+    var pairs = [];
+    names.forEach(function (nm, ni) { nines.forEach(function (x, xi) { var f = x ? fit(x, nm) : 0; if (f > 0) pairs.push([f, ni, xi]); }); });
+    pairs.sort(function (a, b) { return b[0] - a[0] || a[2] - b[2]; });
+    var used = [], pick = names.map(function () { return null; });
+    pairs.forEach(function (pr) {
+      if (pick[pr[1]] || used.indexOf(nines[pr[2]]) >= 0) return;
+      pick[pr[1]] = nines[pr[2]];
+      used.push(nines[pr[2]]);
     });
     // unnamed or unreadable: by position when the count fits, else the one nine left when only one is missing
     if (pick.some(function (x) { return !x; })) {
