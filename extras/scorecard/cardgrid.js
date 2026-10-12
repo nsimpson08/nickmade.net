@@ -158,6 +158,14 @@
     var rows = [];
     for (var r = 0; r < ys.length - 1; r++) if (ys[r + 1] - ys[r] > h * 0.02) rows.push([ys[r], ys[r + 1]]);
     var rowMed = rows.map(function (r3) { return r3[1] - r3[0]; }).sort(function (a, b) { return a - b; })[rows.length >> 1];
+    // a row two or three times the usual height is rows whose line wasn't seen (Breckenridge: the faint line under its
+    // tan Handicap row hid the first blank row, so the round spilled below Par): split it into equal rows
+    rows = rows.reduce(function (out, r4) {
+      var k = Math.round((r4[1] - r4[0]) / rowMed);
+      if (k < 2 || k > 3 || (r4[1] - r4[0]) / rowMed < 1.75) { out.push(r4); return out; }
+      for (var q = 0; q < k; q++) out.push([r4[0] + (r4[1] - r4[0]) * q / k, r4[0] + (r4[1] - r4[0]) * (q + 1) / k]);
+      return out;
+    }, []);
     var blank = nines.map(function (nine) {
       return rows.map(function (row, ri) {
         var ink = 0, all = 0, light = 0;
