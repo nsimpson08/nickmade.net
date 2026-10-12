@@ -352,3 +352,10 @@ a { color: inherit; }
 .sc-cc-prev { display: block; width: 100%; margin: 0 0 10px; padding: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: none; color: inherit; text-align: left; cursor: zoom-in; }
 .sc-cc-prev canvas { display: block; width: 100%; height: auto; }
 .sc-cc-prev span { display: block; padding: 8px 12px; font-size: 0.85rem; color: var(--muted, #8a8f8b); }
+.sc-pl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; margin-bottom: 14px; }
+.sc-pl-hole { display: grid; gap: 4px; padding: 8px; border: 1px solid var(--line); border-radius: 10px; font-size: 0.85rem; }
+.sc-pl-hole b { font-size: 1rem; }
+.sc-pl-hole small { color: var(--muted); }
+.sc-pl-hole .sc-in { height: 40px; text-align: center; font-size: 1.1rem; }
+.sc-pl-hole label { display: flex; align-items: center; gap: 6px; }
+.sc-cc-wipe { width: 100%; margin: 0 0 10px; }

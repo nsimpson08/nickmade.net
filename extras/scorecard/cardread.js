@@ -36,7 +36,19 @@
     c.width = Math.round(w * k); c.height = Math.round(h * k);
     var x = c.getContext("2d");
     x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height); // a PNG with see-through parts reads as white card
-    x.drawImage(src, 0, 0, c.width, c.height);
+    // shrunk by halves (a big scan shrunk in one step drops its thin lines: a 6944 px card lost 3 row lines at 3200)
+    var step = src, sw = w, sh = h;
+    while (sw * 0.5 > c.width) {
+      var t = document.createElement("canvas");
+      t.width = Math.round(sw * 0.5); t.height = Math.round(sh * 0.5);
+      var tx = t.getContext("2d");
+      tx.fillStyle = "#fff"; tx.fillRect(0, 0, t.width, t.height);
+      tx.imageSmoothingQuality = "high";
+      tx.drawImage(step, 0, 0, t.width, t.height);
+      step = t; sw = t.width; sh = t.height;
+    }
+    x.imageSmoothingQuality = "high";
+    x.drawImage(step, 0, 0, c.width, c.height);
     return c;
   }
   function fromImage(blob) {
@@ -45,7 +57,10 @@
       img.onload = function () {
         URL.revokeObjectURL(url);
         var small = jpeg(shrink(img, img.naturalWidth, img.naturalHeight));
-        bigs.set(small, function () { return jpeg(shrink(img, img.naturalWidth, img.naturalHeight, BIG)); });
+        // lossless: JPEG smears a scan's thin lines (Holiday Hills' scan lost 3 row lines); a long, thin card (a
+        // front-and-back scan, 6944 x 1313) kept up to 7200 px wide, as shrinking it to 3200 lost row lines too
+        var bigMax = img.naturalWidth > img.naturalHeight * 2 ? 7200 : BIG;
+        bigs.set(small, function () { return shrink(img, img.naturalWidth, img.naturalHeight, bigMax).toDataURL("image/png"); });
         resolve(small);
       };
       img.onerror = function () { URL.revokeObjectURL(url); reject(new Error("That picture couldn't be opened.")); };
@@ -82,7 +97,7 @@
       return page.render({ canvasContext: ctx, viewport: view }).promise.then(function () {
         var url = jpeg(shrink(c, c.width, c.height));
         if (best.nums >= 20) texts.set(url, best.text);
-        bigs.set(url, function () { return jpeg(c); });
+        bigs.set(url, function () { return c.toDataURL("image/png"); });
         return url;
       });
     });

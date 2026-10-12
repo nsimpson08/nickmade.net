@@ -340,8 +340,8 @@
         for (k = 1; k <= n; k++) {
           var v = st(k);
           if (v == null) continue;
-          write(k, v);
           mark(at(k), v - course.par[k - 1], Math.min(colOf[k].w, h));
+          write(k, v);
         }
         nines.forEach(function (nn) { write(nn[2], sum(nn[0], nn[1], st), hs * 0.9); });
         write("tot", sum(1, n, st), hs * 0.9);
@@ -376,12 +376,11 @@
       } else if (r.role === "greens") {
         var gcount = function (a, b) { var c2 = 0, h2 = 0; for (var j = a; j <= b; j++) { var gv = played(round, j) ? girOf(course, round, j) : null; if (gv != null) { c2++; if (gv) h2++; } } return c2 ? h2 + "/" + c2 : null; };
         for (k = 1; k <= n; k++) {
+          // a check for a green in regulation; a missed one is left empty (Nick, 2026-10-12: no filled / open dots)
           var gv = played(round, k) ? girOf(course, round, k) : null;
-          if (gv == null) continue;
-          var q = at(k), rr = Math.min(colOf[k].w, h) * 0.17;
-          ctx.beginPath(); ctx.arc(q[0], q[1], rr, 0, Math.PI * 2);
-          ctx.lineWidth = 2; ctx.strokeStyle = hand.color; ctx.fillStyle = hand.color;
-          if (gv) ctx.fill(); else ctx.stroke();
+          if (!gv) continue;
+          var q = at(k);
+          glyph("hit", q[0], q[1], Math.min(colOf[k].w, h) * 0.6);
         }
         nines.forEach(function (nn) { write(nn[2], gcount(nn[0], nn[1]), hs * 0.66); });
         write("tot", gcount(1, n), hs * 0.66);
@@ -394,21 +393,25 @@
     }
 
     // birdie circled, eagle double-circled, bogey boxed, double bogey or worse double-boxed
+    // a birdie's ring or a bogey's box; an eagle or a double bogey (or worse) the same mark lightly shaded, as on the
+    // card pictures (Nick, 2026-10-12: shading on every card, no second ring or box). Drawn before the number
     function mark(p, d, size) {
       if (!d) return;
       var r = size * 0.36;
-      ctx.strokeStyle = hand.color; ctx.lineWidth = 1.8;
-      var ring = function (rad) { ctx.beginPath(); ctx.ellipse(p[0], p[1], rad * 1.02, rad * 0.98, -0.2, 0, Math.PI * 2); ctx.stroke(); };
-      var box = function (rad) { ctx.beginPath(); ctx.rect(p[0] - rad, p[1] - rad, rad * 2, rad * 2); ctx.stroke(); };
-      if (d <= -1) { ring(r); if (d <= -2) ring(r * 0.78); }
-      else { box(r * 0.95); if (d >= 2) box(r * 0.75); }
+      var path = function () {
+        ctx.beginPath();
+        if (d < 0) ctx.ellipse(p[0], p[1], r * 1.02, r * 0.98, -0.2, 0, Math.PI * 2); else ctx.rect(p[0] - r * 0.95, p[1] - r * 0.95, r * 1.9, r * 1.9);
+      };
+      if (Math.abs(d) >= 2) { path(); ctx.fillStyle = "rgba(30, 42, 102, 0.16)"; ctx.fill(); }
+      path(); ctx.strokeStyle = hand.color; ctx.lineWidth = 1.8; ctx.stroke();
     }
 
     // fairway: a hand-drawn check, or an arrow for a miss left/right
     function glyph(f, x0, y0, s) {
-      ctx.strokeStyle = hand.color; ctx.lineWidth = 2.6; ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.strokeStyle = hand.color; ctx.lineWidth = 1.7; ctx.lineCap = "round"; ctx.lineJoin = "round";
       ctx.beginPath();
-      if (f === "hit") {
+      if (f === "miss") { ctx.moveTo(x0 - s * 0.3, y0); ctx.lineTo(x0 + s * 0.3, y0); } // missed, side not known
+      else if (f === "hit") {
         ctx.moveTo(x0 - s * 0.42, y0); ctx.lineTo(x0 - s * 0.1, y0 + s * 0.32); ctx.lineTo(x0 + s * 0.45, y0 - s * 0.38);
       } else {
         var dir = f === "left" ? -1 : 1;
@@ -543,12 +546,13 @@
       if (labCol) { var c3 = cell(labCol, row); write(role.label, labCol[0] * W + c3.h * 0.3, c3.y, c3.h * (ri ? 0.62 : 0.72), "left"); }
     });
 
-    // a fairway: a check for hit, an arrow for a miss left or right; a green: a filled dot hit, an open one missed
+    // a fairway: a check for hit, an arrow for a miss left or right (a dash when the side isn't known)
     function fairway(f, c, size) {
       var s2 = size * 0.62;
-      ctx.strokeStyle = HAND.color; ctx.lineWidth = Math.max(2, size * 0.08); ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.strokeStyle = HAND.color; ctx.lineWidth = Math.max(1.2, size * 0.05); // a pen line, not a marker (Nick, 2026-10-12) ctx.lineCap = "round"; ctx.lineJoin = "round";
       ctx.beginPath();
-      if (f === "hit") {
+      if (f === "miss") { ctx.moveTo(c.x - s2 * 0.3, c.y); ctx.lineTo(c.x + s2 * 0.3, c.y); } // missed, side not known
+      else if (f === "hit") {
         ctx.moveTo(c.x - s2 * 0.42, c.y); ctx.lineTo(c.x - s2 * 0.1, c.y + s2 * 0.32); ctx.lineTo(c.x + s2 * 0.45, c.y - s2 * 0.38);
       } else {
         var dir = f === "left" ? -1 : 1;
@@ -557,11 +561,9 @@
       }
       ctx.stroke();
     }
+    // a green in regulation: a check, like a fairway hit; a missed one is left empty (Nick, 2026-10-12)
     function green(hit, c, size) {
-      var r = size * 0.16;
-      ctx.strokeStyle = ctx.fillStyle = HAND.color; ctx.lineWidth = Math.max(1.6, size * 0.06);
-      ctx.beginPath(); ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
-      if (hit) ctx.fill(); else ctx.stroke();
+      if (hit) fairway("hit", c, size);
     }
     // underneath: the date, the tee and the score
     var tee = course.tees.filter(function (x) { return x.key === round.tee; })[0];

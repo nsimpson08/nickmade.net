@@ -532,7 +532,8 @@
       (cc.choices ? '<div class="sc-cc-choices">' + cc.choices.map(function (c, i) {
         return '<button type="button" class="sc-cc-btn" data-cand="' + i + '">' + esc(cardName(c)) + "</button>";
       }).join("") + "</div>" : "") +
-      (cc.pictured ? '<p class="sc-cc-status">✓ Rounds here will be written on this card' + (draft.checked ? "." : ". Save the numbers as the course's card to keep it.") + "</p>" : "") +
+      (cc.pictured ? '<p class="sc-cc-status">✓ Rounds here will be written on this card' + (draft.checked ? "." : ". Save the numbers as the course's card to keep it.") + "</p>" +
+        (OWNER && cc.image && !draft.nines && draft.holes === 18 ? '<button type="button" class="sc-cc-btn sc-cc-wipe" data-act="wipecard">Card has writing on it? Wipe it off</button>' : "") : "") +
       // every course: what a finished round will look like on the card it uses (its card picture, Nick's hand-made
       // Pecan Hollow / Firewheel card, or the plain one)
       (draft && draft.tees && draft.tees.length ? '<button type="button" class="sc-cc-prev" data-act="cardprev" aria-label="See the card full screen">' +
@@ -544,6 +545,8 @@
         // a card saved from a website (or a photo already taken): no camera
         '<label class="sc-cc-btn"><input type="file" id="sc-upload" accept="image/*,application/pdf" hidden>' +
           '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M5 14v5h14v-5"/></svg> Upload</label>' +
+        // a card that's been played on (scores written in): its round, imported
+        (draft.tees.length ? '<label class="sc-cc-btn"><input type="file" id="sc-played" accept="image/*,application/pdf" hidden>Add a played round from a card</label>' : "") +
         (waiting ? '<button type="button" class="sc-cc-btn" data-act="readsnap">Read the card</button>' : "") +
         (draft.website && !cc.looked ? '<button type="button" class="sc-cc-btn" data-act="lookup">Find the website\'s card</button>' : "") +
         (cc.sources.length && draft.tees.length ? '<button type="button" class="sc-cc-btn go" data-act="compare">Compare' + (diffs ? " (" + diffs + ")" : "") + "</button>" : "") +
@@ -565,6 +568,12 @@
       var par = draft.par[n - 1];
       scores[n] = { strokes: par + ups[(n - 1) % 9], putts: n % 4 === 2 ? 1 : 2, fairway: par === 3 ? null : ["hit", "left", "hit", "right"][n % 4] };
     });
+    // always an eagle and a double bogey, so the preview shows both shaded marks (Nick, 2026-10-12): the eagle on the
+    // first par 5 (else a par 4), with one putt; the double bogey on the last hole that isn't it
+    var eagle = holes.filter(function (n) { return draft.par[n - 1] === 5; })[0] || holes.filter(function (n) { return draft.par[n - 1] === 4; })[0];
+    if (eagle) { scores[eagle].strokes = draft.par[eagle - 1] - 2; scores[eagle].putts = 1; }
+    var dbl = holes.filter(function (n) { return n !== eagle; }).pop();
+    if (dbl) scores[dbl].strokes = draft.par[dbl - 1] + 2;
     return { id: "example", course: draft, tee: setupTee || defaultTee(draft), holes: holes, scores: scores, player: prefs.name || "Me", date: dayToIso(setupDay) };
   }
   function cardPreview() {
@@ -724,7 +733,7 @@
   // blank rows, the picture is kept on the server, and card.js writes each round onto it. Nothing to adjust: a card
   // whose grid isn't found (a skewed photo) keeps the plain card.
   //   img: the card read (else it's fetched again from url); read: its numbers (read.order: a 27-hole card's nines)
-  function cardPicture(img, read, url) {
+  function cardPicture(img, read, url, knownGrid) {
     if (!OWNER || !window.NMCardGrid) return;
     var id = draft.id;
     var source = img ? Promise.resolve(img) : !url ? Promise.reject() : fetch(API + "/scorecard/file?u=" + encodeURIComponent(url), { headers: auth() })
@@ -733,7 +742,7 @@
     source.then(function (small) {
       return new Promise(function (res, rej) { var im = new Image(); im.onload = function () { res(im); }; im.onerror = rej; im.src = NMCardRead.bigOf(small); });
     }).then(function (im) {
-      var grid = NMCardGrid.find(im);
+      var grid = knownGrid || NMCardGrid.find(im);
       if (!grid) return; // a card with no blank rows (just a table, like Holiday Hills' website card) gets rows added underneath (card.js)
       var play;
       if (draft.nines || draft.holes === 9) {
@@ -759,7 +768,7 @@
         cc.pictured = true;
         ccPaint();
       });
-    }).catch(function () {});
+    }).catch(function (e) { console.log("card picture not made:", e && e.message); });
   }
 
   // a photo of the card (or a PDF/picture of it): read now, or kept until there's signal
@@ -1203,7 +1212,7 @@
       var p = c.par[n - 1], d = s.strokes - p;
       o.done++; o.strokes += s.strokes; o.par += p;
       if (s.putts != null) { o.putts += s.putts; o.puttsHoles++; }
-      if (p !== 3 && s.fairway) { o.fwN++; if (s.fairway === "hit") o.fw++; else if (s.fairway === "left") o.fwL++; else o.fwR++; }
+      if (p !== 3 && s.fairway) { o.fwN++; if (s.fairway === "hit") o.fw++; else if (s.fairway === "left") o.fwL++; else if (s.fairway === "right") o.fwR++; }
       var g = NMCard.girOf(c, r, n);
       if (g != null) { o.girN++; if (g) o.gir++; }
       o.pen += s.penalties || 0;
@@ -1476,7 +1485,7 @@
         (OWNER ? '<p class="sc-hcp" aria-live="polite"></p>' : "") +
         '<div class="sc-stats">' +
           tile("Putts", s.puttsHoles ? s.putts : "–", s.puttsHoles ? (s.putts / s.puttsHoles).toFixed(1) + " a hole" : "") +
-          tile("Fairways", s.fwN ? s.fw + "/" + s.fwN : "–", s.fwN ? "missed " + s.fwL + " left, " + s.fwR + " right" : "") +
+          tile("Fairways", s.fwN ? s.fw + "/" + s.fwN : "–", s.fwN ? (s.fwL + s.fwR ? "missed " + s.fwL + " left, " + s.fwR + " right" : "missed " + (s.fwN - s.fw)) : "") +
           tile("Greens", s.girN ? s.gir + "/" + s.girN : "–", s.girN ? Math.round(s.gir / s.girN * 100) + "% in regulation" : "") +
           tile("Penalties", s.pen, "") +
         "</div>" +
@@ -1655,6 +1664,7 @@
     if (act === "newcourse") { var qv = app.querySelector("#sc-q"); return newCourse(qv ? qv.value.trim() : ""); }
     if (act === "lookup") return lookupCard();
     if (act === "cardprev") return NMCardViewer.open(exampleRound());
+    if (act === "wipecard") return wipeCard();
     if (act === "uncard") return removeCard(b);
     if (act === "nines") return pickNine(b);
     if (act === "readsnap") return readSnap();
@@ -1780,6 +1790,7 @@
   app.addEventListener("change", function (e) {
     var el = e.target, d = el.dataset;
     if (el.id === "sc-upload") { if (el.files && el.files[0]) snap(el.files[0], true); return; }
+    if (el.id === "sc-played") { if (el.files && el.files[0]) playedCard(el.files[0]); return; }
     if (el.id === "sc-date") {
       setupDay = /^\d{4}-\d{2}-\d{2}$/.test(el.value) && el.value <= today() ? el.value : today();
       el.value = setupDay;
@@ -1841,6 +1852,214 @@
     if (press === "fired" && e.target.closest('[data-act="pen"]')) { e.stopImmediatePropagation(); }
     press = null;
   }, true);
+
+  // ---------- a played round from a filled-in card (Nick's scanned Holiday Hills card, 2026-10-12) ----------
+  // The card is cut into its two nines (cardgrid.js) and each read once (part "played": every row, which are
+  // handwritten, each box). A review screen picks whose row is the round, the date and tee, and lets any score be fixed;
+  // saving makes a finished round. The card picture is made from the same scan with the handwritten rows wiped (only
+  // when the reader's rows line up with the grid's, so a printed row is never wiped by mistake).
+  var pc = null; // { id, rows: [front rows, back rows], grid, img (big), players: [{ name, scores[18] }], fir[18], gir[18] }
+  function playedCard(file) {
+    var id = draft.id;
+    if (draft.nines || draft.holes !== 18) { ccPaint("Adding a played round from a card works on an 18-hole course for now."); return; }
+    ccPaint("Getting the card ready…");
+    NMCardRead.fromFile(file).then(readPlayed).then(function (got) {
+      if (cc.id !== id) return;
+      pc = playedFrom(got);
+      if (!pc.players.length) throw new Error("No handwritten scores found on that card.");
+      ccPaint("");
+      playedScreen();
+    }).catch(function (err) { ccPaint(err.status === 0 ? "No signal to read the card." : err.message); });
+  }
+  // Wipe the handwriting off the card just read (Upload): the same reading as a played round (2 reads, kept on the
+  // phone, so adding the round afterwards costs nothing), then the card picture made again from the wiped scan
+  function wipeCard() {
+    var id = draft.id;
+    if (!cc.image) return;
+    ccPaint("Finding the handwriting…");
+    readPlayed(cc.image).then(function (got) {
+      if (cc.id !== id) return;
+      var p2 = playedFrom(got);
+      if (!p2.wipe.length) { ccPaint(got.rows[0].some(function (r) { return r && r.hand; }) ? "The card's rows didn't line up with what was read, so it was left as is." : "No handwriting found on the card."); return; }
+      var g2 = copy(got.grid), blank = (g2.blank[0] || []).concat(p2.wipe).filter(function (v, i, a) { return a.indexOf(v) === i; }).sort(function (a, b) { return a - b; });
+      g2.blank = g2.nines.map(function () { return blank; });
+      cc.pictured = false;
+      ccPaint("Wiped " + p2.wipe.length + " handwritten row" + (p2.wipe.length === 1 ? "" : "s") + ". Making the card picture again…");
+      cardPicture(wipeRows(got.im, got.grid, p2.wipe), null, null, g2);
+    }).catch(function (err) { ccPaint(err.status === 0 ? "No signal to read the card." : err.message); });
+  }
+  // a filled-in card read row by row: { im (big), grid, rows: [front rows, back rows] }
+  function readPlayed(small) {
+    return Promise.resolve(small).then(function (small) {
+      var big = NMCardRead.bigOf(small);
+      return new Promise(function (res, rej) { var im = new Image(); im.onload = function () { res(im); }; im.onerror = rej; im.src = big; }).then(function (im) {
+        var grid = NMCardGrid.find(im);
+        if (!grid || grid.nines.length !== 2) throw new Error("Couldn't find the card's two nines. Try a straighter, flatter scan.");
+        return NMCardRead.ninePieces(small).then(function (pieces) {
+          if (!pieces || pieces.length !== 2) throw new Error("Couldn't find the card's two nines. Try a straighter, flatter scan.");
+          ccPaint("Reading the scores on the card…");
+          var ask = function (image) {
+            var key = "nm-scorecard-ask:played:" + fnv(image), kept = load(key, null);
+            if (kept) return Promise.resolve(kept);
+            return api("/scorecard/read", { method: "POST", body: { visitorId: VID, image: image, part: "played", holes: 9 } })
+              .then(function (r) { save(key, { read: r.read }); return { read: r.read }; });
+          };
+          return Promise.all(pieces.map(ask)).then(function (rs) {
+            return { im: im, grid: grid, rows: rs.map(function (r) { return (r.read && r.read.rows) || []; }) };
+          });
+        });
+      });
+    });
+  }
+  // The handwritten rows' places in the grid. The reader can skip or add a row (an empty one, most often), so its rows
+  // are lined up with the grid's like a diff: an empty row against a blank grid row, a filled one against a row with
+  // ink. A handwritten row is wiped only where it lands on a grid row with ink, and nothing is wiped unless most rows
+  // line up. -> [grid row indexes]
+  function alignWipe(rows, g) {
+    var A = rows.map(function (r) { return !!r && (!!String(r.label || "").trim() || (r.cells || []).some(function (v) { return v != null; })); });
+    var blank = g.blank[0] || [], G = g.rows.map(function (r, i) { return blank.indexOf(i) < 0; }); // true: has ink
+    var n = A.length, m = G.length, S = [], B = [];
+    for (var i = 0; i <= n; i++) { S.push([]); B.push([]); for (var j = 0; j <= m; j++) { S[i][j] = 0; B[i][j] = 0; } }
+    for (var i2 = 1; i2 <= n; i2++) { S[i2][0] = -i2; B[i2][0] = 1; }
+    for (var j2 = 1; j2 <= m; j2++) { S[0][j2] = -j2; B[0][j2] = 2; }
+    for (var a = 1; a <= n; a++) for (var b = 1; b <= m; b++) {
+      var diag = S[a - 1][b - 1] + (A[a - 1] === G[b - 1] ? 2 : -1), up = S[a - 1][b] - 1, left = S[a][b - 1] - 1;
+      if (diag >= up && diag >= left) { S[a][b] = diag; B[a][b] = 0; } else if (up >= left) { S[a][b] = up; B[a][b] = 1; } else { S[a][b] = left; B[a][b] = 2; }
+    }
+    var pairs = [], ia = n, jb = m, agree = 0;
+    while (ia > 0 && jb > 0) {
+      if (B[ia][jb] === 0) { pairs.push([ia - 1, jb - 1]); if (A[ia - 1] === G[jb - 1]) agree++; ia--; jb--; }
+      else if (B[ia][jb] === 1) ia--; else jb--;
+    }
+    if (agree < Math.min(n, m) * 0.8) return [];
+    return pairs.filter(function (p) { return rows[p[0]] && rows[p[0]].hand && G[p[1]]; }).map(function (p) { return p[1]; }).sort(function (x, y) { return x - y; });
+  }
+  function playedFrom(got) {
+    var front = got.rows[0], back = got.rows[1], low = function (v) { return String(v || "").toLowerCase().trim(); };
+    var num = function (v) { var n = typeof v === "number" ? v : parseInt(v, 10); return n >= 1 && n <= 15 ? n : null; };
+    var nine = function (cells) { var a = []; for (var i = 0; i < 9; i++) a.push(cells && cells[i] != null ? cells[i] : null); return a; };
+    var scoreRows = function (rows) { return rows.filter(function (r) { return r && r.hand && nine(r.cells).filter(num).length >= 5; }); };
+    var fr = scoreRows(front), br = scoreRows(back);
+    var players = fr.map(function (r, i) {
+      var other = br.filter(function (b) { return low(b.label) && low(b.label) === low(r.label); })[0] || br[i] || {};
+      return { name: r.label || "Player " + (i + 1), scores: nine(r.cells).map(num).concat(nine(other.cells).map(num)) };
+    });
+    var checks = function (re) {
+      var f = front.filter(function (r) { return r && re.test(r.label || ""); })[0], b = back.filter(function (r) { return r && re.test(r.label || ""); })[0];
+      if (!f && !b) return null;
+      return nine(f && f.cells).concat(nine(b && b.cells)).map(function (v) { return v === "check" || v === "✓" || v === true; });
+    };
+    var wipe = alignWipe(front, got.grid);
+    return { id: draft.id, im: got.im, grid: got.grid, players: players, fir: checks(/f\s*i\s*r|fairway/i), gir: checks(/g\s*i\s*r|green/i), wipe: wipe,
+      pick: Math.max(0, players.findIndex(function (p) { return low(p.name).indexOf(low(prefs.name || "nick").slice(0, 3)) === 0; })),
+      day: today(), tee: setupTee || defaultTee(draft) };
+  }
+  function playedScreen() {
+    if (!at(2, playedScreen)) return;
+    var P = pc.players[pc.pick], n = draft.holes;
+    var total = P.scores.reduce(function (a, v) { return a + (v || 0); }, 0);
+    var cell = function (h) {
+      var par = draft.par[h - 1], i = h - 1;
+      return '<div class="sc-pl-hole"><b>' + h + "</b><small>par " + par + "</small>" +
+        '<input class="sc-in" type="number" inputmode="numeric" min="1" max="15" data-pl-score="' + i + '" value="' + (P.scores[i] || "") + '">' +
+        (pc.fir && par !== 3 ? '<label><input type="checkbox" data-pl-fir="' + i + '"' + (pc.fir[i] ? " checked" : "") + "> FIR</label>" : "") +
+        (pc.gir ? '<label><input type="checkbox" data-pl-gir="' + i + '"' + (pc.gir[i] ? " checked" : "") + "> GIR</label>" : "") + "</div>";
+    };
+    var holes = []; for (var h = 1; h <= n; h++) holes.push(cell(h));
+    app.innerHTML = bar('<button class="sc-icon sc-back" type="button" data-act="cmpback" aria-label="Back">&larr;</button>', "Played card", sunBtn) +
+      '<section class="sc-pad sc-played">' +
+        '<p class="sc-muted small">Check the scores against the card, then save the round.</p>' +
+        (OWNER ? '<label class="sc-approve"><input type="checkbox" id="sc-pl-wipe"' + (pc.wipe.length && pc.doWipe !== false ? " checked" : "") + (pc.wipe.length ? "" : " disabled") + "><span>" +
+          (pc.wipe.length ? "Wipe the handwriting off the card picture (" + pc.wipe.length + " row" + (pc.wipe.length === 1 ? "" : "s") + "), so this course's rounds are written on a clean card"
+            : "Can't wipe the handwriting: the rows read didn't line up with the card's") + "</span></label>" : "") +
+        '<h3 class="sc-sub">Whose round</h3><div class="sc-seg sc-seg-wrap" role="radiogroup">' + pc.players.map(function (p, i) {
+          var t = p.scores.reduce(function (a, v) { return a + (v || 0); }, 0);
+          return '<button type="button" role="radio" data-pl-who="' + i + '" aria-checked="' + (i === pc.pick) + '">' + esc(p.name) + (t ? " · " + t : "") + "</button>";
+        }).join("") + "</div>" +
+        '<h3 class="sc-sub">Date played</h3><input type="date" id="sc-pl-day" class="sc-in sc-date" max="' + today() + '" value="' + esc(pc.day) + '">' +
+        '<h3 class="sc-sub">Tee</h3><select id="sc-pl-tee" class="sc-in">' + draft.tees.map(function (t) {
+          return '<option value="' + esc(t.key) + '"' + (t.key === pc.tee ? " selected" : "") + ">" + esc(t.name) + "</option>";
+        }).join("") + "</select>" +
+        '<h3 class="sc-sub">Scores <span class="sc-muted">' + total + "</span></h3>" +
+        '<div class="sc-pl-grid">' + holes.join("") + "</div>" +
+        '<button class="sc-go" type="button" data-act="plsave">Save round</button>' +
+      "</section>";
+  }
+  function savePlayed(btn) {
+    var P = pc.players[pc.pick], now = Date.now(), n = draft.holes, scores = {};
+    var missing = [];
+    for (var h = 1; h <= n; h++) {
+      var v = P.scores[h - 1];
+      if (!v) { missing.push(h); continue; }
+      var par = draft.par[h - 1], s = { strokes: v, at: now };
+      if (pc.fir && par !== 3) s.fairway = pc.fir[h - 1] ? "hit" : "miss";
+      if (pc.gir) s.gir = !!pc.gir[h - 1];
+      scores[h] = s;
+    }
+    if (missing.length && !confirm((missing.length === 1 ? "Hole " + missing[0] + " has" : "Holes " + missing.join(", ") + " have") + " no score. Save anyway?")) return;
+    btn.disabled = true;
+    var holes = []; for (var k = 1; k <= n; k++) holes.push(k);
+    var r = { id: uuid(), v: 1, course: copy(draft), tee: pc.tee, holes: holes, scores: scores, current: 1, player: OWNER ? prefs.name || P.name : P.name,
+      date: dayToIso(pc.day), day: pc.day, startedAt: now, updatedAt: now, finishedAt: now, onSite: OWNER };
+    var past = load(K.rounds, []);
+    past.unshift(r);
+    save(K.rounds, past.slice(0, KEEP));
+    prefs.recent = [{ id: draft.id, name: draft.name, place: draft.place }].concat(prefs.recent.filter(function (x) { return x.id !== draft.id; })).slice(0, 8);
+    savePrefs();
+    queueSync(0);
+    // the card picture: the scan with its handwritten rows wiped
+    if (OWNER && pc.wipe.length && pc.doWipe !== false) {
+      // the wiped rows are blank now, whatever specks the wipe missed: the grid found on the scan, with them as blank
+      var g2 = copy(pc.grid), blank = (g2.blank[0] || []).concat(pc.wipe).filter(function (v, i, a) { return a.indexOf(v) === i; }).sort(function (a, b) { return a - b; });
+      g2.blank = g2.nines.map(function () { return blank; });
+      cardPicture(wipeRows(pc.im, pc.grid, pc.wipe), null, null, g2);
+    }
+    pc = null;
+    summary(r);
+  }
+  // the scan with the given rows' boxes painted over in each box's own paper color (the lines stay)
+  function wipeRows(im, g, rows) {
+    var W = im.naturalWidth, H = im.naturalHeight, c = document.createElement("canvas");
+    c.width = W; c.height = H;
+    var x = c.getContext("2d");
+    x.drawImage(im, 0, 0);
+    var cols = [];
+    g.nines.forEach(function (n) { [n.label].concat(n.holes, [n.total, n.after]).forEach(function (cc) { if (cc) cols.push(cc); }); });
+    rows.forEach(function (ri) {
+      var row = g.rows[ri];
+      if (!row) return;
+      cols.forEach(function (cc) {
+        var x0 = Math.round(cc[0] * W) + 2, x1 = Math.round(cc[1] * W) - 2, y0 = Math.round(row[0] * H) + 2, y1 = Math.round(row[1] * H) - 2;
+        if (x1 <= x0 || y1 <= y0) return;
+        var d = x.getImageData(x0, y0, x1 - x0, y1 - y0).data, light = [[], [], []];
+        for (var i = 0; i < d.length; i += 16) { if (d[i] + d[i + 1] + d[i + 2] > 600) { light[0].push(d[i]); light[1].push(d[i + 1]); light[2].push(d[i + 2]); } }
+        var med = function (a) { a.sort(function (p, q) { return p - q; }); return a.length ? a[a.length >> 1] : 250; };
+        x.fillStyle = "rgb(" + med(light[0]) + "," + med(light[1]) + "," + med(light[2]) + ")";
+        x.fillRect(x0, y0, x1 - x0, y1 - y0);
+      });
+    });
+    return c.toDataURL("image/jpeg", 0.92);
+  }
+  // the review screen's controls
+  app.addEventListener("click", function (e) {
+    if (!pc || !app.querySelector(".sc-played")) return;
+    var b = e.target.closest("[data-pl-who], [data-act]");
+    if (!b) return;
+    if (b.dataset.plWho != null) { pc.pick = +b.dataset.plWho; playedScreen(); }
+    else if (b.dataset.act === "plsave") savePlayed(b);
+    else return;
+    e.stopImmediatePropagation();
+  }, true);
+  app.addEventListener("change", function (e) {
+    if (!pc) return;
+    var el = e.target, d = el.dataset;
+    if (d.plScore != null) { var v = parseInt(el.value, 10); pc.players[pc.pick].scores[+d.plScore] = v >= 1 && v <= 15 ? v : null; }
+    else if (d.plFir != null) pc.fir[+d.plFir] = el.checked;
+    else if (d.plGir != null) pc.gir[+d.plGir] = el.checked;
+    else if (el.id === "sc-pl-day") pc.day = /^\d{4}-\d{2}-\d{2}$/.test(el.value) && el.value <= today() ? el.value : today();
+    else if (el.id === "sc-pl-tee") pc.tee = el.value;
+    else if (el.id === "sc-pl-wipe") pc.doWipe = el.checked;
+  });
 
   boot();
 })();

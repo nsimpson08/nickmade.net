@@ -10,13 +10,24 @@
 //                                     label: [x0, x1] | null }], rows: [[y0, y1]], blank: [[row indexes] per nine] }
 //   all as fractions of the picture's width and height
 (function () {
-  // worked on at the picture's own size up to 2400 px wide (shrinking fades a card's 1-pixel rules)
+  // worked on at the picture's own size up to 4800 px wide, shrunk by halves (shrinking fades a card's 1-pixel rules:
+  // Holiday Hills' 6944 px scan lost 4 of its 16 row lines at 2400 in one step)
   function gray(img) {
-    var W = Math.min(2400, img.naturalWidth), k = W / img.naturalWidth, h = Math.round(img.naturalHeight * k);
+    var W = Math.min(4800, img.naturalWidth), k = W / img.naturalWidth, h = Math.round(img.naturalHeight * k);
+    var step = img, sw = img.naturalWidth, sh = img.naturalHeight;
+    while (sw * 0.5 > W) {
+      var t = document.createElement("canvas");
+      t.width = Math.round(sw * 0.5); t.height = Math.round(sh * 0.5);
+      var tx = t.getContext("2d");
+      tx.imageSmoothingQuality = "high";
+      tx.drawImage(step, 0, 0, t.width, t.height);
+      step = t; sw = t.width; sh = t.height;
+    }
     var c = document.createElement("canvas");
     c.width = W; c.height = h;
-    var x = c.getContext("2d");
-    x.drawImage(img, 0, 0, W, h);
+    var x = c.getContext("2d", { willReadFrequently: true });
+    x.imageSmoothingQuality = "high";
+    x.drawImage(step, 0, 0, W, h);
     var d = x.getImageData(0, 0, W, h).data, g = new Float32Array(W * h), rgb = d;
     for (var i = 0, j = 0; i < g.length; i++, j += 4) g[i] = 0.299 * d[j] + 0.587 * d[j + 1] + 0.114 * d[j + 2];
     return { g: g, rgb: rgb, w: W, h: h };
@@ -94,12 +105,18 @@
 
     // columns, less any the row lines don't cross (a "Players Initials" / "INITIAL" column down the middle): those
     // break a run of hole columns
-    var cols = [];
+    var cols = [], drift = Math.max(3, Math.round(w / 700));
     for (var i = 0; i < xs.length - 1; i++) {
       var c0 = Math.round(xs[i] + (xs[i + 1] - xs[i]) * 0.3), c1 = Math.round(xs[i + 1] - (xs[i + 1] - xs[i]) * 0.3), crossed = 0;
       ys.forEach(function (ly) {
         var yy = Math.round(ly), on = 0;
-        for (var cx = c0; cx <= c1; cx++) on += hm[yy * w + cx] || hm[(yy - 1) * w + cx] || hm[(yy + 1) * w + cx] ? 1 : 0;
+        // within a few rows of the line's middle (3 at 2400 px wide, more on a bigger working copy): a scan a little
+        // crooked drifts that much across the card
+        for (var cx = c0; cx <= c1; cx++) {
+          var hit = 0;
+          for (var dy = -drift; dy <= drift && !hit; dy++) hit = hm[(yy + dy) * w + cx] || 0;
+          on += hit;
+        }
         if (on > (c1 - c0 + 1) * 0.6) crossed++;
       });
       cols.push([xs[i], xs[i + 1], crossed / ys.length]);

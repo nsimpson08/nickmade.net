@@ -288,6 +288,17 @@ ASK.nine = () => `This is one nine of a golf course scorecard: the row names on 
 // Beside the nine-by-nine reads of a 27-hole card: just the nines' names (left to right) and the rating / slope tables.
 // A short reply, so it comes back in seconds (the whole card's every number in one read can pass the minute Workers
 // AI allows, and did on Breckenridge's JPG, 2026-10-12)
+// One nine of a card that was filled in by hand (a played round, scanned): every row top to bottom, which are
+// handwritten, and what's in each box, so the app can import the round and wipe the handwriting off the card picture
+ASK.played = () => `This is one nine of a golf scorecard that was filled in by hand: the row names on the left, then holes 1 to 9 and the nine's total column. ` +
+  `List EVERY row of the grid from top to bottom, including empty rows, and reply with JSON only:\n` +
+  `{"rows": [{"label": "<the row's name, printed or handwritten, or empty>", "hand": <true if the row's boxes or name are handwritten>, ` +
+  `"cells": [<9 entries for holes 1 to 9: the number in the box, "check" for a check mark, or null if empty>], "total": <the number in the total column or null>}]}\n` +
+  `Rules:
+- Never skip a row, even an empty one: the number of rows must match the grid.
+- Read handwritten numbers carefully; if one can't be read, use null.
+Reply with the JSON only, no other words.`;
+
 ASK.meta = () => `This golf scorecard shows one or more nines side by side. Reply with JSON only:\n` +
   `{"nines": ["<each nine's own name, left to right, one word: the big faded word printed across it; if there is none, the FIRST name of the rating heading printed under that nine (under NORTH / SOUTH, give NORTH)>"], ` +
   `"ratings": [{"nines": "<the heading as printed, like NORTH / SOUTH>", "tees": [{"color": "<the row's color>", "rating": <number>, "slope": <number>, "women": <true if marked W>}]}]}\n` +
@@ -662,7 +673,7 @@ async function putRound(request, id, env, cors, h) {
       "gir_set = excluded.gir_set, penalties = excluded.penalties, updated_at = excluded.updated_at " +
       "WHERE excluded.updated_at >= round_holes.updated_at"
     ).bind(id, hole, int(s.par, 3, 6) || (pars ? int(pars[hole - 1], 3, 6) : null), int(s.yards, 30, 800), int(s.hcp, 1, 18),
-      s.strokes, int(s.putts, 0, 10), ["hit", "left", "right"].indexOf(s.fairway) >= 0 ? s.fairway : null,
+      s.strokes, int(s.putts, 0, 10), ["hit", "left", "right", "miss"].indexOf(s.fairway) >= 0 ? s.fairway : null, // miss: a played card's FIR row only says hit or not
       typeof s.girShown === "boolean" ? (s.girShown ? 1 : 0) : null, typeof s.gir === "boolean" ? (s.gir ? 1 : 0) : null,
       int(s.penalties, 0, 10), s.at));
   });
