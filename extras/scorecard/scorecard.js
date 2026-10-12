@@ -286,7 +286,7 @@
       save(K.course + id, c);
       return c;
     }, function (err) {
-      var kept = load(K.course + id, null);
+      var kept = load(K.course + id, null) || playedCourse(id);
       if (kept) return kept;
       if (id.indexOf("api:") === 0) return apiCourse(id.slice(4));
       var pair = NINES.exec(id);
@@ -296,6 +296,16 @@
         return r.json();
       });
     });
+  }
+  // the course as a past round on this phone played it (a course added from its card and never saved still has that)
+  function playedCourse(id) {
+    var r = load(K.rounds, []).filter(function (x) { return x.course && x.course.id === id; })[0];
+    return r ? copy(r.course) : null;
+  }
+  // a course this phone can open: saved here, played here, rebuilt from OpenGolfAPI or its two nines (else a server or
+  // hand-made file, which the lists check themselves)
+  function openable(id) {
+    return /^(api|nines):/.test(id) || !!load(K.course + id, null) || !!playedCourse(id);
   }
   function yardsOf(t) { return t.total || t.yards.reduce(function (a, v) { return a + (v || 0); }, 0); }
   // Nick's rule (2026-10-10): "the whites", the tee one back from the front tees = the second-shortest
@@ -342,7 +352,8 @@
       var known = function (id) { return list.some(function (m) { return m.id === id; }); };
       var rows = list.map(function (c) { return courseRow(c, ownBadge(c, files)); });
       files.forEach(function (f) { if (!known(f.id)) rows.push(courseRow(f, f.ownerChecked ? "✓ Card" : "✓ Checked")); });
-      prefs.recent.forEach(function (r) { if (!known(r.id) && !files.some(function (f) { return f.id === r.id; })) rows.push(courseRow(r, "")); });
+      // recent courses this phone can still open (a course added from its card but never saved can't be, 2026-10-12)
+      prefs.recent.forEach(function (r) { if (!known(r.id) && !files.some(function (f) { return f.id === r.id; }) && openable(r.id)) rows.push(courseRow(r, "")); });
       app.querySelector(".sc-mine").innerHTML = rows.join("") || '<li class="sc-muted">Search for a course to start.</li>';
     });
     pastRounds();
@@ -451,6 +462,9 @@
   function setup(course, keep) {
     if (!at(1, function () { setup(draft && draft.id === course.id ? draft : course, true); })) return; // with any numbers changed since
     draft = copy(course);
+    // a pair of nines saved before the server kept "nines" (2026-10-12: its card got Beaver + Bear's columns): from its id
+    var pairId = NINES.exec(draft.id || "");
+    if (pairId && !draft.nines) draft.nines = [pairId[1], pairId[2]];
     if (!keep) {
       setupDay = null;
       original = numbers(draft);
@@ -705,7 +719,10 @@
       var play;
       if (draft.nines || draft.holes === 9) {
         var names = draft.nines ? draft.name.split(" + ") : [nineName(draft)], order = (read && read.order) || [];
-        play = names.map(function (nm, i) {
+        // the columns the reader matched to these nines (fuzzy names, ruling out the club's others), when it saw as
+        // many nines as the grid did
+        if (read && read.picked && read.count === grid.nines.length) play = read.picked.slice();
+        else play = names.map(function (nm, i) {
           var k = order.length === grid.nines.length ? order.findIndex(function (x) { return x.indexOf(nm.toLowerCase()) >= 0; }) : -1;
           return k >= 0 ? k : grid.nines.length === names.length ? i : -1;
         });
@@ -1561,7 +1578,17 @@
     }
     if (d.course) {
       b.classList.add("busy");
-      loadCourse(d.course).then(setup).catch(function (err) { b.classList.remove("busy"); alert(err.message || "Couldn't load that course."); });
+      var cid = d.course;
+      loadCourse(cid).then(setup).catch(function (err) {
+        b.classList.remove("busy");
+        if (err.status !== 0 && !/^No signal/.test(err.message || "")) { // gone for good: off the recent list
+          prefs.recent = prefs.recent.filter(function (r) { return r.id !== cid; });
+          savePrefs();
+          var li = b.closest("li");
+          if (li && b.closest(".sc-mine")) li.remove();
+        }
+        alert(err.message || "Couldn't load that course.");
+      });
       return;
     }
     if (d.past) { var r = pastById(d.past); if (r) summary(r); return; }

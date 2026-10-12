@@ -309,6 +309,7 @@
       if (missing === 1 && left.length === 1) pick = pick.map(function (x) { return x || left[0]; });
     }
     if (pick.some(function (x) { return !x; })) return null;
+    var picked = pick.map(function (x) { return nines.indexOf(x); }); // which of the card's nines, left to right
     var rank = function (h, odd) {
       h = list(h, 9, 1, 18);
       if (h.some(function (v) { return v == null; })) return h;
@@ -353,6 +354,8 @@
       res.parTotal = res.parOut;
       res.hcpWomen = wa;
     }
+    res.picked = picked;
+    res.count = nines.length;
     return res;
   }
 

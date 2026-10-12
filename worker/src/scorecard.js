@@ -541,6 +541,8 @@ function cleanCourse(c, id, owner) {
   if (/^https?:\/\//.test(c.website || "")) out.website = str(c.website, 300);
   if (c.source && typeof c.source === "object") out.source = JSON.parse(JSON.stringify(c.source).slice(0, 2000));
   if (c.credit) out.credit = str(c.credit, 200);
+  // two nines played as one 18: which nines (the app also tells it from the id, nines:<front>+<back>)
+  if (Array.isArray(c.nines) && c.nines.length === 2 && c.nines.every((x) => typeof x === "string" && x.length <= 80)) out.nines = c.nines;
   if (Array.isArray(c.clubNines)) out.clubNines = c.clubNines.filter((x) => typeof x === "string").slice(0, 6).map((x) => x.slice(0, 30)); // a 27-hole club's nines
   if (owner && c.card && typeof c.card === "object") out.card = c.card; // the card's look or picture: Nick's files only
   return JSON.stringify(out).length <= 80000 ? out : null;
