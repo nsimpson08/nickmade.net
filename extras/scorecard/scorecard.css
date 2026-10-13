@@ -359,3 +359,8 @@ a { color: inherit; }
 .sc-pl-hole .sc-in { height: 40px; text-align: center; font-size: 1.1rem; }
 .sc-pl-hole label { display: flex; align-items: center; gap: 6px; }
 .sc-cc-wipe { width: 100%; margin: 0 0 10px; }
+.sc-rs { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 8px 0 12px; }
+.sc-rs-in { display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; }
+.sc-rs-in .sc-in { width: 84px; height: 40px; text-align: center; }
+.sc-rs .sc-muted { flex-basis: 100%; }
+.sc-rs-round { margin-top: 10px; }

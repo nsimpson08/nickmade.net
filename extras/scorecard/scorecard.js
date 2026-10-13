@@ -461,7 +461,7 @@
   // ---------- setup: tee, holes, and a look at the numbers before teeing off ----------
 
   var draft = null, setupTee = null, setupNine = "18", original = "", setupDay = null; // setupDay: the date played, for entering old rounds
-  function numbers(c) { return JSON.stringify([c.par, c.hcp, c.hcpWomen || null, c.tees.map(function (t) { return t.yards; })]); }
+  function numbers(c) { return JSON.stringify([c.par, c.hcp, c.hcpWomen || null, c.tees.map(function (t) { return [t.yards, t.rating || null, t.slope || null]; })]); }
 
   // keep: re-drawing the same course after the card check (its sources and the "original" numbers stay)
   function setup(course, keep) {
@@ -508,7 +508,8 @@
         '<p class="sc-muted small sc-date-note"' + (setupDay && setupDay !== today() ? "" : " hidden") + '>An old round: enter each hole\'s score; putts and fairways can be left blank.</p>' +
         '<details class="sc-check"' + ((src.kind === "api" && !chk) || src.kind === "photo" || src.kind === "website" && !draft.card ? " open" : "") + "><summary>" +
           (chk ? "Look over the numbers" : "Check the numbers") + "</summary>" +
-          '<p class="sc-muted small">Tap a par to change it. Yardage is for the tee you picked.</p><div class="sc-table"></div></details>' +
+          '<p class="sc-muted small">Tap a par to change it. Yardage is for the tee you picked.</p>' +
+          '<div class="sc-rs"></div><div class="sc-table"></div></details>' +
         '<label class="sc-approve" hidden><input type="checkbox" id="sc-approve" checked><span></span></label>' +
         '<button class="sc-go" type="button" data-act="start">Start round</button>') +
         (draft.credit ? '<p class="sc-credit">' + esc(draft.credit) + "</p>" : "") +
@@ -1006,10 +1007,21 @@
     var warn = tee.total && sum && sum !== tee.total ? '<p class="sc-warn">These holes add up to ' + fmtYds(sum) + " yds, but the tee says " + fmtYds(tee.total) + ". Check them.</p>" : "";
     var seen = {}, dup = hc.some(function (h) { if (h == null) return false; if (seen[h]) return true; seen[h] = 1; return false; });
     if (dup) warn += '<p class="sc-warn">A handicap is used twice: each one should appear once.</p>';
+    // the picked tee's rating and slope, typed in when the card or OpenGolfAPI didn't have them (for the handicap)
+    var rsBox = app.querySelector(".sc-rs");
+    if (rsBox && !rsBox.contains(document.activeElement)) rsBox.innerHTML = rsInputs(tee, "setup");
     app.querySelector(".sc-table").innerHTML = '<div class="sc-tr sc-th"><span>Hole</span><span>Par</span><span>Yds</span><span>Hcp</span></div>' + rows +
       '<div class="sc-tr sc-tt"><span>Total</span><span>' + par + "</span><span>" + fmtYds(sum || tee.total) + "</span><span></span></div>" + warn;
     approveBox();
   }
+
+  // Rating and slope boxes for a tee (setup: the course; round: a finished round's own course)
+  function rsInputs(t, where) {
+    return '<label class="sc-rs-in">Rating <input type="number" inputmode="decimal" step="0.1" min="20" max="90" class="sc-in" data-rs-rating="' + where + '" value="' + (t.rating || "") + '" placeholder="e.g. 70.1"></label>' +
+      '<label class="sc-rs-in">Slope <input type="number" inputmode="numeric" min="55" max="155" class="sc-in" data-rs-slope="' + where + '" value="' + (t.slope || "") + '" placeholder="e.g. 125"></label>' +
+      '<span class="sc-muted small">' + esc(t.name) + " tees, for your handicap</span>";
+  }
+  function rsValue(el, lo, hi) { var v = parseFloat(el.value); return v >= lo && v <= hi ? (el.dataset.rsSlope != null ? Math.round(v) : Math.round(v * 10) / 10) : null; }
 
   // "Save as this course's card": offered when the course has no checked file yet, or (Nick) when he's changed
   // numbers in a checked one. A visitor can't replace a checked file; their changes stay with their own round.
@@ -1138,7 +1150,9 @@
     };
   }
   function acked(id, sentAt) {
-    var mark = function (x) { x.ackAt = Math.max(x.ackAt || 0, sentAt); x.courseAcked = true; };
+    // the course counts as sent only if the round hasn't changed since (a rating typed in while a send was going
+    // was lost: its course went unsent, 2026-10-12)
+    var mark = function (x) { x.ackAt = Math.max(x.ackAt || 0, sentAt); if ((x.updatedAt || 0) <= sentAt) x.courseAcked = true; };
     if (round && round.id === id) { mark(round); save(K.round, round); }
     var past = load(K.rounds, []);
     past.forEach(function (x) { if (x.id === id) mark(x); });
@@ -1484,6 +1498,7 @@
           (s.done < r.holes.length ? " · " + s.done + " of " + r.holes.length + " holes" : r.holes.length === 9 ? " · 9 holes" : "") + "</p>" +
         (kinds ? '<p class="sc-kinds">' + esc(kinds) + "</p>" : "") +
         (OWNER ? '<p class="sc-hcp" aria-live="polite"></p>' : "") +
+        '<div class="sc-rs sc-rs-round">' + rsInputs(tee, "round") + "</div>" +
         '<div class="sc-stats">' +
           tile("Putts", s.puttsHoles ? s.putts : "–", s.puttsHoles ? (s.putts / s.puttsHoles).toFixed(1) + " a hole" : "") +
           tile("Fairways", s.fwN ? s.fw + "/" + s.fwN : "–", s.fwN ? (s.fwL + s.fwR ? "missed " + s.fwL + " left, " + s.fwR + " right" + (s.fwN - s.fw - s.fwL - s.fwR ? ", " + (s.fwN - s.fw - s.fwL - s.fwR) + " unmarked" : "") : "missed " + (s.fwN - s.fw)) : "") +
@@ -1821,6 +1836,30 @@
       queueSync(0);
       var line = app.querySelector(".sc-hcp");
       if (line) { line.textContent = ""; setTimeout(function () { roundHcp(r, 0); }, 1500); }
+      return;
+    }
+    if (d.rsRating != null || d.rsSlope != null) { // a tee's rating or slope typed in
+      var lo = d.rsSlope != null ? 55 : 20, hi = d.rsSlope != null ? 155 : 90, val = el.value === "" ? null : rsValue(el, lo, hi);
+      if (el.value !== "" && val == null) { el.setCustomValidity("Out of range"); el.reportValidity(); return; }
+      el.setCustomValidity("");
+      var field = d.rsSlope != null ? "slope" : "rating";
+      if ((d.rsRating || d.rsSlope) === "round") { // a finished round: its own course copy, sent again (the handicap redoes it)
+        var all = load(K.rounds, []), rr = all.filter(function (x) { return x.id === app.dataset.round; })[0];
+        if (!rr) return;
+        teeOf(rr.course, rr.tee)[field] = val;
+        rr.updatedAt = Date.now(); rr.courseAcked = false;
+        save(K.rounds, all);
+        var kept = load(K.course + rr.course.id, null); // and this phone's copy of the course, for next time
+        if (kept) { var kt = kept.tees.filter(function (t) { return t.key === rr.tee; })[0]; if (kt) { kt[field] = val; save(K.course + rr.course.id, kept); } }
+        queueSync(0);
+        var line = app.querySelector(".sc-hcp");
+        if (line) { line.textContent = ""; setTimeout(function () { roundHcp(rr, 0); }, 2500); }
+        return;
+      }
+      if (!draft) return;
+      teeOf(draft, setupTee)[field] = val;
+      app.querySelectorAll(".sc-tee").forEach(function (b) { var t = teeOf(draft, b.dataset.tee); b.outerHTML = teeBtn(t); });
+      approveBox();
       return;
     }
     if (!draft || (d.yds == null && d.hcp == null)) return;
