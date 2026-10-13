@@ -290,7 +290,10 @@
   // names: the nines played, in order ("Bear", "Elk"). Each nine ranks its handicaps on its own (1-9, or odd 1-17);
   // two played as an 18: the first takes the odd numbers and the second the even. The rating and slope come from the
   // card's table for that pair (either order), matched to each tee by its row color.
-  function fromNines(read, names, others) {
+  // known (optional): what the course already has for each wanted nine, [{ par: [9], yards: [[9] per tee] }]. When it
+  // has numbers, each nine on the card is matched by them (yardages and pars that agree): only one nine on the card
+  // has Bear's yardages, whatever its faded name was read as (Breckenridge's names were misread three ways, 2026-10-12)
+  function fromNines(read, names, others, known) {
     var nines = (read && read.nines) || [];
     var low = function (v) { return String(v || "").toLowerCase(); };
     // a nine's name as read (and x.alt, a second reading) against a wanted name: contained in it, or a word of it off
@@ -317,9 +320,24 @@
       return best;
     };
     var is = function (x, nm) { return fit(x, nm) > 0; };
-    // every (wanted name, nine) pair by how well it fits, the best taken first, each nine used once
+    // by numbers: how many of a nine's yardages and pars agree with what the course has for a wanted nine
+    var byNumbers = function (x, k) {
+      var kn = known && known[k];
+      if (!x || !kn) return 0;
+      var agree = 0, cells = 0, got = {};
+      (x.tees || []).forEach(function (t) { list(t.yards, 9, 30, 800).forEach(function (v, i) { if (v != null) got[i + ":" + v] = 1; }); });
+      (kn.yards || []).forEach(function (ys) { (ys || []).forEach(function (v, i) { if (v != null) { cells++; if (got[i + ":" + v]) agree++; } }); });
+      var par = list(x.par, 9, 3, 6);
+      (kn.par || []).forEach(function (v, i) { if (v != null) { cells++; if (par[i] === v) agree++; } });
+      return cells ? agree / cells : 0;
+    };
+    // every (wanted name, nine) pair by how well it fits, the best taken first, each nine used once: by numbers when
+    // the course has them (a clear match: over half its numbers agree), else by name
     var pairs = [];
-    names.forEach(function (nm, ni) { nines.forEach(function (x, xi) { var f = x ? fit(x, nm) : 0; if (f > 0) pairs.push([f, ni, xi]); }); });
+    names.forEach(function (nm, ni) { nines.forEach(function (x, xi) {
+      var num = byNumbers(x, ni), f = num > 0.5 ? 10 + num : x ? fit(x, nm) : 0;
+      if (f > 0) pairs.push([f, ni, xi]);
+    }); });
     pairs.sort(function (a, b) { return b[0] - a[0] || a[2] - b[2]; });
     var used = [], pick = names.map(function () { return null; });
     pairs.forEach(function (pr) {

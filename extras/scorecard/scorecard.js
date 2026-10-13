@@ -628,7 +628,10 @@
             return { read: { nines: nines, ratings: Array.isArray(m.ratings) ? m.ratings : [] } };
           });
       }).then(function (res) {
-        var read = NMCardRead.fromNines(res.read, names, draft.clubNines);
+        return knownNines().then(function (known) { return { res: res, known: known }; });
+      }).then(function (got) {
+        var res = got.res;
+        var read = NMCardRead.fromNines(res.read, names, draft.clubNines, got.known);
         if (read) read.order = ((res.read && res.read.nines) || []).map(function (x) { return String((x && x.name) || "").toLowerCase(); }); // the card's nines, left to right
         if (!read) {
           var found = ((res.read && res.read.nines) || []).map(function (x) { return x && x.name; }).filter(Boolean);
@@ -661,6 +664,17 @@
         return closes.reduce(function (read, close, i) { return close ? NMCardRead.mergeCloseUp(read, sides[i], close) : read; }, res.read);
       });
     }); }
+  }
+
+  // What the course has for each nine played, to match the card's nines by their numbers: for two nines played as one,
+  // each nine's own course (OpenGolfAPI's Bear and Elk), not the joined copy, which a wrong card could have changed;
+  // a single nine: the course itself. [{ par, yards: [per tee] }] (empty when not to be had)
+  function knownNines() {
+    var c = draft, of = function (x) { return { par: x.par.slice(0, 9), yards: (x.tees || []).map(function (t) { return (t.yards || []).slice(0, 9); }) }; };
+    if (!c.nines) return Promise.resolve([of(c)]);
+    // OpenGolfAPI's own numbers for an OpenGolfAPI nine (a copy kept here could hold a wrong card's), else its course
+    return Promise.all(c.nines.map(function (id) { return (/^api:/.test(id) ? apiCourse(id.slice(4)) : loadCourse(id)).catch(function () { return null; }); }))
+      .then(function (cs) { return cs.map(function (x) { return x && x.holes === 9 ? of(x) : null; }); });
   }
 
   // a quick fingerprint of a picture's data (FNV-1a), to know a card uploaded before
