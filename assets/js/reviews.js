@@ -161,8 +161,9 @@
     var date = new Date(d + "T00:00:00");
     return isNaN(date) ? "" : date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   }
-  var opens = !!document.querySelector('script[src*="film-dialog"]'); // rows open a case only where there are cases (Movies)
   function renderArchive(el) {
+    // rows open a case only where there are cases (Movies); checked now, since film-dialog.js loads after this file
+    var opens = !!document.querySelector('script[src*="film-dialog"]');
     var a = el.nmArchive;
     var seen = {};
     // the section's own posters past its newest 8 (6 on a phone) come first, then what the Worker has archived
