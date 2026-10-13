@@ -133,8 +133,11 @@
       }
       // a "PLAYER" or "INITIAL" column the same width as a hole, just before hole 1 or 10: fewer of the row lines cross
       // it than cross the holes
+      // ... but never the column right after the card's label column (its first wide column): that's hole 1 (Branson
+      // Hills' hole 1 is crossed a little less, beside its rating column, and was dropped, shifting every score)
       var runCross = run.map(function (c) { return c[2]; }).sort(function (a, b) { return a - b; })[run.length >> 1];
-      while (run.length > 9 && run[0][2] < runCross * 0.85) { run.shift(); i2++; }
+      var afterLabels = i2 > 0 && wid(cols[i2 - 1]) > med * 1.6 && cols.slice(0, i2 - 1).every(function (c) { return wid(c) <= med * 1.6; });
+      while (!afterLabels && run.length > 9 && run[0][2] < runCross * 0.85) { run.shift(); i2++; }
       if (run.length >= 9 && med > 14) {
         // nine holes, then that nine's total (Out / In / TOT 9), and again for a second nine in the same run
         var k = 0;
