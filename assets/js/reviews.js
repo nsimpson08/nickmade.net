@@ -118,7 +118,7 @@
         "</h2>" : "") +
       body(sec) +
       (capped(sec) ? '<div class="cap-more" hidden><button type="button" class="cap-toggle" aria-expanded="false"></button></div>' : "") +
-      (sec.live === "watched" && sec.title && sec.archive !== false // only Recently Watched/Played have an Archive (filled by live.js); archive: false turns it off (Games, 1.3)
+      (sec.live === "watched" && sec.title && sec.archive !== false // only Recently Watched/Played have an Archive (filled by live.js); archive: false turns it off
         ? '<div class="archive"><button type="button" class="archive-toggle" aria-expanded="false">Archive</button>' +
           '<div class="archive-panel" hidden></div></div>'
         : "") +
@@ -161,6 +161,7 @@
     var date = new Date(d + "T00:00:00");
     return isNaN(date) ? "" : date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   }
+  var opens = !!document.querySelector('script[src*="film-dialog"]'); // rows open a case only where there are cases (Movies)
   function renderArchive(el) {
     var a = el.nmArchive;
     var seen = {};
@@ -173,10 +174,11 @@
     panel.innerHTML = all.length
       ? '<ol class="archive-list">' + all.map(function (it) {
           // each one opens its card on the Movies page (film-dialog.js), with Nick's rating and review in it
-          var data = it.title ? ' class="archive-item"' + (it.imdbId ? ' data-imdb="' + esc(it.imdbId) + '"' : "") + ' data-film-title="' + esc(it.title) + '"' +
+          var data = it.title ? (opens ? ' class="archive-item"' : "") + (it.imdbId ? ' data-imdb="' + esc(it.imdbId) + '"' : "") + ' data-film-title="' + esc(it.title) + '"' +
             (it.year ? ' data-year="' + esc(it.year) + '"' : "") + (it.image ? ' data-image="' + esc(it.image) + '"' : "") +
             (it.rating ? ' data-rating="' + esc(it.rating) + '"' : "") + (it.review ? ' data-review="' + esc(it.review) + '"' : "") +
             (it.where ? ' data-where="' + esc(it.where) + '"' : "") + (it.watch ? ' data-watch="' + esc(it.watch) + '"' : "") +
+            (it.date ? ' data-date="' + esc(it.date) + '"' : "") + // the date watched, shown in its case too
             (it.suggestedBy ? ' data-by="' + esc(it.suggestedBy) + '"' : "") + (it.comment ? ' data-note="' + esc(it.comment) + '"' + (it.commentPrivate ? " data-note-private" : "") : "") +
             (it.watchedWith ? ' data-with="' + esc(it.watchedWith) + '"' : "") : ""; // (only the owner's Archive has it)
           return "<li" + data + "><span class=\"t\">" + esc(it.title) + "</span>" + (it.year ? ' <span class="y">' + esc(it.year) + "</span>" : "") +

@@ -40,7 +40,6 @@ window.SECTIONS = [
     live: "watched",
     title: "Recently Played",
     subtitle: "",
-    archive: false, // no Archive link under it (older games are still kept by the Worker)
     layout: "grid",
     items: []
   },

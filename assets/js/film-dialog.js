@@ -62,7 +62,7 @@
       return {
         fig: row, title: rt, year: row.dataset.year || "", imdb: row.dataset.imdb || "", image: posterSrc(row.dataset.image),
         rating: row.dataset.rating || "", mine: row.dataset.review || "", with: row.dataset.with || "", where: row.dataset.where || "", watch: row.dataset.watch || "",
-        by: row.dataset.by || "", note: row.dataset.note || "", notePrivate: row.hasAttribute("data-note-private"),
+        by: row.dataset.by || "", note: row.dataset.note || "", notePrivate: row.hasAttribute("data-note-private"), date: row.dataset.date || "",
         review: rr && rr.classList.contains("entry") ? rr.id : "",
       };
     }
@@ -83,12 +83,17 @@
       by: fig.classList.contains("poster") ? (fig.querySelector(".suggested-by") || { textContent: "" }).textContent.replace(/^Suggested by /, "").trim() : "",
       note: fig.classList.contains("poster") ? (fig.querySelector(".suggest-comment") || { textContent: "" }).textContent.trim() : "",
       notePrivate: !!fig.querySelector(".suggest-comment.private"),
+      date: fig.nmItem && fig.nmItem.date || "", // the date watched (a Recently Watched card keeps its item, live.js)
       fig: fig, title: title.trim(), year: year, imdb: fig.dataset.imdb || "",
       image: img ? img.currentSrc || img.src : "",
       review: review && review.classList.contains("entry") && review !== fig ? review.id : "",
     };
   }
 
+  function watchedDate(d) {
+    var x = /^\d{4}-\d{2}-\d{2}$/.test(d || "") ? new Date(d + "T00:00:00") : null;
+    return x && !isNaN(x) ? x.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
+  }
   function render(f, d) {
     var where = window.NMWhere && NMWhere[f.where]; // where Nick watched it (live.js)
     var watch = window.NMWatch && NMWatch[f.watch]; // a 1st watch or a rewatch (live.js)
@@ -108,11 +113,15 @@
           return i === facts.length - 1 && d && d.rated && x === d.rated ? '<span class="rated">' + esc(x) + "</span>" : esc(x);
         }).join(" · ") + "</p>" : "") +
         // Nick's own rating and short review (Recently Watched and its Archive)
-        (f.rating || f.mine || f.with || where || watch || f.by ? '<div class="film-mine"><p class="film-mine-head">My take' +
+        (f.rating || f.mine || f.with || where || watch || f.by || f.date ? '<div class="film-mine"><p class="film-mine-head">My take' +
           (/^[\d.]+$/.test(f.rating) ? " " + stars(f.rating) : "") + "</p>" +
           (f.mine ? "<p>" + esc(f.mine) + "</p>" : "") +
-          (watch || where ? '<p class="film-where">' + (watch ? watch.icon + "<span>" + watch.label + "</span>" : "") +
-            (watch && where ? '<span class="film-where-sep" aria-hidden="true">·</span>' : "") + (where ? where.icon + "<span>" + where.label + "</span>" : "") + "</p>" : "") +
+          // when (the date watched, kept in the Archive too), then a 1st watch or rewatch, then home or theater
+          (watch || where || watchedDate(f.date) ? '<p class="film-where">' + [
+            watchedDate(f.date) ? "<span>Watched " + esc(watchedDate(f.date)) + "</span>" : "",
+            watch ? watch.icon + "<span>" + watch.label + "</span>" : "",
+            where ? where.icon + "<span>" + where.label + "</span>" : "",
+          ].filter(Boolean).join('<span class="film-where-sep" aria-hidden="true">·</span>') + "</p>" : "") +
           (f.with ? '<p class="film-with" title="Only you see this">Watched with ' + esc(f.with) + "</p>" : "") +
           (f.by ? '<p class="film-sugg">Suggested by ' + esc(f.by) + (f.note ? ': <q>' + esc(f.note) + "</q>" + (f.notePrivate ? ' <span class="film-sugg-private">(just for you)</span>' : "") : "") + "</p>" : "") +
           "</div>" : "") +
