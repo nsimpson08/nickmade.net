@@ -499,6 +499,8 @@ html.wall-bg-on .topbar nav a[href="/play/"]::before { background: rgba(255, 255
 .trend-tip-meta { display: flex; align-items: center; gap: 6px; font-size: 0.72rem; }
 .trend-tip-meta i { width: 12px; height: 2px; border-radius: 1px; }
 .round.flash { animation: round-flash 1.6s ease-out; }
+/* the Score Trend's dot for a round on the course jumps to its scorecard picture: the same flash, on the picture */
+.round-tile.flash .round-tile-card, .round-tile.ready.flash .round-tile-card { animation: round-flash 1.6s ease-out; }
 /* Golf page On the course: each round as its scorecard image (golf.js cardTile), tap to open it full screen */
 .rounds.rounds-cards { grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 18px; }
 /* Trackman and X-Golf: the newest 8, the rest behind Archive (golf.js) */

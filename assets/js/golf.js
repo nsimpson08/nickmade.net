@@ -436,11 +436,8 @@
       data.course = rounds;
       // the handicap index from these rounds (World Handicap System, worked out by the Worker): over the On the
       // course summary, like X-Golf's
-      if (hc && hc.index != null) {
-        var latest = (hc.rounds || []).filter(function (x) { return x.differential != null; })[0];
-        data.courseStats = { headline: [["Handicap", hc.index.toFixed(1)]],
-          stats: [["Counting", "best " + hc.counted + " of " + hc.of + " rounds"]].concat(latest ? [["Latest differential", String(latest.differential)]] : []) };
-      }
+      // just the number, with the others across the top (Nick, 2026-10-12: no box of "Counting" / "Latest differential")
+      if (hc && hc.index != null) data.courseStats = { headline: [["Handicap", hc.index.toFixed(1)]] };
       scorecardOpen = open;
       render();
       lastW = chartBox ? chartBox.clientWidth : 0;
