@@ -40,8 +40,9 @@ Personal site, served by GitHub Pages from the root of `main`. Plain HTML, no bu
   `photography/originals/<film|pixel|cats>/` (not published), then run `python3 tools/photos.py`. It makes
   metadata-free copies (location, camera data and phones' hidden extra images removed; only an artist and
   copyright tag added), smaller versions in `photography/sizes/`, and `photography/photos.js`. The full-resolution
-  copies are too big for GitHub Pages, so the script uploads them to Cloudflare R2 (bucket `nickmade-photos`,
-  served at photos.nickmade.net) with wrangler instead of committing them. Sections, the Instagram username and the
+  copies and the smaller versions are too big for GitHub Pages, so the script uploads both to Cloudflare R2 (bucket
+  `nickmade-photos`, served at photos.nickmade.net; the smaller ones under `sizes/`) with wrangler instead of
+  committing them. Only the wall thumbnails (`photography/thumbs/`) stay in the repo. Sections, the Instagram username and the
   R2 address are set in `photography/config.js`. The page opens in a slideshow (one big photo, thumbnails beside it);
   1, 2 and 4 columns are in the layout toggle. In owner mode photos can also be added from a phone (to Pixel or Cats)
   or removed (`assets/js/photo-upload.js`; stored by the Worker in R2 and KV, not in this repo); new ones are marked

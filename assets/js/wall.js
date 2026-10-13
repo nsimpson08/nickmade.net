@@ -273,6 +273,8 @@
     if (m) return m[1] + "thumbs/" + m[2] + ".webp";
     m = /^(.*\/photography\/)sizes\/([^/?#]+)-\d+\.jpg$/i.exec(src);
     if (m) return m[1] + "thumbs/" + m[2] + ".webp";
+    m = /^https:\/\/photos\.nickmade\.net\/sizes\/([^/?#]+)-\d+\.jpg$/i.exec(src); // the sizes on R2; their thumbs stay here
+    if (m) return "/photography/thumbs/" + m[1] + ".webp";
     m = /^(.*\/site\/[a-z]+-\d{8}-[0-9a-f]{6})-\d+\.jpg$/.exec(src); // a photo added on the site (1.4): its own thumb
     if (m) return m[1] + "-thumb.webp";
     m = /^(.*\/img\?u=)(.+)$/.exec(src);

@@ -245,7 +245,7 @@
     function thumbOf(p) { // tools/thumbs.py's 400px copy of the 800px size (a site-added photo has its own)
       if (p.thumb) return p.thumb;
       var small = p.sizes.length ? p.sizes[0].src : p.src;
-      return small.replace(/^sizes\/(.+)-\d+\.jpg$/, "thumbs/$1.webp");
+      return small.replace(/^(?:.*\/)?sizes\/(.+)-\d+\.jpg$/, "thumbs/$1.webp"); // the sizes are on R2, the thumbs here
     }
     function slideshow() {
       if (ss) return slideTo(ssAt);

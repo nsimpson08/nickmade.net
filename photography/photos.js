@@ -10,19 +10,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r01-k400-16-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r01-k400-16-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r01-k400-16-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r01-k400-16-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r01-k400-16-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r01-k400-16-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/r01-k400-16-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r01-k400-16-3600.jpg"
       }
     ]
   },
@@ -36,19 +36,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r01-k400-11-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r01-k400-11-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r01-k400-11-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r01-k400-11-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r01-k400-11-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r01-k400-11-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/r01-k400-11-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r01-k400-11-3600.jpg"
       }
     ]
   },
@@ -62,19 +62,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r01-k400-02-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r01-k400-02-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r01-k400-02-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r01-k400-02-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r01-k400-02-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r01-k400-02-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/r01-k400-02-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r01-k400-02-3600.jpg"
       }
     ]
   },
@@ -88,19 +88,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20261001-003513280-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20261001-003513280-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20261001-003513280-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20261001-003513280-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20261001-003513280-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20261001-003513280-mp-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20261001-003513280-mp-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20261001-003513280-mp-2-3600.jpg"
       }
     ]
   },
@@ -114,15 +114,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/olympus-collection-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/olympus-collection-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/olympus-collection-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/olympus-collection-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/olympus-collection-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/olympus-collection-2400.jpg"
       }
     ]
   },
@@ -136,11 +136,11 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20260923-153643474-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260923-153643474-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20260923-153643474-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260923-153643474-mp-2-1600.jpg"
       }
     ]
   },
@@ -154,11 +154,11 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20260906-000200815-night-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260906-000200815-night-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20260906-000200815-night-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260906-000200815-night-2-1600.jpg"
       }
     ]
   },
@@ -172,19 +172,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20260904-225933964-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260904-225933964-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20260904-225933964-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260904-225933964-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20260904-225933964-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260904-225933964-mp-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20260904-225933964-mp-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260904-225933964-mp-2-3600.jpg"
       }
     ]
   },
@@ -198,19 +198,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20260902-173558513-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260902-173558513-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20260902-173558513-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260902-173558513-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20260902-173558513-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260902-173558513-mp-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20260902-173558513-mp-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260902-173558513-mp-2-3600.jpg"
       }
     ]
   },
@@ -224,19 +224,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20260902-171133738-mp-3-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260902-171133738-mp-3-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20260902-171133738-mp-3-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260902-171133738-mp-3-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20260902-171133738-mp-3-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260902-171133738-mp-3-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20260902-171133738-mp-3-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260902-171133738-mp-3-3600.jpg"
       }
     ]
   },
@@ -250,19 +250,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20260831-210558117-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260831-210558117-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20260831-210558117-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260831-210558117-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20260831-210558117-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260831-210558117-mp-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20260831-210558117-mp-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260831-210558117-mp-2-3600.jpg"
       }
     ]
   },
@@ -276,11 +276,11 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20260831-015250582-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260831-015250582-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20260831-015250582-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260831-015250582-mp-2-1600.jpg"
       }
     ]
   },
@@ -294,11 +294,11 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20260828-040304890-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260828-040304890-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20260828-040304890-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260828-040304890-mp-2-1600.jpg"
       }
     ]
   },
@@ -312,15 +312,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20260725-221143665-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260725-221143665-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20260725-221143665-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260725-221143665-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20260725-221143665-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260725-221143665-2-2400.jpg"
       }
     ]
   },
@@ -334,11 +334,11 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20260623-194138954-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260623-194138954-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20260623-194138954-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260623-194138954-mp-2-1600.jpg"
       }
     ]
   },
@@ -352,19 +352,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20260623-192854610-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260623-192854610-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20260623-192854610-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260623-192854610-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20260623-192854610-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260623-192854610-mp-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20260623-192854610-mp-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260623-192854610-mp-2-3600.jpg"
       }
     ]
   },
@@ -378,19 +378,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20260621-183229021-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260621-183229021-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20260621-183229021-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260621-183229021-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20260621-183229021-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260621-183229021-mp-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20260621-183229021-mp-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260621-183229021-mp-2-3600.jpg"
       }
     ]
   },
@@ -404,11 +404,11 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20260508-225315120-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260508-225315120-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20260508-225315120-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260508-225315120-mp-2-1600.jpg"
       }
     ]
   },
@@ -422,15 +422,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r32-c800-18-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r32-c800-18-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r32-c800-18-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r32-c800-18-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r32-c800-18-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r32-c800-18-2400.jpg"
       }
     ]
   },
@@ -444,15 +444,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r29-k100-35-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-35-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r29-k100-35-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-35-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r29-k100-35-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-35-2400.jpg"
       }
     ]
   },
@@ -466,15 +466,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r29-k100-34-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-34-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r29-k100-34-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-34-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r29-k100-34-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-34-2400.jpg"
       }
     ]
   },
@@ -488,15 +488,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r29-k100-33-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-33-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r29-k100-33-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-33-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r29-k100-33-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-33-2400.jpg"
       }
     ]
   },
@@ -510,15 +510,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r29-k100-28-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-28-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r29-k100-28-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-28-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r29-k100-28-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-28-2400.jpg"
       }
     ]
   },
@@ -532,15 +532,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r29-k100-27-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-27-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r29-k100-27-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-27-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r29-k100-27-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-27-2400.jpg"
       }
     ]
   },
@@ -554,15 +554,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r29-k100-25-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-25-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r29-k100-25-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-25-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r29-k100-25-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-25-2400.jpg"
       }
     ]
   },
@@ -576,15 +576,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r29-k100-23-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-23-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r29-k100-23-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-23-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r29-k100-23-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-23-2400.jpg"
       }
     ]
   },
@@ -598,15 +598,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r29-k100-18-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-18-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r29-k100-18-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-18-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r29-k100-18-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-18-2400.jpg"
       }
     ]
   },
@@ -620,15 +620,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r29-k100-17-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-17-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r29-k100-17-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-17-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r29-k100-17-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-17-2400.jpg"
       }
     ]
   },
@@ -642,15 +642,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r29-k100-15-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-15-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r29-k100-15-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-15-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r29-k100-15-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-15-2400.jpg"
       }
     ]
   },
@@ -664,15 +664,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r29-k100-05-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-05-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r29-k100-05-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-05-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r29-k100-05-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-05-2400.jpg"
       }
     ]
   },
@@ -686,15 +686,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r29-k100-04-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-04-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r29-k100-04-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-04-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r29-k100-04-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-04-2400.jpg"
       }
     ]
   },
@@ -708,15 +708,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r29-k100-02-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-02-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r29-k100-02-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-02-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r29-k100-02-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-02-2400.jpg"
       }
     ]
   },
@@ -730,11 +730,11 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r29-k100-01-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-01-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r29-k100-01-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r29-k100-01-1600.jpg"
       }
     ]
   },
@@ -748,15 +748,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r30-k200-33-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r30-k200-33-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r30-k200-33-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r30-k200-33-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r30-k200-33-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r30-k200-33-2400.jpg"
       }
     ]
   },
@@ -770,15 +770,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r30-k200-26-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r30-k200-26-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r30-k200-26-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r30-k200-26-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r30-k200-26-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r30-k200-26-2400.jpg"
       }
     ]
   },
@@ -792,15 +792,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r30-k200-11-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r30-k200-11-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r30-k200-11-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r30-k200-11-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r30-k200-11-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r30-k200-11-2400.jpg"
       }
     ]
   },
@@ -814,15 +814,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r30-k200-05-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r30-k200-05-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r30-k200-05-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r30-k200-05-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r30-k200-05-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r30-k200-05-2400.jpg"
       }
     ]
   },
@@ -836,15 +836,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r30-k200-03-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r30-k200-03-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r30-k200-03-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r30-k200-03-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r30-k200-03-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r30-k200-03-2400.jpg"
       }
     ]
   },
@@ -858,19 +858,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20260320-020647127-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260320-020647127-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20260320-020647127-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260320-020647127-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20260320-020647127-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260320-020647127-mp-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20260320-020647127-mp-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260320-020647127-mp-2-3600.jpg"
       }
     ]
   },
@@ -884,15 +884,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20260320-020059807-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260320-020059807-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20260320-020059807-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260320-020059807-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20260320-020059807-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260320-020059807-mp-2-2400.jpg"
       }
     ]
   },
@@ -906,15 +906,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20260320-020047890-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260320-020047890-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20260320-020047890-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260320-020047890-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20260320-020047890-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260320-020047890-mp-2-2400.jpg"
       }
     ]
   },
@@ -928,19 +928,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20260319-022615956-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260319-022615956-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20260319-022615956-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260319-022615956-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20260319-022615956-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260319-022615956-mp-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20260319-022615956-mp-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260319-022615956-mp-2-3600.jpg"
       }
     ]
   },
@@ -954,19 +954,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20260317-193444649-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260317-193444649-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20260317-193444649-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260317-193444649-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20260317-193444649-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260317-193444649-mp-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20260317-193444649-mp-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260317-193444649-mp-2-3600.jpg"
       }
     ]
   },
@@ -980,15 +980,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20260315-235057601-mp-3-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260315-235057601-mp-3-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20260315-235057601-mp-3-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260315-235057601-mp-3-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20260315-235057601-mp-3-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260315-235057601-mp-3-2400.jpg"
       }
     ]
   },
@@ -1002,19 +1002,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20260315-025942017-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260315-025942017-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20260315-025942017-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260315-025942017-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20260315-025942017-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260315-025942017-mp-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20260315-025942017-mp-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260315-025942017-mp-2-3600.jpg"
       }
     ]
   },
@@ -1028,19 +1028,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20260314-211816032-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260314-211816032-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20260314-211816032-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260314-211816032-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20260314-211816032-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260314-211816032-mp-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20260314-211816032-mp-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260314-211816032-mp-2-3600.jpg"
       }
     ]
   },
@@ -1054,15 +1054,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20260124-011559729-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260124-011559729-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20260124-011559729-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260124-011559729-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20260124-011559729-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20260124-011559729-mp-2-2400.jpg"
       }
     ]
   },
@@ -1076,15 +1076,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r25-f400-27-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r25-f400-27-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r25-f400-27-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r25-f400-27-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r25-f400-27-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r25-f400-27-2400.jpg"
       }
     ]
   },
@@ -1098,19 +1098,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r26-k400-37-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r26-k400-37-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r26-k400-37-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r26-k400-37-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r26-k400-37-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r26-k400-37-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/r26-k400-37-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r26-k400-37-3600.jpg"
       }
     ]
   },
@@ -1124,19 +1124,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r26-k400-21-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r26-k400-21-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r26-k400-21-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r26-k400-21-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r26-k400-21-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r26-k400-21-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/r26-k400-21-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r26-k400-21-3600.jpg"
       }
     ]
   },
@@ -1150,19 +1150,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r26-k400-17-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r26-k400-17-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r26-k400-17-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r26-k400-17-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r26-k400-17-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r26-k400-17-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/r26-k400-17-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r26-k400-17-3600.jpg"
       }
     ]
   },
@@ -1176,19 +1176,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r26-k400-09-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r26-k400-09-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r26-k400-09-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r26-k400-09-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r26-k400-09-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r26-k400-09-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/r26-k400-09-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r26-k400-09-3600.jpg"
       }
     ]
   },
@@ -1202,19 +1202,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r26-k400-08-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r26-k400-08-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r26-k400-08-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r26-k400-08-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r26-k400-08-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r26-k400-08-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/r26-k400-08-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r26-k400-08-3600.jpg"
       }
     ]
   },
@@ -1228,19 +1228,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r26-k400-07-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r26-k400-07-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r26-k400-07-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r26-k400-07-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r26-k400-07-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r26-k400-07-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/r26-k400-07-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r26-k400-07-3600.jpg"
       }
     ]
   },
@@ -1254,19 +1254,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r26-k400-06-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r26-k400-06-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r26-k400-06-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r26-k400-06-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r26-k400-06-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r26-k400-06-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/r26-k400-06-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r26-k400-06-3600.jpg"
       }
     ]
   },
@@ -1280,19 +1280,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r27-e100-36-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r27-e100-36-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r27-e100-36-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r27-e100-36-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r27-e100-36-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r27-e100-36-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/r27-e100-36-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r27-e100-36-3600.jpg"
       }
     ]
   },
@@ -1306,19 +1306,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r27-e100-35-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r27-e100-35-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r27-e100-35-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r27-e100-35-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r27-e100-35-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r27-e100-35-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/r27-e100-35-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r27-e100-35-3600.jpg"
       }
     ]
   },
@@ -1332,19 +1332,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r27-e100-13-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r27-e100-13-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r27-e100-13-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r27-e100-13-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r27-e100-13-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r27-e100-13-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/r27-e100-13-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r27-e100-13-3600.jpg"
       }
     ]
   },
@@ -1358,19 +1358,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r27-e100-12-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r27-e100-12-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r27-e100-12-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r27-e100-12-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r27-e100-12-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r27-e100-12-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/r27-e100-12-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r27-e100-12-3600.jpg"
       }
     ]
   },
@@ -1384,19 +1384,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r27-e100-09-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r27-e100-09-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r27-e100-09-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r27-e100-09-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r27-e100-09-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r27-e100-09-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/r27-e100-09-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r27-e100-09-3600.jpg"
       }
     ]
   },
@@ -1410,19 +1410,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r27-e100-06-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r27-e100-06-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r27-e100-06-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r27-e100-06-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r27-e100-06-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r27-e100-06-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/r27-e100-06-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r27-e100-06-3600.jpg"
       }
     ]
   },
@@ -1436,19 +1436,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r27-e100-04-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r27-e100-04-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r27-e100-04-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r27-e100-04-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r27-e100-04-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r27-e100-04-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/r27-e100-04-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r27-e100-04-3600.jpg"
       }
     ]
   },
@@ -1462,15 +1462,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20251121-224421352-mp-3-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20251121-224421352-mp-3-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20251121-224421352-mp-3-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20251121-224421352-mp-3-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20251121-224421352-mp-3-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20251121-224421352-mp-3-2400.jpg"
       }
     ]
   },
@@ -1484,11 +1484,11 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20251121-175150617-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20251121-175150617-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20251121-175150617-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20251121-175150617-mp-2-1600.jpg"
       }
     ]
   },
@@ -1502,19 +1502,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20251121-175126593-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20251121-175126593-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20251121-175126593-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20251121-175126593-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20251121-175126593-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20251121-175126593-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20251121-175126593-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20251121-175126593-2-3600.jpg"
       }
     ]
   },
@@ -1528,19 +1528,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20251120-165038946-pano-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20251120-165038946-pano-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20251120-165038946-pano-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20251120-165038946-pano-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20251120-165038946-pano-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20251120-165038946-pano-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20251120-165038946-pano-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20251120-165038946-pano-2-3600.jpg"
       }
     ]
   },
@@ -1554,15 +1554,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r23-hp400-05-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r23-hp400-05-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r23-hp400-05-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r23-hp400-05-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r23-hp400-05-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r23-hp400-05-2400.jpg"
       }
     ]
   },
@@ -1576,11 +1576,11 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20251013-213801727-mp-3-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20251013-213801727-mp-3-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20251013-213801727-mp-3-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20251013-213801727-mp-3-1600.jpg"
       }
     ]
   },
@@ -1594,11 +1594,11 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20251013-145806922-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20251013-145806922-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20251013-145806922-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20251013-145806922-mp-2-1600.jpg"
       }
     ]
   },
@@ -1612,11 +1612,11 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20250824-174224415-mp-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20250824-174224415-mp-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20250824-174224415-mp-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20250824-174224415-mp-1600.jpg"
       }
     ]
   },
@@ -1630,15 +1630,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20250822-155831042-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20250822-155831042-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20250822-155831042-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20250822-155831042-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20250822-155831042-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20250822-155831042-mp-2-2400.jpg"
       }
     ]
   },
@@ -1652,19 +1652,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r21-k100-07-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r21-k100-07-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r21-k100-07-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r21-k100-07-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r21-k100-07-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r21-k100-07-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/r21-k100-07-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r21-k100-07-3600.jpg"
       }
     ]
   },
@@ -1678,19 +1678,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r21-k100-09-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r21-k100-09-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r21-k100-09-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r21-k100-09-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r21-k100-09-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r21-k100-09-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/r21-k100-09-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r21-k100-09-3600.jpg"
       }
     ]
   },
@@ -1704,19 +1704,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r21-k100-16-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r21-k100-16-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r21-k100-16-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r21-k100-16-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r21-k100-16-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r21-k100-16-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/r21-k100-16-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r21-k100-16-3600.jpg"
       }
     ]
   },
@@ -1730,19 +1730,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r21-k100-17-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r21-k100-17-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r21-k100-17-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r21-k100-17-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r21-k100-17-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r21-k100-17-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/r21-k100-17-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r21-k100-17-3600.jpg"
       }
     ]
   },
@@ -1756,19 +1756,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r21-k100-30-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r21-k100-30-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r21-k100-30-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r21-k100-30-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r21-k100-30-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r21-k100-30-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/r21-k100-30-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r21-k100-30-2-3600.jpg"
       }
     ]
   },
@@ -1782,15 +1782,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r20-k400-24-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r20-k400-24-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r20-k400-24-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r20-k400-24-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r20-k400-24-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r20-k400-24-2400.jpg"
       }
     ]
   },
@@ -1804,15 +1804,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r20-k400-23-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r20-k400-23-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r20-k400-23-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r20-k400-23-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r20-k400-23-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r20-k400-23-2400.jpg"
       }
     ]
   },
@@ -1826,15 +1826,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r19-c800-34-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r19-c800-34-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r19-c800-34-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r19-c800-34-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r19-c800-34-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r19-c800-34-2400.jpg"
       }
     ]
   },
@@ -1848,15 +1848,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r19-c800-31-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r19-c800-31-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r19-c800-31-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r19-c800-31-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r19-c800-31-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r19-c800-31-2400.jpg"
       }
     ]
   },
@@ -1870,15 +1870,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r16-kda100-24-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r16-kda100-24-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r16-kda100-24-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r16-kda100-24-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r16-kda100-24-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r16-kda100-24-2400.jpg"
       }
     ]
   },
@@ -1892,15 +1892,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r16-kda100-02-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r16-kda100-02-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r16-kda100-02-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r16-kda100-02-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r16-kda100-02-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r16-kda100-02-2400.jpg"
       }
     ]
   },
@@ -1914,15 +1914,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r15-k200-23-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r15-k200-23-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r15-k200-23-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r15-k200-23-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r15-k200-23-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r15-k200-23-2400.jpg"
       }
     ]
   },
@@ -1936,15 +1936,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r17-k400-28-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r17-k400-28-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r17-k400-28-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r17-k400-28-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r17-k400-28-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r17-k400-28-2400.jpg"
       }
     ]
   },
@@ -1958,15 +1958,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r17-k400-26-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r17-k400-26-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r17-k400-26-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r17-k400-26-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r17-k400-26-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r17-k400-26-2400.jpg"
       }
     ]
   },
@@ -1980,15 +1980,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r17-k400-23-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r17-k400-23-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r17-k400-23-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r17-k400-23-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r17-k400-23-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r17-k400-23-2400.jpg"
       }
     ]
   },
@@ -2002,15 +2002,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r17-k400-03-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r17-k400-03-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r17-k400-03-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r17-k400-03-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r17-k400-03-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r17-k400-03-2400.jpg"
       }
     ]
   },
@@ -2024,15 +2024,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r17-k400-02-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r17-k400-02-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r17-k400-02-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r17-k400-02-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r17-k400-02-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r17-k400-02-2400.jpg"
       }
     ]
   },
@@ -2046,15 +2046,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r11-wnc400-36-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r11-wnc400-36-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r11-wnc400-36-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r11-wnc400-36-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r11-wnc400-36-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r11-wnc400-36-2400.jpg"
       }
     ]
   },
@@ -2068,15 +2068,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r11-wnc400-21-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r11-wnc400-21-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r11-wnc400-21-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r11-wnc400-21-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r11-wnc400-21-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r11-wnc400-21-2400.jpg"
       }
     ]
   },
@@ -2090,15 +2090,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r11-wnc400-12-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r11-wnc400-12-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r11-wnc400-12-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r11-wnc400-12-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r11-wnc400-12-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r11-wnc400-12-2400.jpg"
       }
     ]
   },
@@ -2112,15 +2112,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r13-f400-22-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r13-f400-22-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r13-f400-22-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r13-f400-22-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r13-f400-22-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r13-f400-22-2400.jpg"
       }
     ]
   },
@@ -2134,15 +2134,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r13-f400-06-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r13-f400-06-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r13-f400-06-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r13-f400-06-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r13-f400-06-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r13-f400-06-2400.jpg"
       }
     ]
   },
@@ -2156,15 +2156,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r14-f400-12-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r14-f400-12-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r14-f400-12-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r14-f400-12-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r14-f400-12-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r14-f400-12-2400.jpg"
       }
     ]
   },
@@ -2178,15 +2178,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r14-f400-13-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r14-f400-13-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r14-f400-13-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r14-f400-13-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r14-f400-13-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r14-f400-13-2400.jpg"
       }
     ]
   },
@@ -2200,11 +2200,11 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20250223-064222151-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20250223-064222151-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20250223-064222151-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20250223-064222151-mp-2-1600.jpg"
       }
     ]
   },
@@ -2218,15 +2218,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r10-k800-28-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r10-k800-28-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r10-k800-28-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r10-k800-28-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r10-k800-28-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r10-k800-28-2400.jpg"
       }
     ]
   },
@@ -2240,11 +2240,11 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20250115-034636492-mp-3-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20250115-034636492-mp-3-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20250115-034636492-mp-3-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20250115-034636492-mp-3-1600.jpg"
       }
     ]
   },
@@ -2258,15 +2258,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r05-f100-24-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r05-f100-24-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r05-f100-24-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r05-f100-24-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r05-f100-24-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r05-f100-24-2400.jpg"
       }
     ]
   },
@@ -2280,15 +2280,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r07-k400-10-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r07-k400-10-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r07-k400-10-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r07-k400-10-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r07-k400-10-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r07-k400-10-2400.jpg"
       }
     ]
   },
@@ -2302,15 +2302,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r07-k400-05-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r07-k400-05-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r07-k400-05-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r07-k400-05-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r07-k400-05-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r07-k400-05-2400.jpg"
       }
     ]
   },
@@ -2324,19 +2324,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20250113-031617203-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20250113-031617203-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20250113-031617203-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20250113-031617203-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20250113-031617203-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20250113-031617203-mp-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20250113-031617203-mp-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20250113-031617203-mp-2-3600.jpg"
       }
     ]
   },
@@ -2350,15 +2350,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r02-k400-34-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r02-k400-34-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r02-k400-34-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r02-k400-34-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r02-k400-34-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r02-k400-34-2400.jpg"
       }
     ]
   },
@@ -2372,15 +2372,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r02-k400-12-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r02-k400-12-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r02-k400-12-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r02-k400-12-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r02-k400-12-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r02-k400-12-2400.jpg"
       }
     ]
   },
@@ -2394,15 +2394,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r03-k200-23-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r03-k200-23-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r03-k200-23-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r03-k200-23-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r03-k200-23-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r03-k200-23-2400.jpg"
       }
     ]
   },
@@ -2416,15 +2416,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r03-k200-10-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r03-k200-10-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r03-k200-10-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r03-k200-10-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r03-k200-10-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r03-k200-10-2400.jpg"
       }
     ]
   },
@@ -2438,15 +2438,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/r03-k200-05-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/r03-k200-05-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/r03-k200-05-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/r03-k200-05-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/r03-k200-05-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/r03-k200-05-2400.jpg"
       }
     ]
   },
@@ -2460,19 +2460,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20241027-175523483-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20241027-175523483-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20241027-175523483-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20241027-175523483-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20241027-175523483-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20241027-175523483-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20241027-175523483-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20241027-175523483-2-3600.jpg"
       }
     ]
   },
@@ -2486,15 +2486,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20241022-003757573-3-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20241022-003757573-3-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20241022-003757573-3-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20241022-003757573-3-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20241022-003757573-3-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20241022-003757573-3-2400.jpg"
       }
     ]
   },
@@ -2508,19 +2508,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20241008-205032594-pano-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20241008-205032594-pano-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20241008-205032594-pano-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20241008-205032594-pano-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20241008-205032594-pano-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20241008-205032594-pano-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20241008-205032594-pano-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20241008-205032594-pano-2-3600.jpg"
       }
     ]
   },
@@ -2534,19 +2534,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20241008-203848192-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20241008-203848192-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20241008-203848192-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20241008-203848192-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20241008-203848192-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20241008-203848192-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20241008-203848192-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20241008-203848192-2-3600.jpg"
       }
     ]
   },
@@ -2560,19 +2560,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20241007-215521809-3-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20241007-215521809-3-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20241007-215521809-3-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20241007-215521809-3-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20241007-215521809-3-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20241007-215521809-3-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20241007-215521809-3-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20241007-215521809-3-3600.jpg"
       }
     ]
   },
@@ -2586,19 +2586,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20240831-162841525-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240831-162841525-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20240831-162841525-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240831-162841525-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20240831-162841525-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240831-162841525-mp-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20240831-162841525-mp-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240831-162841525-mp-2-3600.jpg"
       }
     ]
   },
@@ -2612,19 +2612,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20240831-154845492-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240831-154845492-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20240831-154845492-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240831-154845492-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20240831-154845492-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240831-154845492-mp-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20240831-154845492-mp-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240831-154845492-mp-2-3600.jpg"
       }
     ]
   },
@@ -2638,19 +2638,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20240831-164820857-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240831-164820857-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20240831-164820857-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240831-164820857-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20240831-164820857-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240831-164820857-mp-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20240831-164820857-mp-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240831-164820857-mp-2-3600.jpg"
       }
     ]
   },
@@ -2664,19 +2664,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20240831-161229441-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240831-161229441-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20240831-161229441-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240831-161229441-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20240831-161229441-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240831-161229441-mp-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20240831-161229441-mp-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240831-161229441-mp-2-3600.jpg"
       }
     ]
   },
@@ -2690,19 +2690,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20240831-154954440-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240831-154954440-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20240831-154954440-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240831-154954440-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20240831-154954440-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240831-154954440-mp-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20240831-154954440-mp-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240831-154954440-mp-2-3600.jpg"
       }
     ]
   },
@@ -2716,19 +2716,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20240830-224316966-mp-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240830-224316966-mp-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20240830-224316966-mp-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240830-224316966-mp-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20240830-224316966-mp-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240830-224316966-mp-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20240830-224316966-mp-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240830-224316966-mp-3600.jpg"
       }
     ]
   },
@@ -2742,19 +2742,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20240830-223829009-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240830-223829009-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20240830-223829009-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240830-223829009-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20240830-223829009-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240830-223829009-mp-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20240830-223829009-mp-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240830-223829009-mp-2-3600.jpg"
       }
     ]
   },
@@ -2768,19 +2768,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20240830-223829827-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240830-223829827-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20240830-223829827-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240830-223829827-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20240830-223829827-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240830-223829827-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20240830-223829827-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240830-223829827-2-3600.jpg"
       }
     ]
   },
@@ -2794,19 +2794,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20240830-212707057-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240830-212707057-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20240830-212707057-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240830-212707057-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20240830-212707057-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240830-212707057-mp-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20240830-212707057-mp-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240830-212707057-mp-2-3600.jpg"
       }
     ]
   },
@@ -2820,19 +2820,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20240830-190501691-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240830-190501691-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20240830-190501691-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240830-190501691-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20240830-190501691-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240830-190501691-mp-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20240830-190501691-mp-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240830-190501691-mp-2-3600.jpg"
       }
     ]
   },
@@ -2846,19 +2846,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20240830-180514809-mp-2-effects-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240830-180514809-mp-2-effects-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20240830-180514809-mp-2-effects-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240830-180514809-mp-2-effects-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20240830-180514809-mp-2-effects-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240830-180514809-mp-2-effects-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20240830-180514809-mp-2-effects-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240830-180514809-mp-2-effects-3600.jpg"
       }
     ]
   },
@@ -2872,15 +2872,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20240826-205815051-portrait-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240826-205815051-portrait-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20240826-205815051-portrait-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240826-205815051-portrait-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20240826-205815051-portrait-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240826-205815051-portrait-2-2400.jpg"
       }
     ]
   },
@@ -2894,15 +2894,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20240723-163330599-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240723-163330599-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20240723-163330599-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240723-163330599-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20240723-163330599-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240723-163330599-mp-2-2400.jpg"
       }
     ]
   },
@@ -2916,15 +2916,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20240617-223637514-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240617-223637514-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20240617-223637514-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240617-223637514-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20240617-223637514-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240617-223637514-mp-2-2400.jpg"
       }
     ]
   },
@@ -2938,15 +2938,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20240121-182956247-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240121-182956247-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20240121-182956247-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240121-182956247-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20240121-182956247-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240121-182956247-mp-2-2400.jpg"
       }
     ]
   },
@@ -2960,11 +2960,11 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20240112-214421189-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240112-214421189-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20240112-214421189-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20240112-214421189-mp-2-1600.jpg"
       }
     ]
   },
@@ -2978,15 +2978,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20231228-234353207-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20231228-234353207-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20231228-234353207-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20231228-234353207-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20231228-234353207-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20231228-234353207-mp-2-2400.jpg"
       }
     ]
   },
@@ -3000,15 +3000,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20231118-063438388-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20231118-063438388-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20231118-063438388-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20231118-063438388-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20231118-063438388-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20231118-063438388-mp-2-2400.jpg"
       }
     ]
   },
@@ -3022,11 +3022,11 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20231111-003620558-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20231111-003620558-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20231111-003620558-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20231111-003620558-mp-2-1600.jpg"
       }
     ]
   },
@@ -3040,19 +3040,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20231012-170159878-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20231012-170159878-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20231012-170159878-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20231012-170159878-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20231012-170159878-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20231012-170159878-mp-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20231012-170159878-mp-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20231012-170159878-mp-2-3600.jpg"
       }
     ]
   },
@@ -3066,15 +3066,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20231012-163514108-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20231012-163514108-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20231012-163514108-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20231012-163514108-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20231012-163514108-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20231012-163514108-mp-2-2400.jpg"
       }
     ]
   },
@@ -3088,15 +3088,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20231012-163507266-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20231012-163507266-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20231012-163507266-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20231012-163507266-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20231012-163507266-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20231012-163507266-mp-2-2400.jpg"
       }
     ]
   },
@@ -3110,19 +3110,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20231012-154730010-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20231012-154730010-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20231012-154730010-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20231012-154730010-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20231012-154730010-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20231012-154730010-mp-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20231012-154730010-mp-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20231012-154730010-mp-2-3600.jpg"
       }
     ]
   },
@@ -3136,19 +3136,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20231011-201936538-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20231011-201936538-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20231011-201936538-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20231011-201936538-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20231011-201936538-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20231011-201936538-mp-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20231011-201936538-mp-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20231011-201936538-mp-2-3600.jpg"
       }
     ]
   },
@@ -3162,19 +3162,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20231009-202208965-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20231009-202208965-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20231009-202208965-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20231009-202208965-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20231009-202208965-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20231009-202208965-mp-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20231009-202208965-mp-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20231009-202208965-mp-2-3600.jpg"
       }
     ]
   },
@@ -3188,19 +3188,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20230729-222733723-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20230729-222733723-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20230729-222733723-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20230729-222733723-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20230729-222733723-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20230729-222733723-mp-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20230729-222733723-mp-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20230729-222733723-mp-2-3600.jpg"
       }
     ]
   },
@@ -3214,15 +3214,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20230722-224726882-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20230722-224726882-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20230722-224726882-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20230722-224726882-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20230722-224726882-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20230722-224726882-mp-2-2400.jpg"
       }
     ]
   },
@@ -3236,19 +3236,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20230606-161834028-mp-2-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20230606-161834028-mp-2-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20230606-161834028-mp-2-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20230606-161834028-mp-2-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20230606-161834028-mp-2-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20230606-161834028-mp-2-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20230606-161834028-mp-2-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20230606-161834028-mp-2-3600.jpg"
       }
     ]
   },
@@ -3262,19 +3262,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20230511-174140740-mp-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20230511-174140740-mp-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20230511-174140740-mp-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20230511-174140740-mp-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20230511-174140740-mp-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20230511-174140740-mp-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20230511-174140740-mp-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20230511-174140740-mp-3600.jpg"
       }
     ]
   },
@@ -3288,15 +3288,15 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20230427-221307719-mp-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20230427-221307719-mp-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20230427-221307719-mp-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20230427-221307719-mp-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20230427-221307719-mp-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20230427-221307719-mp-2400.jpg"
       }
     ]
   },
@@ -3310,19 +3310,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20221221-232426274-pano-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20221221-232426274-pano-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20221221-232426274-pano-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20221221-232426274-pano-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20221221-232426274-pano-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20221221-232426274-pano-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20221221-232426274-pano-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20221221-232426274-pano-3600.jpg"
       }
     ]
   },
@@ -3336,19 +3336,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20220902-221203474-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20220902-221203474-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20220902-221203474-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20220902-221203474-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20220902-221203474-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20220902-221203474-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20220902-221203474-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20220902-221203474-3600.jpg"
       }
     ]
   },
@@ -3362,19 +3362,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20220430-174449365-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20220430-174449365-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20220430-174449365-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20220430-174449365-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20220430-174449365-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20220430-174449365-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20220430-174449365-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20220430-174449365-3600.jpg"
       }
     ]
   },
@@ -3388,19 +3388,19 @@ window.PHOTOS = [
     "sizes": [
       {
         "w": 800,
-        "src": "sizes/pxl-20220430-171243934-800.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20220430-171243934-800.jpg"
       },
       {
         "w": 1600,
-        "src": "sizes/pxl-20220430-171243934-1600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20220430-171243934-1600.jpg"
       },
       {
         "w": 2400,
-        "src": "sizes/pxl-20220430-171243934-2400.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20220430-171243934-2400.jpg"
       },
       {
         "w": 3600,
-        "src": "sizes/pxl-20220430-171243934-3600.jpg"
+        "src": "https://photos.nickmade.net/sizes/pxl-20220430-171243934-3600.jpg"
       }
     ]
   }
