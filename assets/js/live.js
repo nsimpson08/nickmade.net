@@ -86,8 +86,7 @@
           var a = document.createElement("a");
           a.href = l.href;
           a.textContent = l.label;
-          a.target = "_blank";
-          a.rel = "noopener noreferrer";
+          a.rel = "noreferrer"; // same tab, so Back returns here (Nick)
           bar.insertBefore(a, bar.lastElementChild);
         });
       })
