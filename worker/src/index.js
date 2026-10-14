@@ -16,7 +16,7 @@ import { scorecardRoute } from "./scorecard.js";
 //                               with Authorization: Bearer ADMIN_TOKEN it's Nick's own pick:
 //                               no name, no per-visitor limit, allowed past the cap
 //   GET    /admin/check         200 if the Authorization token is the admin token
-//   GET    /owner/links?page=   (admin) Nick's own links for that page's owner bar: { links: [{ label, href }] }
+//   GET    /owner/links?page=   (admin) Nick's own links for that page's owner bar (page=home too): { links: [{ label, href }] }
 //   PATCH  /queue/:imdbId       { page, visitorId, name, comment, commentPrivate } -> a visitor edits their own suggestion
 //   DELETE /queue/:imdbId       remove a submission: Nick (Authorization: Bearer ADMIN_TOKEN), or the visitor who suggested
 //                               it (?visitorId=), which also gives them that suggestion back
@@ -156,7 +156,7 @@ export default {
       }
       if (url.pathname === "/owner/links" && request.method === "GET") {
         if (!isAdmin(request, env)) return json({ error: "Unauthorized" }, 401, cors);
-        const page = pageOf(url.searchParams.get("page"));
+        const page = url.searchParams.get("page") === "home" ? "home" : pageOf(url.searchParams.get("page")); // Home has no queue, but has links
         const links = JSON.parse((await env.QUEUE.get("owner:links")) || "[]").filter((l) => (l.page || "movies") === page);
         return json({ links: links.map((l) => ({ label: l.label, href: l.href })) }, 200, cors);
       }

@@ -1632,6 +1632,7 @@ html.wall-bg-on .poster .xbox-stats .complete { text-shadow: none; filter: drop-
   color: var(--accent);
 }
 .owner-bar a { margin-left: 8px; color: var(--muted); }
+.banner .owner-bar.home-owner { margin: 14px 0 0; font-size: 0.8rem; color: var(--faint); } /* Home: under the banner (now.js) */
 /* Games, owner mode: "Refresh" from Xbox at the right of Recently Played's heading (live.js syncXbox) */
 .xbox-sync {
   margin-left: auto;

@@ -11,6 +11,32 @@
   var root = document.getElementById("now");
   if (!root) return;
 
+  // Owner mode: Nick's own links for Home (his private pages), kept in the Worker (GET /owner/links?page=home), so
+  // they're never in the site's code; a small line under the banner, only when he's signed in on this browser
+  (function ownerLinks() {
+    var token = null;
+    try { token = localStorage.getItem("nm-admin-token"); } catch (e) {}
+    if (!token || !API) return;
+    fetch(API + "/owner/links?page=home", { headers: { Authorization: "Bearer " + token } })
+      .then(function (r) { return r.ok ? r.json() : { links: [] }; })
+      .then(function (d) {
+        if (!d.links || !d.links.length) return;
+        var bar = document.createElement("p");
+        bar.className = "owner-bar home-owner";
+        bar.innerHTML = "<span>Owner mode</span>";
+        d.links.forEach(function (l) {
+          var a = document.createElement("a");
+          a.href = l.href;
+          a.textContent = l.label;
+          a.target = "_blank";
+          a.rel = "noopener noreferrer";
+          bar.appendChild(a);
+        });
+        root.parentNode.appendChild(bar);
+      })
+      .catch(function () {});
+  })();
+
   function esc(s) {
     return String(s).replace(/[&<>"']/g, function (c) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
