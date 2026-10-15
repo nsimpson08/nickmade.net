@@ -6,7 +6,7 @@
 // -100 to 100; romance, 0 to 100) and goes in the room's history. The page works out best friends, crushes, couples,
 // rivals and cliques from those numbers.
 //
-//   GET    /cats?visitorId=           { cats, rel, log, mine, mines (all of yours: several only for Nick), max, owner }: the room, how every pair of cats get on
+//   GET    /cats?visitorId=           { cats, rel, log, mine, mines (all of yours: up to CATS_EACH, plus kittens; any number for Nick), max, owner }: the room, how every pair of cats get on
 //                                     ({ "<id>|<id>": { f, r } }), the newest history first, and the id of this
 //                                     browser's cat (owner: Nick, with the admin token, can remove any cat)
 //   POST   /cats                      { visitorId, name, ownerName, gender ("f" | "m"), personality, look } -> makes a cat: { cat, code } (code: the recovery code)
@@ -24,8 +24,8 @@
 //   POST   /cats/tick                 (admin, for testing) a burst of cat life now: one meeting per cat at once
 // Cat life itself runs on each cat's own clock (live(): 5 min to 4 h apart, leaning long), played out on GET /cats and the cron.
 //
-// One cat per browser (the random id live.js and this page keep), and at most PER_IP cats from one internet connection,
-// so a household can still have a cat each. The recovery code lets the owner look after it from another device.
+// Two cats per browser (CATS_EACH; Nick, 2026-10-15: "every visitor should be allowed to add 2 cats instead of 1";
+// kittens don't count), and at most PER_IP cats from one internet connection, so a household can still have two each. The recovery code lets the owner look after it from another device.
 // Storage (the QUEUE namespace): cats:room  { v, cats, rel, log, tickAt }. Owners and IPs are kept hashed, never raw.
 // Keeping the cats safe across releases (Nick, 2026-10-14: "a saved state of all the cats so when we release new versions
 // of the cat room it won't delete cats history"): the room lives only in KV, never in the repo, so a push or a deploy
@@ -38,7 +38,8 @@
 //   - the private nightly backup copies all of KV too
 
 const ROOM_MAX = 30;
-const PER_IP = 3;
+const CATS_EACH = 2;
+const PER_IP = 6;
 const LOG_MAX = 600;
 const NAME_MAX = 16;
 const OWNER_MAX = 24; // like the queue's "Your name"
@@ -188,7 +189,7 @@ async function getRoom(request, url, env, cors, h) {
   let mine = null, mines = [];
   if (validId(visitorId)) {
     const me = await ownerHash(h, env, visitorId);
-    mines = room.cats.filter((x) => (x.owners || []).includes(me)).map((x) => x.id); // more than one only for Nick
+    mines = room.cats.filter((x) => (x.owners || []).includes(me)).map((x) => x.id); // up to CATS_EACH (plus kittens); any number for Nick
     mine = mines[0] || null;
     // a day checked in, for tricks (once a day per cat: a KV write at most once a day per owner)
     const today = plano(Date.now());
@@ -272,8 +273,8 @@ async function makeCat(request, env, cors, h) {
   // Nick (owner mode) can make as many cats as he likes (Nick, 2026-10-14), past the room's 30, as long as there's a
   // spot free; visitors get one each
   const nick = h.isAdmin(request, env);
-  const already = room.cats.find((c) => (c.owners || []).includes(me));
-  if (already && !nick) return h.json({ error: "You already have a cat in the room: " + already.name + "." }, 409, cors);
+  const already = room.cats.filter((c) => !c.kitten && (c.owners || []).includes(me));
+  if (already.length >= CATS_EACH && !nick) return h.json({ error: "You already have " + CATS_EACH + " cats in the room: " + already.map((c) => c.name).join(" and ") + "." }, 409, cors);
   if (nick && !freeSpots(room).length) return h.json({ error: "Every spot in the room is taken (" + Object.keys(SPOTS).length + ")." }, 409, cors);
   if (room.cats.length >= ROOM_MAX && !nick) return h.json({ error: "The room's full right now (" + ROOM_MAX + " cats). Check back soon." }, 409, cors);
   const ipRaw = request.headers.get("CF-Connecting-IP") || "";
@@ -318,8 +319,8 @@ async function claim(request, env, cors, h) {
   const c = room.cats.find((x) => x.code === code);
   if (!c) return h.json({ error: "No cat has that code. Check the letters and try again." }, 404, cors);
   const me = await ownerHash(h, env, body.visitorId);
-  const other = room.cats.find((x) => x !== c && (x.owners || []).includes(me));
-  if (other) return h.json({ error: "This browser already looks after " + other.name + "." }, 409, cors);
+  const others = room.cats.filter((x) => x !== c && !x.kitten && (x.owners || []).includes(me));
+  if (!c.kitten && others.length >= CATS_EACH) return h.json({ error: "This browser already looks after " + others.map((x) => x.name).join(" and ") + "." }, 409, cors);
   if (!c.owners.includes(me)) c.owners = c.owners.concat(me).slice(-6);
   c.seen = Date.now();
   await save(env, room);

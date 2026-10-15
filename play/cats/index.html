@@ -35,10 +35,10 @@
     <button type="button" class="cats-pan right" aria-label="Turn the room right"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.4-5.7M20 4v5h-5"/></svg></button>
     <button type="button" class="cats-zoom" aria-pressed="false" aria-label="Zoom in"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5M8.5 11h5M11 8.5v5"/></svg></button>
 
-    <!-- your cat, or the button to make one -->
+    <!-- your cats (up to two), and the button to make one -->
     <div class="cats-me">
       <button type="button" class="cats-make" hidden>Make your cat</button>
-      <button type="button" class="cats-mine" hidden></button>
+      <span class="cats-mines"></span><!-- a button for each of your cats (room.js renderMine) -->
     </div>
     <p class="cats-hint">Click a cat to meet it · <span class="hint-wheel">scroll to zoom · </span><span class="hint-pinch">pinch to zoom · </span>turn the room with the arrows</p>
     <p class="cats-toast" role="status" hidden></p>
@@ -127,7 +127,7 @@
     <div class="cats-log-head"><h2 id="cats-help-title">How the Cattery works</h2><button type="button" class="cats-log-close" aria-label="Close">&times;</button></div>
     <div class="cats-log-body">
       <section><h3>Your cat</h3><ul>
-        <li><b>Make your cat</b> in the Cat Maker: name, girl or boy, pattern, fur, eyes. One cat per visitor.</li>
+        <li><b>Make your cat</b> in the Cat Maker: name, girl or boy, pattern, fur, eyes. Up to two cats per visitor.</li>
         <li>Open your cat’s card to <b>feed</b>, <b>pet</b>, <b>play</b>, or <b>move</b> it to a perch, a bed, or the top of a tower.</li>
         <li>Keep the <b>recovery code</b> on its card to look after it from another phone or computer.</li>
         <li>Come back at least <b>every 30 days</b> (feed, pet or play), or it moves out to live with a family down the street.</li>

@@ -2127,7 +2127,7 @@
     if (!c) return;
     cardFor = id; selected = c;
     var d = c.data, mine = isMine(id);
-    if (mine) room.mine = id; // the one you're looking after now (Nick can have several)
+    if (mine && room.mine !== id) { room.mine = id; renderMine(); } // the one you're looking after now (up to two; Nick can have several)
     card.querySelector("h2").textContent = d.name + (mine ? " (yours)" : "");
     card.querySelector(".cats-card-look").textContent = CD.describe(d.look) + (GENDER[d.gender] ? " · " + GENDER[d.gender] : "");
     var away = isAway(c);
@@ -2611,7 +2611,16 @@
     for (var y = 0; y < 100; y++) p32.set(sp.px.subarray((y + 32) * sp.w + 14, (y + 32) * sp.w + 154), y * 140);
     pctx.putImageData(pimg, 0, 0);
   })(0);
-  var makeBtn = document.querySelector(".cats-make"), mineBtn = document.querySelector(".cats-mine");
+  var makeBtn = document.querySelector(".cats-make"), minesEl = document.querySelector(".cats-mines");
+  // up to two cats each (the Worker's CATS_EACH; Nick, 2026-10-15), kittens not counted; Nick can make any number
+  var CATS_EACH = 2;
+  function canMake() { return !room || room.owner || (room.mines || []).filter(function (id) { return cats[id] && !cats[id].data.kitten; }).length < CATS_EACH; }
+  function renderMine() { // a button for each of your cats; the one you're looking after now is lit
+    var ids = (room.mines || []).filter(function (id) { return cats[id]; });
+    minesEl.innerHTML = ids.map(function (id) { return '<button type="button" class="cats-mine" data-id="' + id + '" aria-pressed="' + (id === room.mine) + '">' + esc(cats[id].data.name) + "</button>"; }).join("");
+    makeBtn.hidden = !canMake();
+    makeBtn.textContent = ids.length && !room.owner ? "Make another cat" : "Make your cat";
+  }
   function openMaker() {
     // drop #make from the address first (the Play page links here with it): back-close.js adds a history step for the
     // open dialog and steps back out when it's closed; if that landed on #make again, hashchange would reopen the
@@ -2624,7 +2633,7 @@
     if (!matchMedia("(pointer: coarse)").matches) nameInput.focus();
   }
   makeBtn.addEventListener("click", openMaker);
-  mineBtn.addEventListener("click", function () { var c = cats[room.mine]; if (c) { openCard(c.id); } });
+  minesEl.addEventListener("click", function (e) { var b = e.target.closest("[data-id]"); if (b && cats[b.dataset.id]) { openCard(b.dataset.id); renderMine(); } });
   maker.querySelector(".maker-close").addEventListener("click", function () { maker.close(); });
   maker.addEventListener("click", function (e) { if (e.target === maker) maker.close(); });
   form.addEventListener("submit", function (e) {
@@ -2693,9 +2702,7 @@
       else c.spot = cd.spot;
     });
     Object.keys(cats).forEach(function (id) { if (!seen[id]) delete cats[id]; });
-    makeBtn.hidden = !!room.mine && !room.owner; // Nick can always make another
-    mineBtn.hidden = !room.mine;
-    if (room.mine && cats[room.mine]) mineBtn.textContent = cats[room.mine].data.name;
+    renderMine();
     renderPanel();
     if (cardFor && cats[cardFor] && !card.hidden) openCard(cardFor);
     room.mineLog = d.mineLog || [];
@@ -2716,9 +2723,9 @@
       .then(function (d) { if (!d.error) apply(d, arrived); })
       .catch(function (e) { if (window.console) console.error("cattery:", e); }); // offline: try again next minute
   }
-  load().then(function () { if (location.hash === "#make" && (!room.mine || room.owner)) openMaker(); });
+  load().then(function () { if (location.hash === "#make" && canMake()) openMaker(); });
   setInterval(function () { if (!document.hidden) load(); }, 60000);
-  window.addEventListener("hashchange", function () { if (location.hash === "#make" && (!room.mine || room.owner)) openMaker(); });
+  window.addEventListener("hashchange", function () { if (location.hash === "#make" && canMake()) openMaker(); });
 
   // ---------- sound (a tiny synth: mews, purrs, crunching; nothing plays until you do something) ----------
   var audio = null, soundOn = true;
