@@ -438,6 +438,7 @@ button { font: inherit; }
 }
 .maker-swatches button[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 0 2px var(--coral); }
 .maker-check { display: flex; gap: 6px; align-items: center; font-size: 0.86rem; }
+.maker-hint { margin: 6px 0 0; font-size: 0.8rem; color: var(--muted); }
 .maker-desc { margin: 0; font-size: 0.84rem; color: var(--muted); }
 .maker-msg { min-height: 1.2em; margin: 10px 0 0; color: #ff9b84; font-size: 0.86rem; }
 .maker-buttons { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; margin-top: 6px; }

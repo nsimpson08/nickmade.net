@@ -2099,7 +2099,20 @@
     more.textContent = left + " more ↓";
   }
   function meter(v) { return '<span class="meter"><i style="width:' + Math.round(v * 100) + '%"></i></span>'; }
-  function personality(tr) {
+  // the personalities the owner picks from in the Cat Maker (the Worker's PERSONALITIES); a kitten has none and is
+  // described from its traits
+  var PERSONALITY = {
+    easygoing: ["Easygoing", "Gets along with most cats, takes life as it comes."],
+    friendly: ["Friendly", "Wants to be everyone’s friend. Quick to share."],
+    playful: ["Playful", "Always up for a chase or a game."],
+    lazy: ["Lazy", "Would rather nap. Plays now and then."],
+    standoffish: ["Standoffish", "Keeps to itself and warms up slowly. Doesn’t love company."],
+    bossy: ["Bossy", "Runs the room. Picks more fights."],
+    gentle: ["Gentle", "Never starts trouble. Sweet with everyone."],
+    romantic: ["Romantic", "Falls in love easily."],
+  };
+  function personality(tr, p) {
+    if (p && PERSONALITY[p]) return PERSONALITY[p][0];
     tr = tr || {};
     var words = [];
     if (tr.friendly > 0.7) words.push("friendly"); else if (tr.friendly < 0.25) words.push("aloof");
@@ -2129,7 +2142,7 @@
     var facts = [];
     if (mine) facts.push(["Owner", "You"]);
     else if (d.ownerName) facts.push(["Owner", esc(d.ownerName)]);
-    facts.push(["Personality", esc(personality(d.traits))]);
+    facts.push(["Personality", esc(personality(d.traits, d.personality))]);
     if (d.parents) facts.push(["Parents", d.parents.map(function (p) { return catName(p, "a cat who moved out"); }).join(" &amp; ")]);
     var kids = room.cats.filter(function (x) { return x.parents && x.parents.indexOf(id) >= 0; });
     if (kids.length) facts.push([kids.length > 1 ? "Kittens" : "Kitten", kids.map(function (x) { return catName(x.id, x.name); }).join(", ")]);
@@ -2537,6 +2550,7 @@
   try { ownerInput.value = localStorage.getItem("nm-name") || ""; } catch (e) {}
   if (ADMIN && !ownerInput.value) ownerInput.value = "Nick";
   var look = CD.randomLook(), previewPose = "sit", gender = null; // "f" / "m", picked in the maker (required)
+  var persona = null; // a PERSONALITY key, picked in the maker (required)
   var GENDER = { f: "girl", m: "boy" }, SHE = { f: "she’ll", m: "he’ll" };
   // the preview: the middle of the cat's picture (140 x 100 of its 168 x 136), shown at twice the size
   var pcv = maker.querySelector(".maker-preview canvas"), pctx = pcv.getContext("2d");
@@ -2548,6 +2562,7 @@
     ["base", "second"].forEach(function (f) {
       maker.querySelector('[data-field="' + f + '"]').innerHTML = Object.keys(CD.FURS).map(function (k) { return '<button type="button" data-v="' + k + '" aria-pressed="false" title="' + CD.FURS[k].name + '" aria-label="' + CD.FURS[k].name + '" style="background:' + CD.FURS[k].hex + '"></button>'; }).join("");
     });
+    maker.querySelector('[data-field="personality"]').innerHTML = Object.keys(PERSONALITY).map(function (k) { return '<button type="button" data-v="' + k + '" aria-pressed="false">' + PERSONALITY[k][0] + "</button>"; }).join("");
     maker.querySelector('[data-field="eyes"]').innerHTML = Object.keys(CD.EYES).map(function (k) {
       var bgc = CD.EYES[k].hex || "linear-gradient(90deg," + CD.EYES.blue.hex + " 50%," + CD.EYES.gold.hex + " 50%)";
       return '<button type="button" data-v="' + k + '" aria-pressed="false" title="' + CD.EYES[k].name + '" aria-label="' + CD.EYES[k].name + '" style="background:' + bgc + '"></button>';
@@ -2564,13 +2579,16 @@
     if (sec) secBox.querySelector("legend").textContent = sec;
     form.fluffy.checked = !!look.fluffy;
     [].forEach.call(maker.querySelectorAll('[data-field="gender"] button'), function (b) { b.setAttribute("aria-pressed", String(b.dataset.v === gender)); });
-    maker.querySelector(".maker-desc").textContent = CD.describe(look) + (gender ? " · " + GENDER[gender] : "");
+    [].forEach.call(maker.querySelectorAll('[data-field="personality"] button'), function (b) { b.setAttribute("aria-pressed", String(b.dataset.v === persona)); });
+    maker.querySelector(".maker-hint").textContent = persona ? PERSONALITY[persona][1] : "How your cat gets along with the others.";
+    maker.querySelector(".maker-desc").textContent = CD.describe(look) + (gender ? " · " + GENDER[gender] : "") + (persona ? " · " + PERSONALITY[persona][0].toLowerCase() : "");
   }
   maker.querySelector(".maker-controls").addEventListener("click", function (e) {
     var b = e.target.closest("[data-v]");
     if (!b) return;
     var f = b.parentNode.dataset.field;
     if (f === "gender") { gender = b.dataset.v; maker.querySelector(".maker-msg").textContent = ""; SFX.tick(); syncMaker(); return; }
+    if (f === "personality") { persona = b.dataset.v; maker.querySelector(".maker-msg").textContent = ""; SFX.tick(); syncMaker(); return; }
     look[f] = b.dataset.v;
     if (f === "pattern" && CD.PATTERNS[look.pattern].second && (!look.second || look.second === look.base)) look.second = look.base === "black" ? "ginger" : "black";
     if (f === "pattern" && look.pattern === "colorpoint" && look.eyes !== "blue") look.eyes = "blue";
@@ -2578,7 +2596,7 @@
     syncMaker();
   });
   form.fluffy.addEventListener("change", function () { look.fluffy = form.fluffy.checked; syncMaker(); });
-  maker.querySelector(".maker-random").addEventListener("click", function () { look = CD.randomLook(); gender = Math.random() < 0.5 ? "f" : "m"; syncMaker(); SFX.mew(look.seed); });
+  maker.querySelector(".maker-random").addEventListener("click", function () { look = CD.randomLook(); gender = Math.random() < 0.5 ? "f" : "m"; persona = (function (k) { return k[Math.floor(Math.random() * k.length)]; })(Object.keys(PERSONALITY)); syncMaker(); SFX.mew(look.seed); });
   maker.querySelector(".maker-poses").addEventListener("click", function (e) {
     var b = e.target.closest("[data-pose]");
     if (!b) return;
@@ -2615,11 +2633,12 @@
     var name = nameInput.value.trim();
     if (!name) { msg.textContent = "Give your cat a name."; nameInput.focus(); return; }
     if (!gender) { msg.textContent = "Pick girl or boy."; return; }
+    if (!persona) { msg.textContent = "Pick a personality."; return; }
     var ownerName = ownerInput.value.replace(/\s+/g, " ").trim();
     if (!ownerName && !ADMIN) { msg.textContent = "Add your name, so everyone knows whose cat it is."; ownerInput.focus(); return; }
     if (ownerName && !ADMIN) { try { localStorage.setItem("nm-name", ownerName); } catch (e) {} }
     go.disabled = true; msg.textContent = "";
-    fetch(API + "/cats", { method: "POST", headers: headers(true), body: JSON.stringify({ visitorId: VID, name: name, ownerName: ownerName, gender: gender, look: look }) })
+    fetch(API + "/cats", { method: "POST", headers: headers(true), body: JSON.stringify({ visitorId: VID, name: name, ownerName: ownerName, gender: gender, personality: persona, look: look }) })
       .then(function (r) { return r.json(); })
       .then(function (d) {
         go.disabled = false;

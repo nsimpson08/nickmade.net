@@ -9,7 +9,7 @@
 //   GET    /cats?visitorId=           { cats, rel, log, mine, mines (all of yours: several only for Nick), max, owner }: the room, how every pair of cats get on
 //                                     ({ "<id>|<id>": { f, r } }), the newest history first, and the id of this
 //                                     browser's cat (owner: Nick, with the admin token, can remove any cat)
-//   POST   /cats                      { visitorId, name, ownerName, gender ("f" | "m"), look } -> makes a cat: { cat, code } (code: the recovery code)
+//   POST   /cats                      { visitorId, name, ownerName, gender ("f" | "m"), personality, look } -> makes a cat: { cat, code } (code: the recovery code)
 //                                      ownerName = the visitor's own name, shown on the cat's card to everyone
 //   POST   /cats/claim                { visitorId, code } -> this browser can look after that cat too: { cat }
 //   POST   /cats/:id                  { visitorId, action: "feed" | "pet" | "play" | "go" | "meet" | "treat" | "date" | "apart" | "collect" | "name" | "wear", spot?, with?, name?, g? }
@@ -245,6 +245,21 @@ function freeSpots(room, except) {
   return Object.keys(SPOTS).filter((s) => !taken.has(s));
 }
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
+// The owner picks a personality in the Cat Maker (Nick, 2026-10-15: "selectable when creating the cat", not generated).
+// Each sets the four traits the room runs on within a range, so two easygoing cats still differ a little. Kittens keep
+// generated traits (no personality: the page describes them from their traits).
+//   friendly: more nice meetings, more likely to share; playful: chases and play; bossy: more spats; romantic: crushes
+const PERSONALITIES = {
+  easygoing:   { friendly: [0.45, 0.65], playful: [0.4, 0.6], bossy: [0.3, 0.45], romantic: [0.4, 0.6] },
+  friendly:    { friendly: [0.8, 0.95], playful: [0.45, 0.65], bossy: [0.15, 0.3], romantic: [0.5, 0.7] },
+  playful:     { friendly: [0.55, 0.7], playful: [0.8, 0.95], bossy: [0.3, 0.45], romantic: [0.35, 0.55] },
+  lazy:        { friendly: [0.45, 0.6], playful: [0.05, 0.2], bossy: [0.25, 0.4], romantic: [0.35, 0.55] },
+  standoffish: { friendly: [0.08, 0.22], playful: [0.3, 0.45], bossy: [0.4, 0.55], romantic: [0.2, 0.35] },
+  bossy:       { friendly: [0.3, 0.45], playful: [0.4, 0.6], bossy: [0.78, 0.92], romantic: [0.3, 0.5] },
+  gentle:      { friendly: [0.6, 0.75], playful: [0.35, 0.5], bossy: [0.05, 0.15], romantic: [0.5, 0.65] },
+  romantic:    { friendly: [0.6, 0.75], playful: [0.4, 0.6], bossy: [0.2, 0.35], romantic: [0.8, 0.95] },
+};
+const traitsFor = (p) => Object.fromEntries(Object.entries(PERSONALITIES[p]).map(([k, [lo, hi]]) => [k, r2(lo + Math.random() * (hi - lo))]));
 const r2 = (x) => Math.round(x * 100) / 100;
 
 async function makeCat(request, env, cors, h) {
@@ -274,6 +289,7 @@ async function makeCat(request, env, cors, h) {
   if (ownerProblem) return h.json({ error: ownerProblem }, 400, cors);
   const gender = body.gender === "f" || body.gender === "m" ? body.gender : null; // Nick, 2026-10-15
   if (!gender) return h.json({ error: "Pick girl or boy." }, 400, cors);
+  const personality = PERSONALITIES[body.personality] ? body.personality : null; // the page requires one; a page from before it existed sends none, and gets random traits
   const look = cleanLook(body.look);
   if (!look) return h.json({ error: "Pick a pattern, a colour and eyes." }, 400, cors);
   const spots = freeSpots(room);
@@ -281,7 +297,8 @@ async function makeCat(request, env, cors, h) {
   const now = Date.now();
   const c = {
     id: newId(), name, ownerName, gender, look, born: now, spot: pick(floorish.length ? floorish : spots),
-    traits: { friendly: r2(Math.random()), playful: r2(Math.random()), bossy: r2(Math.random()), romantic: r2(Math.random()) },
+    personality: personality || undefined,
+    traits: personality ? traitsFor(personality) : { friendly: r2(Math.random()), playful: r2(Math.random()), bossy: r2(Math.random()), romantic: r2(Math.random()) },
     fed: now, petted: 0, played: 0, seen: now, pinUntil: now + 6 * 3600e3, nextAt: now + gap(),
     owners: [me], ip, code: newCode(name, room), nick: nick || undefined, // Nick's cats never move out
   };
