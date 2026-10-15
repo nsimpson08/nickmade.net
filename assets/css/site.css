@@ -245,6 +245,7 @@ img { display: block; max-width: 100%; }
 /* ---------- Changelog ---------- */
 
 .release + .release { margin-top: 64px; }
+.release { scroll-margin-top: 90px; } /* a link to one version (#v1-5) lands below the top bar */
 .release-head {
   display: flex;
   flex-wrap: wrap;
@@ -391,7 +392,23 @@ html.wall-bg-on .topbar nav a[href="/play/"]::before { background: rgba(255, 255
 .game-clip { display: block; aspect-ratio: 16 / 9; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); transition: border-color .2s, box-shadow .2s; }
 .game-clip video { display: block; width: 100%; height: 100%; object-fit: cover; }
 .game-clip:hover { border-color: var(--accent); box-shadow: 0 0 32px -12px var(--accent); }
-@media (max-width: 760px) { .project.game-card { grid-template-columns: 1fr; row-gap: 14px; } }
+.game-links { display: flex; flex-direction: column; gap: 8px; align-self: start; } /* a card with two links (the Cattery) */
+@media (max-width: 760px) { .project.game-card { grid-template-columns: 1fr; row-gap: 14px; } .game-links { flex-direction: row; flex-wrap: wrap; } }
+/* Play: a game with a new version since the visitor last opened it (play/index.html); the footer's pulsing mint dot */
+.play-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: 12px;
+  vertical-align: 0.3em;
+  color: var(--mint);
+  font: 500 0.68rem/1 var(--body);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.play-new i { width: 7px; height: 7px; border-radius: 50%; background: var(--mint); animation: now-pulse 2.4s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) { .play-new i { animation: none; } }
 
 /* ---------- Golf (Extras) ---------- */
 
@@ -641,6 +658,51 @@ html.wall-bg-on .topbar nav a[href="/play/"]::before { background: rgba(255, 255
    Animation, on every load: the badge pops in with a ring, the pill opens to the right, the text fades in,
    a shine sweeps across, the number counts up, then "Achievement unlocked" flips to "Total gamerscore". */
 .xa { min-height: 72px; margin-top: 28px; } /* its height before it loads, so the page doesn't jump */
+/* Xbox and PlayStation side by side (psn-banner.js), wrapping to one under the other when they don't fit */
+.xa-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px 16px; margin-top: 28px; }
+.xa-row .xa { margin-top: 0; }
+.xa-row { align-items: stretch; } /* the two pills the same height (the taller one's), contents centered */
+.xa-row .xa { display: flex; }
+/* PlayStation (Nick: blue, with trophies like PlayStation's own): the same pill in PlayStation blue with a faint
+   triangle-circle-cross-square pattern, the platinum trophy in the badge, and bronze to platinum cups with counts */
+.xa-ps .xa-toast { --xa-green: #0070d1; --xa-green-hi: #8cc8ff; padding-right: 22px; }
+.xa-ps .xa-toast::before {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' fill='none' stroke='%23ffffff' stroke-opacity='.07' stroke-width='1.4'%3E%3Cpath d='M10 6l6 10H4z'/%3E%3Ccircle cx='48' cy='12' r='5'/%3E%3Cpath d='M6 40l10 10M16 40L6 50'/%3E%3Crect x='42' y='40' width='11' height='11'/%3E%3C/svg%3E") 0 0 / 64px 64px, radial-gradient(120% 140% at 0% 0%, #1f6fe0 0%, #0b3c9e 45%, #062466 100%);
+  box-shadow: inset 0 0 0 1px rgba(140, 200, 255, 0.28), 0 12px 32px rgba(0, 20, 70, 0.55);
+}
+.xa-ps a.xa-toast:hover::before, .xa-ps a.xa-toast:focus-visible::before {
+  box-shadow: inset 0 0 0 1px var(--xa-green-hi), 0 12px 32px rgba(0, 20, 70, 0.55), 0 0 26px rgba(80, 160, 255, 0.35);
+}
+.xa-ps .xa-badge { background: radial-gradient(circle at 35% 30%, #2a7fe8, #0a3a8f 75%); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18) inset; }
+.xa-ps .xa-badge .ps-trophy { width: 30px; height: 34px; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)); }
+.xa-ps .xa-label { color: #b9cff0; }
+.xa-ps .xa-gain span { color: #b9cff0; }
+/* both pills: the numbers, then the gain under them (Nick, 2026-10-14: the Xbox one stacked too, the same height as the
+   PlayStation one beside it; it used to have the gain to the right of the total on desktop) */
+.xa-row .xa-score { flex-direction: column; align-items: flex-start; gap: 3px; }
+.ps-cups { display: inline-flex; align-items: center; gap: 12px; }
+.ps-cup { display: inline-flex; align-items: center; gap: 4px; }
+.ps-cup .ps-trophy { width: 20px; height: 23px; flex: none; filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.5)); }
+.ps-cup b { font-family: var(--display); font-weight: 600; font-size: 1rem; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: #fff; }
+@media (prefers-reduced-motion: no-preference) {
+  .xa-ps.play .ps-cup { animation: ps-cup-in 0.45s cubic-bezier(0.3, 1.5, 0.5, 1) both; animation-delay: calc(0.75s + var(--i) * 0.09s); }
+}
+@keyframes ps-cup-in { from { opacity: 0; transform: translateY(6px) scale(0.8); } }
+@media (max-width: 560px) { .ps-cups { gap: 11px; } .ps-cup b { font-size: 0.98rem; } }
+/* Steam (steam-banner.js): the same pill in Steam's navy and light blue, a medal in place of the G; third, so it
+   wraps onto its own row on desktop */
+.xa-steam .xa-toast { --xa-green: #1a9fff; --xa-green-hi: #66c0f4; }
+.xa-steam .xa-toast::before {
+  background: linear-gradient(135deg, #2a475e 0%, #1b2838 55%, #171a21 100%);
+  box-shadow: inset 0 0 0 1px rgba(102, 192, 244, 0.25), 0 12px 32px rgba(0, 0, 0, 0.55);
+}
+.xa-steam a.xa-toast:hover::before, .xa-steam a.xa-toast:focus-visible::before {
+  box-shadow: inset 0 0 0 1px var(--xa-green-hi), 0 12px 32px rgba(0, 0, 0, 0.55), 0 0 24px rgba(102, 192, 244, 0.25);
+}
+.xa-steam .xa-badge { background: radial-gradient(circle at 35% 30%, #4fb4f0, #1a6aa8 75%); }
+.xa-steam .xa-label, .xa-steam .xa-gain span { color: #a9c4d9; }
+.xa-g.xa-medal { border: 0; width: 20px; height: 20px; }
+.xa-medal svg { width: 18px; height: 18px; }
 @media (max-width: 560px) {
   .xa { min-height: 93px; }
   /* the gain goes under the total on purpose: left to wrap, the pill kept its one-line width and sat half empty */
@@ -742,7 +804,7 @@ a.xa-toast:focus-visible { outline: none; }
 .xa-gain { font-size: 0.85rem; font-weight: 500; color: var(--xa-green-hi); white-space: nowrap; }
 .xa-gain span { color: var(--muted); font-weight: 400; }
 .xa-gain + .xa-gain { font-size: 0.78rem; }
-/* Taking turns (xbox-banner.js cycleGains): all in one grid cell, so it's as wide as the longest; the shown one (.on)
+/* Taking turns (one clock for both banners: xbox-banner.js / psn-banner.js NMGainClock): all in one grid cell, so it's as wide as the longest; the shown one (.on)
    slides up and out (.out) as the next comes up from below. Stacked as above with reduced motion. */
 .xa-gains.cycle { display: inline-grid; clip-path: inset(0); }
 .xa-gains.cycle .xa-gain {
@@ -3203,3 +3265,68 @@ img.developing { animation: develop 2.6s cubic-bezier(0.3, 0, 0.2, 1) both; }
 .lib-scan-msg { margin: 8px 0 0; font-size: 0.8rem; color: var(--muted); }
 .lib-scan-msg:empty { display: none; }
 @media (prefers-reduced-motion: reduce) { .lib-scan-line { animation: none; } }
+
+/* ---------- Extras > Golf weather (assets/js/golf-weather.js) ---------- */
+.content.golfwx { max-width: 980px; }
+.gw-search { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: -20px 0 28px; }
+.gw-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--faint); }
+.gw-search input { width: 8.5em; padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px; background: #000; color: var(--fg); font: inherit; font-size: 1rem; letter-spacing: 0.06em; }
+.gw-search input:focus { outline: none; border-color: var(--accent); }
+.gw-search button { padding: 8px 18px; border: 1px solid var(--accent); border-radius: 999px; background: var(--accent); color: #000; font: inherit; font-size: 0.9rem; font-weight: 500; cursor: pointer; }
+.gw-msg { font-size: 0.85rem; color: var(--muted); }
+.gw-msg.bad { color: var(--coral); }
+#gw.loading { opacity: .5; transition: opacity .2s; }
+.gw-courses { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 24px; }
+.gw-courses-label { margin-right: 4px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--faint); }
+.gw-courses button { padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-size: 0.82rem; cursor: pointer; }
+.gw-courses button small { color: var(--faint); font-size: 0.72rem; }
+.gw-courses button:hover { color: var(--fg); border-color: #3a3a40; }
+.gw-courses button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #000; }
+.gw-courses button[aria-pressed="true"] small { color: rgba(0, 0, 0, .6); }
+.gw-best { margin: 0 0 40px; padding: 26px 28px; border: 1px solid var(--line); border-radius: 22px;
+  background: radial-gradient(90% 70% at 0% 0%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 72%), color-mix(in srgb, var(--fg) 3%, transparent); }
+.gw-best h2 { margin: 0 0 14px; font-family: var(--body); font-size: 0.72rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.1em; color: var(--faint); }
+.gw-picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.gw-pick b { display: block; font-family: var(--display); font-weight: 500; font-size: 1.1rem; letter-spacing: -0.01em; }
+.gw-pick span { font-size: 0.85rem; color: var(--muted); }
+.gw-day { display: grid; grid-template-columns: 120px 1fr; gap: 6px 18px; padding: 16px 0; border-top: 1px solid var(--line); }
+.gw-best + .gw-day { border-top: 0; }
+.gw-date { font-weight: 500; }
+.gw-date small { display: block; font-weight: 400; font-size: 0.78rem; color: var(--faint); }
+.gw-window { font-size: 0.9rem; }
+.gw-window b { font-weight: 500; color: var(--accent); }
+.gw-window.none { color: var(--faint); }
+.gw-window .meta { color: var(--muted); }
+.gw-hours { grid-column: 2; display: grid; grid-template-columns: repeat(13, minmax(0, 1fr)); gap: 3px; margin-top: 6px; }
+.gw-h { padding: 6px 0 5px; border-radius: 6px; font-size: 0.72rem; text-align: center; font-variant-numeric: tabular-nums; cursor: default; }
+.gw-h small { display: block; font-size: 0.62rem; opacity: .75; }
+.gw-h.g2, .gw-key i.g2 { background: color-mix(in srgb, var(--mint) 26%, transparent); color: #d8fff0; }
+.gw-h.g1, .gw-key i.g1 { background: color-mix(in srgb, var(--amber) 22%, transparent); color: #ffe9c4; }
+.gw-h.g0, .gw-key i.g0 { background: color-mix(in srgb, var(--coral) 18%, transparent); color: #ffd4c8; }
+.gw-h.in { outline: 2px solid var(--accent); outline-offset: -2px; }
+.gw-h.none { background: transparent; }
+.gw-tip { grid-column: 2; min-height: 1.2em; font-size: 0.8rem; color: var(--muted); }
+/* with a course picked: the window's wind over its holes (a compass of the holes + counts) */
+.gw-course-wind { grid-column: 2; display: flex; align-items: center; gap: 12px; margin-top: 4px; font-size: 0.82rem; color: var(--muted); }
+.gw-course-wind b, .gw-map-note b { font-weight: 500; }
+.gw-course-wind b.down, .gw-map-note b.down { color: var(--mint); }
+.gw-course-wind b.into, .gw-map-note b.into { color: var(--coral); }
+.gw-course-wind b.across, .gw-map-note b.across { color: #ffd166; }
+.gw-course-wind b.top { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; } /* how most of the course plays */
+.gw-rose { flex: none; width: 56px; height: 56px; }
+.gw-map-note { margin: -12px 0 22px; font-size: 0.82rem; color: var(--faint); }
+.gw-key { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 26px; font-size: 0.78rem; color: var(--faint); }
+.gw-key i { display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 3px; vertical-align: -1px; }
+.gw-key a { color: var(--muted); }
+@media (max-width: 640px) {
+  .gw-search { margin-top: -28px; }
+  /* the courses in one row you swipe, not a column down the whole screen */
+  .gw-courses { flex-wrap: nowrap; overflow-x: auto; margin: 0 -16px 22px; padding: 2px 16px; scrollbar-width: none; }
+  .gw-courses::-webkit-scrollbar { display: none; }
+  .gw-courses button, .gw-courses-label { flex: none; white-space: nowrap; }
+  .gw-best { margin: 0 -8px 32px; padding: 20px 18px; border-radius: 16px; }
+  .gw-day { grid-template-columns: 1fr; }
+  .gw-hours, .gw-tip, .gw-course-wind { grid-column: 1; }
+  .gw-h { font-size: 0.64rem; padding: 5px 0 4px; }
+  .gw-h small { font-size: 0.56rem; }
+}

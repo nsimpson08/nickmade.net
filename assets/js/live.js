@@ -594,13 +594,17 @@
         return Promise.all([
           fetch(API + "/watched?" + PQ, { cache: "no-store", headers: authHeaders() }).then(function (r) { return r.json(); }),
           window.NMXboxBanner ? window.NMXboxBanner.reload().catch(function () {}) : null,
+          window.NMPsnBanner ? window.NMPsnBanner.reload().catch(function () {}) : null,
+          window.NMSteamBanner ? window.NMSteamBanner.reload().catch(function () {}) : null,
         ]).then(function (out) {
           renderWatched(out[0].items || [], out[0].archive);
           var n = res.d.updated || 0;
           // the Worker runs the games and the gamerscore separately: say which half didn't work
           status.textContent = res.d.error ? "Gamerscore updated · the games didn't: " + res.d.error
             : "Updated just now · " + (n ? n + (n === 1 ? " game" : " games") + " changed" : "no changes") +
-              (res.d.gamerscoreError ? " · the gamerscore didn't update: " + res.d.gamerscoreError : "");
+              (res.d.gamerscoreError ? " · the gamerscore didn't update: " + res.d.gamerscoreError : "") +
+              (res.d.psnError ? " · PlayStation didn't: " + res.d.psnError : "") +
+              (res.d.steamError ? " · Steam didn't: " + res.d.steamError : typeof res.d.steam === "string" ? " · Steam: " + res.d.steam : "");
         });
       })
       .catch(function (e) { status.textContent = (e && e.said) || "Couldn't reach the server. Try again in a bit."; })

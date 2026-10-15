@@ -103,5 +103,10 @@ async function vote(request, env, cors, h) {
   const kept = body.vote === false ? voters.filter((v) => v.i !== i) : voters;
   if (kept.length) all[k] = kept; else delete all[k];
   await env.QUEUE.put(key(page), JSON.stringify(all));
+  const changed = body.vote === false ? had : !had;
+  if (changed && h.tellOwner) { // for the evening summary on Nick's phone
+    const it = (items || []).find((x) => h.normalize(x.title) === k);
+    await h.tellOwner(env, { type: "vote", page, title: it ? it.title : String(body.title || "").slice(0, 120), up: body.vote !== false });
+  }
   return h.json({ key: k, count: 1 + kept.length, voted: kept.some((v) => v.i === i) }, 200, cors);
 }

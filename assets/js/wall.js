@@ -140,7 +140,8 @@
   ];
   // Play: each game's clip and 5 stills taken from it (play/wall/<game>-1.jpg ... -5.jpg)
   var GAMES = [
-    { slug: "office", title: "Nick\u2019s Office" }, // 1.4, first on the page
+    { slug: "cats", title: "The Cattery" }, // 1.6, first on the page
+    { slug: "office", title: "Nick\u2019s Office" }, // 1.4
     { slug: "nicks-nine", title: "Nick's Nine" },
     { slug: "rapture", title: "Rapture: ADAM & Dice" },
   ];

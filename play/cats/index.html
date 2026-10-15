@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>The Cattery · NickMade</title>
+  <meta name="description" content="Make your own pixel-art cat and move it into the Cattery with everyone else's. Feed it, pet it, send it up the cat towers, and watch who becomes best friends, who falls in love, and who's feuding.">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500&family=Unbounded:wght@500;600;700;800&display=swap">
+  <link rel="stylesheet" href="cats.css">
+</head>
+<body>
+  <!-- The Cattery v1.0 (released with the site's Ver 1.6): one shared room of visitors' cats, drawn in code by room.js (the cats by catdraw.js).
+       The Cat Maker is the dialog below (#make opens it). Cats, how they get on and the history live in the Worker
+       (worker/src/cats.js). -->
+  <header class="cats-top">
+    <a class="cats-back" href="/play/"><span aria-hidden="true">&larr;</span> Play</a>
+    <h1>The Cattery <button type="button" class="cats-ver" title="What’s new in the Cattery" aria-haspopup="dialog">v1.0</button> <button type="button" class="cats-ver cats-help-btn" title="How the Cattery works" aria-haspopup="dialog" aria-label="How the Cattery works">?</button></h1>
+    <!-- the game's own version (Nick, 2026-10-15: "mark the cattery as version 1.0"), from changelog.js; clicking it
+         opens the Cattery's changelog (the dialog below), like Nick's Nine and Rapture -->
+    <button type="button" class="cats-pill cats-times-btn" aria-haspopup="dialog">Times</button>
+    <button type="button" class="cats-pill cats-history-btn" aria-expanded="false" aria-controls="cats-panel">History</button>
+    <button type="button" class="cats-sound" aria-pressed="true" title="Sound on/off">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path class="on" d="M4 9h4l5-4v14l-5-4H4zM16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"/><path class="off" d="M4 9h4l5-4v14l-5-4H4zM16 9l6 6M22 9l-6 6"/></svg>
+      <span class="sr-only">Sound</span>
+    </button>
+  </header>
+
+  <main class="cats-stage" aria-label="The Cattery: every visitor's cat">
+    <canvas id="room" width="320" height="200"></canvas>
+    <div class="cats-tags" aria-hidden="true"></div>
+    <button type="button" class="cats-pan left" aria-label="Turn the room left"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v5h5"/></svg></button>
+    <button type="button" class="cats-pan right" aria-label="Turn the room right"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.4-5.7M20 4v5h-5"/></svg></button>
+    <button type="button" class="cats-zoom" aria-pressed="false" aria-label="Zoom in"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5M8.5 11h5M11 8.5v5"/></svg></button>
+
+    <!-- your cat, or the button to make one -->
+    <div class="cats-me">
+      <button type="button" class="cats-make" hidden>Make your cat</button>
+      <button type="button" class="cats-mine" hidden></button>
+    </div>
+    <p class="cats-hint">Click a cat to meet it · <span class="hint-wheel">scroll to zoom · </span><span class="hint-pinch">pinch to zoom · </span>turn the room with the arrows</p>
+    <p class="cats-toast" role="status" hidden></p>
+    <!-- coming back: what your cats did while you were away -->
+    <section class="cats-recap" hidden aria-live="polite">
+      <h2>While you were away</h2>
+      <p class="cats-recap-when"></p>
+      <div class="cats-recap-body"></div>
+      <button type="button" class="cats-recap-ok">Back to the room</button>
+    </section>
+    <p class="cats-mode" hidden><span></span> <button type="button">Cancel</button></p>
+
+    <!-- the card for the cat you clicked -->
+    <section class="cats-card" hidden aria-live="polite">
+      <button type="button" class="cats-card-close" aria-label="Close">&times;</button>
+      <div class="cats-card-head">
+        <canvas class="cats-card-face" width="168" height="136" aria-hidden="true"></canvas>
+        <div>
+          <h2></h2>
+          <p class="cats-card-look"></p>
+          <p class="cats-card-age"></p>
+          <button type="button" class="cats-snap">Snapshot</button>
+        </div>
+      </div>
+      <dl class="cats-card-facts"></dl>
+      <div class="cats-card-actions" hidden>
+        <button type="button" data-act="feed">Feed</button>
+        <button type="button" data-act="pet">Pet</button>
+        <button type="button" data-act="play">Play</button>
+        <button type="button" data-act="go">Move</button>
+        <button type="button" data-act="meet">Meet a cat</button>
+        <button type="button" data-act="treat">Share a treat</button>
+        <button type="button" data-act="date">Set up a date</button>
+        <button type="button" data-act="apart">Keep apart</button>
+      </div>
+      <div class="cats-card-name" hidden><label>Name your kitten <input maxlength="16" autocomplete="off" placeholder="A name"></label><button type="button">Name</button></div>
+      <div class="cats-card-kind" hidden><button type="button" data-kind="treat">Give a treat</button><button type="button" data-kind="pet">Pet</button></div>
+      <div class="cats-card-wear" hidden><h3 class="cats-card-sub">Wearing</h3><div class="cats-chips"></div></div>
+      <div class="cats-card-tricks" hidden><h3 class="cats-card-sub">Tricks</h3><p><span class="cats-tricks-list"></span> <button type="button" class="cats-trick-go">Do a trick</button></p></div>
+      <h3 class="cats-card-sub">Feelings</h3>
+      <div class="cats-card-feel-wrap"><ul class="cats-card-feel"></ul><p class="cats-card-feel-more" hidden></p></div>
+      <h3 class="cats-card-sub">Lately</h3>
+      <ul class="cats-card-log"></ul>
+      <h3 class="cats-card-sub">Gifts found</h3>
+      <ul class="cats-card-gifts"></ul>
+      <details class="cats-card-postcards" hidden>
+        <summary>Postcards</summary>
+        <ul></ul>
+      </details>
+      <details class="cats-card-diary">
+        <summary>Diary</summary>
+        <ul></ul>
+      </details>
+      <details class="cats-card-more" hidden>
+        <summary>Recovery code and more</summary>
+        <p>On another phone or computer, open the Cattery, choose <b>Make your cat</b>, then <b>Use a recovery code</b>, and enter this code to look after your cat there too.</p>
+        <p class="cats-code-row"><code class="cats-code">••••••</code> <button type="button" class="cats-code-show">Show</button> <button type="button" class="cats-code-copy" hidden>Copy</button></p>
+        <button type="button" class="cats-letgo">Let your cat go…</button>
+      </details>
+      <button type="button" class="cats-remove" hidden>Remove this cat (owner)</button>
+    </section>
+
+    <!-- the history and who's who -->
+    <aside class="cats-panel" id="cats-panel" hidden>
+      <div class="cats-tabs" role="tablist">
+        <button type="button" role="tab" aria-selected="true" data-tab="history">History</button>
+        <button type="button" role="tab" aria-selected="false" data-tab="who">Who’s who</button>
+        <button type="button" class="cats-panel-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="cats-tab" data-tab="history">
+        <p class="cats-events" hidden>Owner: start <button type="button" data-ev="storm">a storm</button> <button type="button" data-ev="sunbeam">a sunbeam</button> <button type="button" data-ev="stop">Stop</button></p>
+        <label class="cats-filter"><input type="checkbox"> Just my cat</label>
+        <ol class="cats-log"></ol>
+      </div>
+      <div class="cats-tab" data-tab="who" hidden>
+        <h3>Cliques</h3>
+        <ul class="cats-cliques"></ul>
+        <h3>Every cat</h3>
+        <ul class="cats-list"></ul>
+      </div>
+    </aside>
+  </main>
+
+  <!-- How the Cattery works (the "?" in the header; Nick: for every visitor) -->
+  <dialog class="cats-log-dlg cats-help" aria-labelledby="cats-help-title">
+    <div class="cats-log-head"><h2 id="cats-help-title">How the Cattery works</h2><button type="button" class="cats-log-close" aria-label="Close">&times;</button></div>
+    <div class="cats-log-body">
+      <section><h3>Your cat</h3><ul>
+        <li><b>Make your cat</b> in the Cat Maker: name, girl or boy, pattern, fur, eyes. One cat per visitor.</li>
+        <li>Open your cat’s card to <b>feed</b>, <b>pet</b>, <b>play</b>, or <b>move</b> it to a perch, a bed, or the top of a tower.</li>
+        <li>Keep the <b>recovery code</b> on its card to look after it from another phone or computer.</li>
+        <li>Come back at least <b>every 30 days</b> (feed, pet or play), or it moves out to live with a family down the street.</li>
+      </ul></section>
+      <section><h3>While you’re away</h3><ul>
+        <li>The cats live their own lives every few hours: they make friends, fall in love, form cliques, start feuds, and nap.</li>
+        <li>Come back to <b>“While you were away”</b>: a recap of what your cat got up to, and a hello.</li>
+        <li>Cats sometimes find <b>gifts</b>, from a toy mouse to a rare tiny crown. Open its card to collect them, and dress your cat in the ones it can wear.</li>
+        <li>Now and then a cat slips out the window for an <b>adventure</b> and comes home with a postcard.</li>
+        <li>Every cat keeps a <b>diary</b>, written in its own voice.</li>
+      </ul></section>
+      <section><h3>Friends, rivals, and love</h3><ul>
+        <li>Each card’s <b>Feelings</b> shows how that cat feels about every other cat: green for friends, red for rivals, a heart for romance.</li>
+        <li><b>Meet a cat</b> sends yours over to someone. <b>Share a treat</b> can patch up a feud, <b>Set up a date</b> nudges two friends toward romance, and <b>Keep apart</b> stops two cats meeting for a day.</li>
+        <li>Rivals are sometimes caught <b>fighting</b> when you walk in. Lovers cuddle up together.</li>
+      </ul></section>
+      <section><h3>Kittens</h3><ul>
+        <li>When a girl and a boy cat are <b>deeply in love</b>, a cuddle can bring a <b>kitten</b>. It’s rare: about once a month for a devoted couple.</li>
+        <li>The kitten takes after both parents, grows up over <b>two weeks</b>, and belongs to both owners, who get to <b>name it</b>.</li>
+      </ul></section>
+      <section><h3>Being a good neighbour</h3><ul>
+        <li>Give anyone’s cat a <b>treat</b> and a <b>pet</b>, once a day each. Its owner sees who it was.</li>
+      </ul></section>
+      <section><h3>Tricks</h3><ul>
+        <li>Visit on different days and your cat learns <b>tricks</b>: sit (2 days), high-five (4), spin (7), roll over (10), and a backflip (14). Missing a day only pauses it.</li>
+      </ul></section>
+      <section><h3>The room</h3><ul>
+        <li>Every afternoon from <b>2 to 4</b> (Plano time), a big <b>sunbeam</b> pours through the window and the cats pile into it for a nap, unless there’s a storm.</li>
+        <li>Now and then a <b>thunderstorm</b> rolls in for two hours and everyone hides.</li>
+        <li>The room dresses up for the <b>seasons</b>: Halloween (October 10 to November 2), winter with a Christmas tree and ornaments to swat (December 1 to January 10), and spring (March 20 to May 31).</li>
+        <li><b>The Cattery Times</b> in the header is a weekly front page of the room’s romances, feuds, and scandals.</li>
+        <li>Take a <b>snapshot</b> of any cat and its best friend from its card to save or share.</li>
+      </ul></section>
+      <section><h3>Getting around</h3><ul>
+        <li>Turn the room with the arrows, zoom with the scroll wheel or a pinch, and drag to look around. <b>History</b> lists everything that has happened and who’s who.</li>
+      </ul></section>
+    </div>
+  </dialog>
+
+  <!-- The Cattery Times: a weekly front page written from the last 7 days of history (room.js writeTimes) -->
+  <dialog class="cats-times" aria-label="The Cattery Times">
+    <button type="button" class="cats-times-close" aria-label="Close">&times;</button>
+    <div class="cats-times-paper"></div>
+  </dialog>
+
+  <!-- the Cattery's own changelog (changelog.js), opened from the version in the header -->
+  <dialog class="cats-log-dlg" aria-labelledby="cats-log-title">
+    <div class="cats-log-head"><h2 id="cats-log-title">What’s new in the Cattery</h2><button type="button" class="cats-log-close" aria-label="Close">&times;</button></div>
+    <div class="cats-log-body"></div>
+  </dialog>
+
+  <!-- the Cat Maker -->
+  <dialog class="maker">
+    <form method="dialog" class="maker-form">
+      <button type="button" class="maker-close" aria-label="Close">&times;</button>
+      <h2>Cat Maker</h2>
+      <div class="maker-grid">
+        <div class="maker-preview">
+          <canvas width="140" height="100" aria-label="Your cat"></canvas>
+          <div class="maker-poses" role="group" aria-label="Preview">
+            <button type="button" data-pose="sit" aria-pressed="true">Sit</button>
+            <button type="button" data-pose="walk" aria-pressed="false">Walk</button>
+            <button type="button" data-pose="crouch" aria-pressed="false">Pounce</button>
+            <button type="button" data-pose="sleep" aria-pressed="false">Nap</button>
+          </div>
+        </div>
+        <div class="maker-controls">
+          <label class="maker-name">Name <input name="name" maxlength="16" autocomplete="off" required placeholder="Mochi"></label>
+          <label class="maker-name">Owner (your name) <input name="owner" maxlength="24" autocomplete="nickname" required placeholder="Shown on your cat's card"></label>
+          <fieldset><legend>Gender</legend><div class="maker-chips" data-field="gender"><button type="button" data-v="f" aria-pressed="false">Girl</button><button type="button" data-v="m" aria-pressed="false">Boy</button></div></fieldset>
+          <fieldset><legend>Pattern</legend><div class="maker-chips" data-field="pattern"></div></fieldset>
+          <fieldset><legend>Fur</legend><div class="maker-swatches" data-field="base"></div></fieldset>
+          <fieldset class="maker-second"><legend>Stripes</legend><div class="maker-swatches" data-field="second"></div></fieldset>
+          <fieldset><legend>Eyes</legend><div class="maker-swatches" data-field="eyes"></div></fieldset>
+          <label class="maker-check"><input type="checkbox" name="fluffy"> Fluffy</label>
+          <p class="maker-desc"></p>
+        </div>
+      </div>
+      <p class="maker-msg" role="alert"></p>
+      <div class="maker-buttons">
+        <button type="button" class="maker-random">Surprise me</button>
+        <button type="submit" class="maker-go">Move into the room</button>
+      </div>
+      <details class="maker-claim">
+        <summary>Already made a cat on another device? Use its recovery code</summary>
+        <p><input class="maker-code" placeholder="MOCHI-7K2F" autocomplete="off" spellcheck="false"> <button type="button" class="maker-claim-go">Use code</button></p>
+      </details>
+    </form>
+    <div class="maker-done" hidden>
+      <h2>Welcome, <span></span>!</h2>
+      <p>Your cat’s moved in. Keep this recovery code somewhere safe: it’s how you look after your cat from another phone or computer.</p>
+      <p class="maker-code-big"><code></code> <button type="button" class="maker-copy">Copy</button></p>
+      <p class="maker-stay">Come back and feed, pet or play with <span></span> at least every 30 days, or <i>they’ll</i> move out to live with a family down the street.</p>
+      <button type="button" class="maker-to-room">Go see the room</button>
+    </div>
+  </dialog>
+
+  <script src="/assets/js/back-close.js"></script>
+  <script src="/assets/js/whats-new.js"></script> <!-- "What's new" for returning visitors (no footer here) -->
+  <script src="changelog.js"></script>
+  <script src="catdraw.js"></script>
+  <script src="room.js" data-api="https://api.nickmade.net" data-api-local="http://localhost:8787"></script>
+</body>
+</html>

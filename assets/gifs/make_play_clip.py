@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""The home page's Play tile: play.mp4 + .jpg. Three games, 4 seconds each (Nick asked for even time): Nick's Office (the room's own 320x200 canvas, scaled
+"""The home page's Play tile: play.mp4 + .jpg. Four games, 4 seconds each (Nick asked for even time): Nick's Office (the room's own 320x200 canvas, scaled
 3x with hard pixel edges: The Dude, the cat, the SNES and the VW bus say their lines, the room turns, night falls),
-then each of the other games from their Play page clips (play/wall/: Nick's Nine's tee shot, Rapture's
-title), crossfading, and back round to the start.
+the Cattery (its room canvas, a 480x300 piece round two rivals' fight scaled 2x: a lunge, the brawl cloud, popping
+out; added 2026-10-14, Nick: "Play gif on homepage needs to add Cattery"), then each of the other games from their
+Play page clips (play/wall/: Nick's Nine's tee shot, Rapture's title), crossfading, and back round to the start.
 
-    node record_play.js <work folder> && python3 make_play_clip.py <work folder>    # Pillow, ffmpeg
+    node record_play.js <work folder> && node record_cattery.js <work folder> && python3 make_play_clip.py <work folder>    # Pillow, ffmpeg
+    (record_cattery.js needs the local Worker on :8787 with rival cats in its room)
 """
 import os, shutil, subprocess, sys
 from PIL import Image
@@ -13,6 +15,8 @@ from cliplib import ROOT, W, H, FPS, Frames, ease, workdir
 WORK = workdir(os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else "clip-work"))
 CLIPS = [("nicks-nine", 3.3, 4.0), ("rapture", 0.2, 4.0)]  # (play/wall/<name>.mp4, start s, length s): 4 s each, like the Office
 FADE = 7  # frames of crossfade
+CATTERY = (147, 120, (260, 400, 740, 700))  # cattery-raw frames: first, how many (4 s), and the piece of the room (left, top, right, bottom)
+CATTERY_BG = (59, 79, 107)  # the Cattery page's background (#3b4f6b), under anything outside the room
 
 
 def clip(name, start, length):
@@ -25,10 +29,21 @@ def clip(name, start, length):
     return [Image.open(os.path.join(d, f)).convert("RGB") for f in sorted(os.listdir(d))]
 
 
+def cattery():
+    raw = os.path.join(WORK, "cattery-raw")
+    first, n, box = CATTERY
+    out = []
+    for f in sorted(x for x in os.listdir(raw) if x.endswith(".png"))[first:first + n]:
+        im = Image.open(os.path.join(raw, f)).convert("RGBA").crop(box)
+        bg = Image.new("RGBA", im.size, CATTERY_BG + (255,))
+        out.append(Image.alpha_composite(bg, im).convert("RGB").resize((W, H), Image.NEAREST))
+    return out
+
+
 def main():
     raw = os.path.join(WORK, "play-raw")
     office = [Image.open(os.path.join(raw, f)).convert("RGB").resize((W, H), Image.NEAREST) for f in sorted(os.listdir(raw)) if f.endswith(".png")]
-    parts = [office] + [clip(*c) for c in CLIPS]
+    parts = [office, cattery()] + [clip(*c) for c in CLIPS]
     out = []
     for part in parts:
         if out:  # crossfade the last frames of what's there into this part's first

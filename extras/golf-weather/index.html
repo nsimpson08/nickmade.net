@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Golf weather · NickMade</title>
+  <meta name="description" content="The best times to play golf this week near any US ZIP code, from the National Weather Service's hourly forecast.">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://api.weather.gov">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500&family=Unbounded:wght@500;600;700;800&display=swap">
+  <link rel="stylesheet" href="/assets/css/site.css">
+</head>
+<body class="page-extras page-golfwx">
+  <header class="topbar">
+    <a class="wordmark" href="/">Nick<span>Made</span></a>
+    <nav>
+      <a href="/games/">Games</a>
+      <a href="/movies/">Movies</a>
+      <a href="/music/">Music</a>
+      <a href="/photography/">Photography</a>
+      <a href="/play/">Play</a>
+      <a href="/extras/" aria-current="page">Extras</a>
+    </nav>
+  </header>
+
+  <main class="content golfwx">
+    <header class="page-head">
+      <a class="back" href="/extras/">&larr; Extras</a>
+      <h1>Golf weather</h1>
+      <p>The best times to play this week near any US ZIP code, by my rules: not over 85°F, wind up to 20 mph, and a dry window of at least 4 hours.</p>
+    </header>
+    <form class="gw-search" id="gw-search" autocomplete="off" novalidate>
+      <label class="gw-label" for="gw-zip">ZIP code</label>
+      <input id="gw-zip" name="zip" inputmode="numeric" maxlength="5" pattern="[0-9]{5}" placeholder="75074" aria-describedby="gw-msg">
+      <button type="submit">Check</button>
+      <span class="gw-msg" id="gw-msg" role="status"></span>
+    </form>
+    <div id="gw"></div>
+  </main>
+  <footer id="site-footer">&copy; 2026 Nick Simpson</footer>
+  <script src="/assets/js/golf-weather.js"></script>
+  <script src="/changelog/log.js"></script>
+  <script src="/assets/js/footer.js"></script>
+</body>
+</html>

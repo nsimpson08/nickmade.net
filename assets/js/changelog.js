@@ -23,7 +23,8 @@
   }
 
   root.innerHTML = log.map(function (v, i) {
-    return '<section class="release' + (i === 0 ? " latest" : "") + '">' +
+    // each version has an id (#v1-5), so the "What's new" pop-up can link to one ("You also missed")
+    return '<section class="release' + (i === 0 ? " latest" : "") + '" id="v' + esc(String(v.version).replace(/\./g, "-")) + '">' +
       '<h2 class="release-head"><span class="release-version">Ver ' + esc(v.version) + "</span>" +
         (v.title ? '<span class="release-title">' + esc(v.title) + "</span>" : "") +
         '<time datetime="' + esc(v.date) + '">' + esc(when(v.date)) + "</time></h2>" +
@@ -35,4 +36,7 @@
         return "<li>" + tag + "<span>" + esc(c.text) + "</span></li>";
       }).join("") + "</ul></section>";
   }).join("") || '<p class="empty">Nothing here yet.</p>';
+  // the page is drawn after it loads, so a link to one version (#v1-5) has to be scrolled to now
+  var target = location.hash && document.getElementById(location.hash.slice(1));
+  if (target) target.scrollIntoView();
 })();

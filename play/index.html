@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Play · NickMade</title>
-  <meta name="description" content="Browser games made by Nick Simpson: Nick's Nine and Rapture: ADAM & Dice. Free to play, nothing to install.">
+  <meta name="description" content="Browser games made by Nick Simpson: the Cattery, Nick's Office, Nick's Nine and Rapture: ADAM & Dice. Free to play, nothing to install.">
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -33,8 +33,28 @@
     <!-- The games themselves still live at /extras/golf-game/ and /extras/rapture/: they're built in their own
          projects, whose publish scripts copy them there (see NOTES). -->
     <section class="games-list">
+      <!-- Ver 1.6: built here (play/cats/: plain canvas; the cats live in the Worker, worker/src/cats.js) -->
+      <article class="project game-card" data-game="cats">
+        <a class="game-clip" href="/play/cats/" tabindex="-1" aria-hidden="true">
+          <video src="/play/wall/cats.mp4?v=2026-10-15" poster="/play/wall/cats.jpg?v=2026-10-15" muted loop playsinline preload="none"></video>
+        </a>
+        <div>
+          <h2>The Cattery</h2>
+          <p>Make your own cat and move it into a room shared with everyone else’s. Feed it, pet it, and send it up the cat towers. While you’re away the cats live their own lives: they make friends, fall in love, start feuds, and get caught fighting. Come back to see what yours got up to and the gifts it found, read its diary, and meddle: share a treat with a rival, set up a date, or keep two cats apart. Watch out for thunderstorms.</p>
+          <ul class="tags">
+            <li>Virtual pet</li>
+            <li>Canvas</li>
+            <li>Pixel art</li>
+            <li>Shared room</li>
+          </ul>
+        </div>
+        <div class="game-links">
+          <a class="open" href="/play/cats/#make">Make your cat <span>&rarr;</span></a>
+          <a class="open" href="/play/cats/">Visit the room <span>&rarr;</span></a>
+        </div>
+      </article>
       <!-- Ver 1.4: built here, not in its own project (play/office/: plain canvas, no build step) -->
-      <article class="project game-card">
+      <article class="project game-card" data-game="office">
         <a class="game-clip" href="/play/office/" tabindex="-1" aria-hidden="true">
           <video src="/play/wall/office.mp4" poster="/play/wall/office.jpg" muted loop playsinline preload="none"></video>
         </a>
@@ -50,7 +70,7 @@
         </div>
         <a class="open" href="/play/office/">Look around <span>&rarr;</span></a>
       </article>
-      <article class="project game-card">
+      <article class="project game-card" data-game="nine">
         <a class="game-clip" href="/extras/golf-game/" tabindex="-1" aria-hidden="true">
           <video src="/play/wall/nicks-nine.mp4" poster="/play/wall/nicks-nine.jpg" muted loop playsinline preload="none"></video>
         </a>
@@ -66,7 +86,7 @@
         </div>
         <a class="open" href="/extras/golf-game/">Play <span>&rarr;</span></a>
       </article>
-      <article class="project game-card">
+      <article class="project game-card" data-game="rapture">
         <a class="game-clip" href="/extras/rapture/" tabindex="-1" aria-hidden="true">
           <video src="/play/wall/rapture.mp4" poster="/play/wall/rapture.jpg" muted loop playsinline preload="none"></video>
         </a>
@@ -99,6 +119,49 @@
     })();
   </script>
   <script src="/changelog/log.js"></script>
+  <script>
+    // A new version of a game (a changelog line with game: "office" / "nine" / "rapture") gets a pulsing dot on its
+    // card until the visitor opens that game, or for a week after that version's changelog date, whichever comes first.
+    // Remembered per game in their browser (localStorage "nm-seen-play-<game>").
+    // Someone who has never had the dot starts from the site version they last saw (footer.js "nm-seen-version"),
+    // so a game updated since their last visit still shows it; first-time visitors start up to date. Runs before
+    // footer.js, which sets nm-seen-version for first-time visitors.
+    (function () {
+      var log = window.CHANGELOG || [];
+      if (!log.length) return;
+      function num(v) { return String(v || "0").split(".").map(Number); }
+      function newer(a, b) { // version a after version b
+        a = num(a); b = num(b);
+        for (var i = 0; i < Math.max(a.length, b.length); i++) if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) > (b[i] || 0);
+        return false;
+      }
+      function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+      function set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+      var base = get("nm-seen-version") || log[0].version;
+      [].forEach.call(document.querySelectorAll(".game-card[data-game]"), function (card) {
+        var game = card.getAttribute("data-game"), key = "nm-seen-play-" + game, latest = null, date = null;
+        log.some(function (v) {
+          var hit = (v.changes || []).some(function (c) { return c.game === game; });
+          if (hit) { latest = v.version; date = v.date; }
+          return hit;
+        });
+        if (!latest) return;
+        if (Date.now() - new Date(date + "T00:00:00").getTime() > 7 * 864e5) return; // a week old: gone for everyone
+        var seen = get(key);
+        if (seen === null) { seen = base; set(key, seen); }
+        if (!newer(latest, seen)) return;
+        var h = card.querySelector("h2");
+        var tag = document.createElement("span");
+        tag.className = "play-new";
+        tag.title = "Updated in Ver " + latest;
+        tag.innerHTML = '<i aria-hidden="true"></i>New version';
+        h.appendChild(tag);
+        [].forEach.call(card.querySelectorAll("a"), function (a) {
+          a.addEventListener("click", function () { set(key, latest); });
+        });
+      });
+    })();
+  </script>
   <script src="/assets/js/footer.js"></script>
 </body>
 </html>

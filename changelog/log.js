@@ -9,9 +9,30 @@
 // page    which part of the site it's about (gives the line its colored tag):
 //         "site", "home", "games", "movies", "music", "photography", "play", or "extras"
 //         The changelog page groups a version's lines by page in that order, whatever order they're written in.
+// game    optional, on a "play" line about one game ("office", "nine", "rapture"): the Play page puts a pulsing dot on
+//         that game's card for returning visitors until they open it (play/index.html). Use it for a new version of a
+//         game, not for a small fix.
+// The "What's new" pop-up for returning visitors has its own text: changelog/popup.js.
 // When to bump: 1.1, 1.2... for new features or sections; 2.0 for a big redesign.
 // New movies, games, or photos don't need a version (that's content; the home Lately strip covers it).
 window.CHANGELOG = [
+  {
+    version: "1.6",
+    date: "2026-10-15",
+    title: "The Cattery",
+    changes: [
+      { page: "home", text: "A new Movies tile" },
+      { page: "games", text: "A PlayStation trophies banner next to Xbox: Full trophy count. Sad PS2 never had these :(" },
+      { page: "games", text: "A Steam banner as well w/link" },
+      { page: "games", text: "Recently Played has its Archive again, like Recently Watched on Movies" },
+      { page: "photography", text: "Photos moved to new server; load faster" },
+      { page: "play", game: "cats", text: "The Cattery: make your own cat, name it, and let it loose in a room with everyone else's. Feed it, pet it, and see who its friends, rivals, and crushes are" },
+      { page: "play", text: "Coming back to the Cattery: see what your cat got up to while you were away, find the gifts it collected, and read its diary. Your cat comes to say hello, too" },
+      { page: "play", game: "nine", text: "Nick's Nine 1.2: arrows on the greens show the slope, more varied holes with real doglegs and new ponds, true lip-outs, and fast-forward. The full list is on the game's title screen" },
+      { page: "play", text: "A glowing dot on a game's card means it has a new version since you last played" },
+      { page: "extras", text: "Golf weather: enter any US ZIP code to see the best times to play this week, by my limits on heat, cold, wind, and rain. Pick a nearby course and it shows how many holes play in or against the wind" }
+    ]
+  },
   {
     version: "1.5",
     date: "2026-10-10",

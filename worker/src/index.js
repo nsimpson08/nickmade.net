@@ -3,7 +3,10 @@ import { musicRoute, MUSIC_SCOPES } from "./music.js";
 import { votesRoute } from "./votes.js";
 import { libraryRoute } from "./library.js";
 import { photosRoute } from "./photos.js";
+import { catsRoute, catsTick } from "./cats.js";
 import { scorecardRoute } from "./scorecard.js";
+import { recordTrophies, trophiesView, TROPHIES_KEY, PsnError } from "./psn.js";
+import { recordSteam, steamView, STEAM_KEY, SteamError } from "./steam.js";
 
 // nickmade-queue: the live sections of the Movies and Games pages: visitor suggestions for "In the Queue",
 // Nick's "Recently Watched"/"Recently Played" lists, and Nick's site-added picks for other sections.
@@ -34,6 +37,8 @@ import { scorecardRoute } from "./scorecard.js";
 //   POST   /xbox/import         { games: [{ titleId, date }] } (admin) -> logs them in Games' Recently Played
 //   POST   /xbox/sync           (admin) run the every-4-hours Recently Played refresh and gamerscore snapshot now (see scheduled() below)
 //   GET    /xbox/gamerscore     Nick's total gamerscore and how much it went up in the last 24 hours (Games banner)
+//   GET    /psn/trophies        Nick's PlayStation trophies, the same way (the Games page's second banner; psn.js)
+//   GET    /steam/achievements  Nick's Steam achievements, the same way (the third banner; steam.js)
 //                               (or refreshes their Xbox stats if already there), poster from PosterSpy or the Xbox store
 //   GET    /library ...         Movies > Library: discs Nick adds on the site (see library.js)
 //   GET    /photos ...          Photography: photos Nick adds on the site, stored in R2 (see photos.js)
@@ -48,6 +53,7 @@ import { scorecardRoute } from "./scorecard.js";
 //   /golf/leaderboard           Nick's Nine leaderboard (GET, POST; DELETE /golf/leaderboard/:id as admin), see golf.js
 //   /music/search, /music/recs  Music's "Suggest a song": songs added to Nick's private community playlist, see music.js
 //   GET/POST /votes             upvotes on In the Queue (Movies and Games), see votes.js
+//   /cats ...                   Play > The Cattery: visitors' cats, how they get on, the room's history (see cats.js)
 //   /scorecard/...              Extras > Scorecard, the real-course score tracker (owner only until SCORECARD_PUBLIC), see scorecard.js
 //
 // Storage: one KV namespace (QUEUE). Keys (Movies keeps the original unprefixed names):
@@ -60,6 +66,7 @@ import { scorecardRoute } from "./scorecard.js";
 //   spotify:scope                  the permissions granted at the last connect; music:* keys are in music.js
 //   xbox:recent                    10-minute cache of /xbox/recent (OpenXBL allows 150 requests/hour, shared with the Montage app)
 //   xbox:gamerscore                { total, at, history: [{ date, total }] }: one snapshot a night, the last 60 kept
+//   cats:room                      the Cattery: every cat, how each pair get on, the history (cats.js)
 
 const PER_VISITOR = 3;
 // Recently Watched/Played keeps the newest 8 by date; older ones move to watched-archive (listed under the section).
@@ -123,8 +130,10 @@ export default {
       if (url.pathname === "/xbox/import" && request.method === "POST") return await xboxImport(request, env, cors);
       if (url.pathname === "/xbox/sync" && request.method === "POST") {
         if (!isAdmin(request, env)) return json({ error: "Unauthorized" }, 401, cors);
-        // the gamerscore and the games each on their own: one failing doesn't stop the other
-        const [synced, scored] = await Promise.allSettled([syncRecentlyPlayed(env), recordGamerscore(env)]);
+        // the gamerscore, the games, PlayStation and Steam each on their own: one failing doesn't stop the others
+        const [synced, scored, ps, st] = await Promise.allSettled([syncRecentlyPlayed(env), recordGamerscore(env),
+          env.PSN_NPSSO ? recordTrophies(env, NIGHT_HELPERS) : Promise.resolve(null),
+          env.STEAM_API_KEY ? recordSteam(env, NIGHT_HELPERS) : Promise.resolve(null)]);
         const failed = [synced, scored].filter((x) => x.status === "rejected").map((x) => x.reason);
         failed.forEach((e) => console.log("Xbox refresh failed:", e && e.message));
         if (failed.length === 2) {
@@ -137,9 +146,19 @@ export default {
           result.gamerscore = score.total;
           result.gained = score.gained;
         } else result.gamerscoreError = scored.reason.message;
+        if (ps.status === "rejected") {
+          console.log("PlayStation refresh failed:", ps.reason && ps.reason.message);
+          result.psnError = ps.reason.message;
+        } else if (ps.value) result.trophies = ps.value.total;
+        if (st.status === "rejected") {
+          console.log("Steam refresh failed:", st.reason && st.reason.message);
+          result.steamError = st.reason.message;
+        } else if (st.value) result.steam = st.value.counting ? "counting, " + st.value.left + " games left" : st.value.total;
         return json(result, 200, cors);
       }
       if (url.pathname === "/xbox/gamerscore" && request.method === "GET") return await gamerscore(env, cors);
+      if (url.pathname === "/psn/trophies" && request.method === "GET") return await trophies(env, cors);
+      if (url.pathname === "/steam/achievements" && request.method === "GET") return await steamAchievements(env, cors);
       if (url.pathname === "/lists" && request.method === "GET") return await getLists(url, env, cors);
       if (url.pathname === "/lists" && request.method === "POST") return await addToList(request, env, cors);
       if (url.pathname.startsWith("/lists/") && request.method === "DELETE") return await removeFromList(request, url, env, cors);
@@ -177,11 +196,11 @@ export default {
       if (url.pathname.startsWith("/watched/") && request.method === "PATCH") return await editWatched(request, url, env, cors);
       if (url.pathname.startsWith("/watched/") && request.method === "DELETE") return await removeWatched(request, url, env, cors);
       if (url.pathname.startsWith("/golf/")) {
-        const res = await golfRoute(request, url, env, cors, { json, isAdmin, sha256, normalize, BLOCKED });
+        const res = await golfRoute(request, url, env, cors, { json, isAdmin, sha256, normalize, BLOCKED, tellOwner });
         if (res) return res;
       }
       if (url.pathname === "/votes") {
-        const res = await votesRoute(request, url, env, cors, { json, sha256, normalize, pageOf, queueState, suggesterId, isAdmin });
+        const res = await votesRoute(request, url, env, cors, { json, sha256, normalize, pageOf, queueState, suggesterId, isAdmin, tellOwner });
         if (res) return res;
       }
       if (url.pathname === "/library" || url.pathname.startsWith("/library/")) {
@@ -192,16 +211,21 @@ export default {
         const res = await photosRoute(request, url, env, cors, { json, isAdmin });
         if (res) return res;
       }
+      if (url.pathname === "/cats" || url.pathname.startsWith("/cats/")) {
+        const res = await catsRoute(request, url, env, cors, { json, isAdmin, sha256, normalize, BLOCKED, tellOwner });
+        if (res) return res;
+      }
       if (url.pathname.startsWith("/scorecard/")) {
-        const res = await scorecardRoute(request, url, env, cors, { json, isAdmin, sha256 });
+        const res = await scorecardRoute(request, url, env, cors, { json, isAdmin, sha256, tellOwner });
         if (res) return res;
       }
       if (url.pathname.startsWith("/music/")) {
-        const res = await musicRoute(request, url, env, cors, { json, isAdmin, normalize, BLOCKED, visitorKeys, usedBy, suggesterId, spotifyAccess });
+        const res = await musicRoute(request, url, env, cors, { json, isAdmin, normalize, BLOCKED, visitorKeys, usedBy, suggesterId, spotifyAccess, tellOwner });
         if (res) return res;
       }
       return json({ error: "Not found" }, 404, cors);
     } catch (err) {
+      console.log("Error on " + url.pathname + ":", err && (err.stack || err.message)); // visitors only see the plain message
       return json({ error: "Something went wrong. Try again in a bit." }, 500, cors);
     }
   },
@@ -217,6 +241,9 @@ export default {
     // night's snapshot was missed and "last 24h" showed +0)
     ctx.waitUntil(twice(env, "sync", () => syncRecentlyPlayed(env)));
     ctx.waitUntil(twice(env, "gamerscore", () => recordGamerscore(env)));
+    if (env.PSN_NPSSO) ctx.waitUntil(twice(env, "psn", () => recordTrophies(env, NIGHT_HELPERS)));
+    if (env.STEAM_API_KEY) ctx.waitUntil(twice(env, "steam", () => recordSteam(env, NIGHT_HELPERS)));
+    if (event.cron === EVERY_4H) ctx.waitUntil(twice(env, "cats", () => catsTick(env))); // a few rounds of cat life
   },
 };
 
@@ -238,6 +265,16 @@ function json(data, status, cors) {
     status: status || 200,
     headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...cors },
   });
+}
+
+// A visitor's action Nick wants on his phone (a new or edited queue suggestion, a song suggestion, a vote, a finished
+// Scorecard round, an approved course file): saved as its own short-lived KV entry, owner:event:<time>-<random>, for
+// his notifications to pick up. Never Nick's own actions, and never in the visitor's way (a failure is just logged).
+async function tellOwner(env, event) {
+  try {
+    const id = Date.now() + "-" + crypto.randomUUID().slice(0, 8);
+    await env.QUEUE.put("owner:event:" + id, JSON.stringify(Object.assign({ at: new Date().toISOString() }, event)), { expirationTtl: 3 * 86400 });
+  } catch (e) { console.log("tellOwner failed:", e.message); }
 }
 
 function isAdmin(request, env) {
@@ -447,6 +484,7 @@ async function addToQueue(request, env, cors) {
   latest.items.push(item);
   await env.QUEUE.put(queueKey(page), JSON.stringify(latest.items));
   for (const k of keys) await env.QUEUE.put(k, String(used + 1));
+  if (!owner) await tellOwner(env, { type: "suggestion", page, title: movie.title, year: movie.year || null, by: name, note: item.comment || "", private: !!item.commentPrivate });
 
   return json({
     item: publicItem(item, owner, by),
@@ -652,6 +690,7 @@ async function editSuggestion(request, url, env, cors) {
   if (comment && body.commentPrivate === true) it.commentPrivate = true; else delete it.commentPrivate;
   it.editedAt = new Date().toISOString();
   await env.QUEUE.put(queueKey(page), JSON.stringify(items));
+  await tellOwner(env, { type: "suggestion-edit", page, title: it.title, year: it.year || null, by: name, note: it.comment || "", private: !!it.commentPrivate });
   return json({ item: publicItem(it, false, by) }, 200, cors);
 }
 
@@ -1147,7 +1186,7 @@ async function syncRecentlyPlayed(env) {
 async function twice(env, step, run) {
   for (let i = 0; i < 2; i++) {
     try { return await run(); } catch (e) {
-      console.log("Xbox " + step + " failed (try " + (i + 1) + "):", e.message);
+      console.log(step + " failed (try " + (i + 1) + "):", e.message);
       await env.QUEUE.put("xbox:lastError", JSON.stringify({ step, message: String(e.message || e), at: new Date().toISOString() }), { expirationTtl: 30 * 86400 });
       if (i === 0) await new Promise((r) => setTimeout(r, 60000));
     }
@@ -1243,6 +1282,30 @@ async function gamerscore(env, cors) {
     }
   }
   return json(gamerscoreView(env, saved), 200, cors);
+}
+
+// ---------- PlayStation trophies banner (psn.js does the work) ----------
+
+const NIGHT_HELPERS = { dateIn, shiftDate, nights, mergeNights };
+
+async function trophies(env, cors) {
+  if (!env.PSN_NPSSO) return json({ error: "PlayStation isn't connected." }, 404, cors);
+  let saved = await env.QUEUE.get(TROPHIES_KEY, "json");
+  if (!saved) { // first visit before the first check
+    try { saved = await recordTrophies(env, NIGHT_HELPERS); } catch (e) {
+      if (e instanceof PsnError) return json({ error: e.message }, 502, cors);
+      throw e;
+    }
+  }
+  return json(trophiesView(env, saved, NIGHT_HELPERS), 200, cors);
+}
+
+// the Steam banner: hidden (503) until the first count of every game is done
+async function steamAchievements(env, cors) {
+  if (!env.STEAM_API_KEY) return json({ error: "Steam isn't connected." }, 404, cors);
+  const saved = await env.QUEUE.get(STEAM_KEY, "json");
+  if (!saved || saved.counting) return json({ error: "Still counting Steam achievements." }, 503, cors);
+  return json(steamView(env, saved, NIGHT_HELPERS), 200, cors);
 }
 
 // ---------- Spotify: top song of a public playlist ----------

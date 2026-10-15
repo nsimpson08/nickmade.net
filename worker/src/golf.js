@@ -1,7 +1,7 @@
 // Nick's Nine leaderboard (extras/golf-game): visitors save their round when they finish the 9th hole.
 //
 //   GET    /golf/leaderboard?visitorId=   { entries: best rounds first (top 100), each { id, name, score, toPar, ghost, date,
-//                                          owner?, mine? } }
+//                                          version, owner?, mine? } }
 //   POST   /golf/leaderboard   { name, holes: [9 hole scores], ghost, visitorId, version } -> { entry, rank, entries }
 //                              with Authorization: Bearer ADMIN_TOKEN (owner mode) the round is marked as Nick's own
 //   DELETE /golf/leaderboard/:id  (admin) remove a round
@@ -38,7 +38,8 @@ async function by(visitorId, env, h) {
 }
 
 function publicEntry(e, mine) {
-  const out = { id: e.id, name: e.name, score: e.score, toPar: e.score - PAR, ghost: e.ghost, date: e.date };
+  // the game version the round was played on; rounds saved before versions were sent were all on 1.1
+  const out = { id: e.id, name: e.name, score: e.score, toPar: e.score - PAR, ghost: e.ghost, date: e.date, version: e.v || "1.1" };
   if (e.owner) out.owner = true;
   if (mine && e.by === mine) out.mine = true;
   return out;
@@ -88,6 +89,7 @@ async function save(request, env, cors, h) {
   const all = (await board(env)).concat(entry).sort(order).slice(0, KEEP);
   await env.QUEUE.put(KEY, JSON.stringify(all));
   const rank = all.indexOf(entry) + 1; // 0 if it didn't make the kept list
+  if (!owner && h.tellOwner) await h.tellOwner(env, { type: "leaderboard", name, score, par: PAR, rank: rank || null, of: all.length });
   return h.json({
     entry: publicEntry(entry, vid), rank: rank || null,
     entries: all.slice(0, SHOW).map((e) => publicEntry(e, vid)),

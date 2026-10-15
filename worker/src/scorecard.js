@@ -579,6 +579,7 @@ async function approve(request, id, env, cors, h) {
       "owner_checked = MAX(courses.owner_checked, excluded.owner_checked), updated_at = excluded.updated_at")
       .bind(id, course.name, course.place || "", version, me.owner ? 1 : 0, now),
   ]);
+  if (!me.owner && h.tellOwner) await h.tellOwner(env, { type: "course", name: course.name, place: course.place || "", version });
   return h.json({ saved: true, version, checked: { version, owner: me.owner, at: now } }, 200, cors);
 }
 
@@ -632,7 +633,7 @@ async function putRound(request, id, env, cors, h) {
   if (!b || !b.round) return h.json({ error: "Bad request." }, 400, cors);
   const me = await player(request, env, h, b.visitorId, true);
   if (!me) return h.json({ error: "Missing this browser's id." }, 400, cors);
-  const have = await env.GOLF.prepare("SELECT player_id FROM rounds WHERE id = ?").bind(id).first();
+  const have = await env.GOLF.prepare("SELECT player_id, finished_at FROM rounds WHERE id = ?").bind(id).first();
   if (have && have.player_id !== me.id) return h.json({ error: "That round belongs to someone else." }, 403, cors);
 
   const r = b.round;
@@ -682,6 +683,10 @@ async function putRound(request, id, env, cors, h) {
   stmts.push(env.GOLF.prepare("DELETE FROM round_holes WHERE round_id = ? AND hole NOT IN (SELECT value FROM json_each(?)) " +
     "AND (SELECT updated_at FROM rounds WHERE id = ?) <= ?").bind(id, JSON.stringify(present), id, r.updatedAt));
   await env.GOLF.batch(stmts);
+  // another golfer just finished a round (its first save marked done): a notification on Nick's phone
+  if (!me.owner && Number.isFinite(r.finishedAt) && !(have && have.finished_at) && h.tellOwner) {
+    await h.tellOwner(env, { type: "round", player: str(r.player, 24), course: str(r.courseName, 80), strokes: n(t.strokes, 400), par: n(t.par, 120), holes: n(t.done, 18) });
+  }
   return h.json({ ok: true }, 200, cors);
 }
 

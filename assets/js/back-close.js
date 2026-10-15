@@ -1,8 +1,9 @@
 // The phone's Back button closes what's open instead of leaving the page (Ver 1.4): a photo in the full view, any
-// dialog (a disc's case, the add and login dialogs...), the poster wall, Nick's Office's card. Opening one adds a step
+// dialog (a disc's case, the add and login dialogs...), the poster wall, Nick's Office's card, the Cattery's card and
+// history panel. Opening one adds a step
 // to the browser's history; Back takes that step and this closes the window, the same as its ×. Closing it any other
 // way (×, Escape, clicking outside) takes the step back out, so the history stays as it was.
-// Loaded on every page by footer.js (and by play/office/ directly, which has no footer).
+// Loaded on every page by footer.js (and by play/office/ and play/cats/ directly, which have no footer).
 (function () {
   if (window.NMBackClose) return;
   window.NMBackClose = true;
@@ -13,10 +14,12 @@
     { open: function () { return document.querySelector('.wall[role="dialog"]'); }, close: function (el) { click(el, ".wall-close"); } },
     { open: function () { return document.querySelector("#lightbox:not([hidden])"); }, close: function (el) { click(el, ".lightbox-close"); } },
     { open: function () { return document.querySelector(".office-card:not([hidden])"); }, close: function (el) { click(el, ".office-card-close"); } },
+    { open: function () { return document.querySelector(".cats-card:not([hidden])"); }, close: function (el) { click(el, ".cats-card-close"); } },
+    { open: function () { return document.querySelector(".cats-panel:not([hidden])"); }, close: function (el) { click(el, ".cats-panel-close"); } },
   ];
   function click(el, sel) { var b = el.querySelector(sel); if (b) b.click(); }
   function count() {
-    return document.querySelectorAll('dialog[open], .wall[role="dialog"], #lightbox:not([hidden]), .office-card:not([hidden])').length;
+    return document.querySelectorAll('dialog[open], .wall[role="dialog"], #lightbox:not([hidden]), .office-card:not([hidden]), .cats-card:not([hidden]), .cats-panel:not([hidden])').length;
   }
 
   var open = 0; // how many we've added a history step for

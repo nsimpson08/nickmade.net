@@ -191,6 +191,7 @@ async function add(request, env, cors, h) {
   latest.unshift(item);
   await env.QUEUE.put(RECS, JSON.stringify(latest));
   for (const k of keys) await env.QUEUE.put(k, String(used + 1));
+  if (!owner && h.tellOwner) await h.tellOwner(env, { type: "song", title: item.title, artist: item.artist, by: item.suggestedBy || "" });
   return h.json({
     item: publicRec(item, owner, by),
     yourRemaining: owner ? PER_VISITOR : Math.max(0, PER_VISITOR - used - 1),
