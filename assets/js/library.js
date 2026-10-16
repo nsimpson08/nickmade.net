@@ -573,6 +573,13 @@
 
   // The add dialog: search IMDb (films and series), pick one, pick the format and any extras, add.
   var addDlg = null, picked = null, searchTimer = null, searchSeq = 0;
+  var ADD_HINT = "It goes on the shelves (and New Arrivals) right away.";
+  var FEATURE_TAGS = ["Making Of", "Gag Reel", "Behind the Scenes", "Deleted Scenes", "Audio Commentary"];
+  function featLines() { return addDlg.querySelector("#lib-features").value.split("\n").map(function (l) { return l.trim(); }).filter(Boolean); }
+  function syncFeatTags() {
+    var have = featLines().map(function (l) { return l.toLowerCase(); });
+    [].forEach.call(addDlg.querySelectorAll(".lib-feat-tags button"), function (b) { b.setAttribute("aria-pressed", String(have.indexOf(b.dataset.feat.toLowerCase()) >= 0)); });
+  }
   function openAdd() {
     if (!addDlg) {
       addDlg = document.createElement("dialog");
@@ -581,7 +588,7 @@
         '<form novalidate>' +
           '<button class="close" type="button" aria-label="Close">&times;</button>' +
           "<h2>Add a disc</h2>" +
-          '<p class="hint">It goes on the shelves (and New Arrivals) right away.</p>' +
+          '<p class="hint">' + ADD_HINT + "</p>" +
           // Scan the barcode (1.4): the exact release, so the title, format, edition and HDR fill in themselves
           '<div class="lib-scan">' +
             '<button type="button" class="open lib-scan-btn" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V4h3M21 7V4h-3M3 17v3h3M21 17v3h-3M7 8v8M10 8v8M13 8v8M16 8v8"/></svg>Scan the barcode</button>' +
@@ -617,9 +624,17 @@
           '<label for="lib-edition">Edition <span class="optional">(optional)</span></label>' +
           '<input id="lib-edition" type="text" maxlength="80" placeholder="e.g. Collector\u2019s Edition">' +
           '<label for="lib-features">On this disc <span class="optional">(optional, one per line)</span></label>' +
+          // the common extras, one tap each (Nick, 2026-10-16): adds the line, or takes it off again
+          '<div class="lib-feat-tags" role="group" aria-label="Common extras">' + FEATURE_TAGS.map(function (t) {
+            return '<button type="button" data-feat="' + esc(t) + '" aria-pressed="false">' + esc(t) + "</button>";
+          }).join("") + "</div>" +
           '<textarea id="lib-features" rows="4" placeholder="Behind-the-scenes documentary\nDeleted scenes\nTrailer"></textarea>' +
           '<p class="error" role="alert"></p>' +
-          '<button class="open submit" type="submit" disabled>Add to the shelves</button>' +
+          '<div class="lib-submits">' +
+            '<button class="open submit" type="submit" disabled>Add to the shelves</button>' +
+            // adds it, then clears the form and opens the barcode scanner for the next one (Nick, 2026-10-16)
+            '<button class="open submit lib-add-more" type="submit" data-more="1" disabled>Add + another</button>' +
+          "</div>" +
         "</form>";
       document.body.appendChild(addDlg);
       var q = addDlg.querySelector("#lib-q");
@@ -649,6 +664,7 @@
         var ed = editionsFound[+b.dataset.ed];
         [].forEach.call(addDlg.querySelectorAll(".lib-ed-list button"), function (x) { x.setAttribute("aria-pressed", String(x === b)); });
         addDlg.querySelector("#lib-features").value = ed.features.join("\n");
+        syncFeatTags();
         var name = addDlg.querySelector("#lib-edition");
         if (!name.value.trim() && ed.title && !/^\d{4}\s/.test(ed.title)) name.value = ed.title.replace(/\s*\b(4K|UHD|Blu-?ray)\b\s*$/i, "");
         var f = ed.format && addDlg.querySelector('input[name="lib-format"][value="' + ed.format + '"]');
@@ -658,6 +674,15 @@
         findHdr();
       });
       addDlg.querySelector("form").addEventListener("submit", submitAdd);
+      addDlg.querySelector(".lib-feat-tags").addEventListener("click", function (e) {
+        var b = e.target.closest("[data-feat]");
+        if (!b) return;
+        var t = b.dataset.feat, lines = featLines(), at = lines.map(function (l) { return l.toLowerCase(); }).indexOf(t.toLowerCase());
+        if (at >= 0) lines.splice(at, 1); else lines.push(t);
+        addDlg.querySelector("#lib-features").value = lines.join("\n");
+        syncFeatTags();
+      });
+      addDlg.querySelector("#lib-features").addEventListener("input", syncFeatTags);
       addDlg.addEventListener("close", stopScan);
       if ("BarcodeDetector" in window && navigator.mediaDevices) addDlg.querySelector(".lib-scan-btn").hidden = false;
       addDlg.querySelector(".lib-scan-btn").addEventListener("click", startScan);
@@ -666,7 +691,14 @@
       addDlg.querySelector(".lib-upc-go").addEventListener("click", function () { lookUpBarcode(upc.value); });
       upc.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); lookUpBarcode(upc.value); } });
     }
+    clearAdd();
+    addDlg.showModal();
+    addDlg.querySelector("#lib-q").focus();
+  }
+  // an empty form (opening the dialog, and after "Add + another")
+  function clearAdd() {
     addDlg.querySelector("form").reset();
+    addDlg.querySelector(".hint").textContent = ADD_HINT;
     picked = null;
     hdrUpc = "";
     hdrFor = "";
@@ -676,9 +708,9 @@
     addDlg.querySelector(".error").textContent = "";
     addDlg.querySelector(".lib-scan-msg").textContent = "";
     scanned = null;
+    [].forEach.call(addDlg.querySelectorAll(".lib-ed-list button"), function (x) { x.setAttribute("aria-pressed", "false"); });
+    syncFeatTags();
     check();
-    addDlg.showModal();
-    addDlg.querySelector("#lib-q").focus();
   }
 
   var results = [];
@@ -853,7 +885,7 @@
     });
     err.textContent = dupe ? "Already on the shelves in " + FORMAT[f.value] + "." : "";
     addDlg.querySelector(".lib-hdr").hidden = !(f && f.value === "4k"); // HDR is a 4K thing
-    addDlg.querySelector(".submit").disabled = !(picked && f) || dupe;
+    [].forEach.call(addDlg.querySelectorAll(".submit"), function (b) { b.disabled = !(picked && f) || dupe; });
   }
 
   function submitAdd(e) {
@@ -861,8 +893,9 @@
     var form = addDlg.querySelector("form");
     var f = form.querySelector('input[name="lib-format"]:checked');
     if (!picked || !f) return;
-    var btn = form.querySelector(".submit"), err = form.querySelector(".error");
-    btn.disabled = true;
+    var more = !!(e.submitter && e.submitter.dataset.more);
+    var btn = more ? form.querySelector(".lib-add-more") : form.querySelector(".submit"), err = form.querySelector(".error"), label = btn.textContent;
+    [].forEach.call(form.querySelectorAll(".submit"), function (b) { b.disabled = true; });
     btn.textContent = "Getting the details…";
     err.textContent = "";
     fetch(API + "/library", {
@@ -881,16 +914,20 @@
     })
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
       .then(function (res) {
-        btn.textContent = "Add to the shelves";
-        if (!res.ok) { err.textContent = res.d.error || "Couldn't add it."; btn.disabled = false; return; }
+        btn.textContent = label;
+        if (!res.ok) { err.textContent = res.d.error || "Couldn't add it."; check(); return; }
         site.unshift(res.d.item);
         rebuild();
         render();
         colourSiteDiscs();
-        addDlg.close();
-        showNew(res.d.item);
+        if (!more) { addDlg.close(); showNew(res.d.item); return; }
+        // the next one: an empty form, the camera on (or the barcode box, where the camera can't read barcodes)
+        clearAdd();
+        addDlg.querySelector(".hint").textContent = "Added " + res.d.item.title + " (" + FORMAT[res.d.item.format] + "). Now the next one.";
+        addDlg.querySelector("form").scrollTop = 0; addDlg.scrollTop = 0;
+        if (!addDlg.querySelector(".lib-scan-btn").hidden) startScan(); else addDlg.querySelector("#lib-upc").focus();
       })
-      .catch(function () { btn.textContent = "Add to the shelves"; btn.disabled = false; err.textContent = "Couldn't reach the server. Try again in a bit."; });
+      .catch(function () { btn.textContent = label; check(); err.textContent = "Couldn't reach the server. Try again in a bit."; });
   }
 
   // after adding: bring the new case into view and glow it

@@ -3263,6 +3263,14 @@ img.developing { animation: develop 2.6s cubic-bezier(0.3, 0, 0.2, 1) both; }
 .queue-dialog .lib-upc input { flex: 1; min-width: 0; margin: 0; letter-spacing: 0.06em; }
 .lib-upc .open { flex: none; }
 .lib-scan-msg { margin: 8px 0 0; font-size: 0.8rem; color: var(--muted); }
+/* Add + another beside Add to the shelves; the common extras as tags over the "On this disc" box (Nick, 2026-10-16) */
+.lib-submits { display: flex; }
+.lib-submits { flex-wrap: wrap; column-gap: 10px; row-gap: 0; }
+.lib-submits .submit { flex: 1 1 auto; width: auto; }
+.lib-feat-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+.lib-feat-tags button { padding: 4px 11px; border: 1px solid var(--line); border-radius: 999px; background: #000; color: var(--muted); font: inherit; font-size: 0.78rem; cursor: pointer; }
+.lib-feat-tags button:hover { color: var(--fg); border-color: #3a3a40; }
+.lib-feat-tags button[aria-pressed="true"] { color: var(--fg); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, #000); }
 .lib-scan-msg:empty { display: none; }
 @media (prefers-reduced-motion: reduce) { .lib-scan-line { animation: none; } }
 
