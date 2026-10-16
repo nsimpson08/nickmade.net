@@ -12,7 +12,7 @@
 //   POST   /cats                      { visitorId, name, ownerName, gender ("f" | "m"), personality, look } -> makes a cat: { cat, code } (code: the recovery code)
 //                                      ownerName = the visitor's own name, shown on the cat's card to everyone
 //   POST   /cats/claim                { visitorId, code } -> this browser can look after that cat too: { cat }
-//   POST   /cats/:id                  { visitorId, action: "feed" | "pet" | "play" | "go" | "meet" | "treat" | "date" | "apart" | "collect" | "name" | "wear", spot?, with?, name?, g? }
+//   POST   /cats/:id                  { visitorId, action: "feed" | "pet" | "play" | "go" | "meet" | "treat" | "date" | "apart" | "collect" | "name" | "wear", spot?, with?, name?, g?, season? }
 //                                     or from ANY visitor to someone else's cat: { visitorId, action: "kind", what: "treat" | "pet", by }
 //                                     (its owner only) -> { cat, event?, extra (milestones it led to), message? }
 //   GET    /cats/:id/code?visitorId=  { code } (its owner only)
@@ -425,10 +425,17 @@ async function act(id, request, env, cors, h) {
       room.log.forEach((e) => { if (e.k === "kitten" && e.c === c.id) e.cn = name; });
       break;
     }
-    case "wear": { // one of the gifts it has found, or nothing
-      const g = String(body.g || "");
+    case "wear": { // one of the gifts it has found, one of this season's hats (season: the page's, by the visitor's date), or nothing
+      const g = String(body.g || ""), sz = SEASON_HATS[body.season] ? body.season : null;
+      if (sz && SEASON_HATS[sz].includes(g)) { // a hat: kept per season, so next Halloween it's the same one again
+        if ((c.hats || {})[sz] === g && !c.wear) { write = false; break; }
+        c.hats = { ...(c.hats || {}), [sz]: g };
+        delete c.wear;
+        break;
+      }
       if (g && (!WEARABLE.includes(g) || !((c.gifts || {})[g] > 0))) return h.json({ error: c.name + " hasn't found one of those." }, 400, cors);
-      if ((c.wear || "") === g) { write = false; break; }
+      if ((c.wear || "") === g && (!sz || (c.hats || {})[sz] === "none")) { write = false; break; }
+      if (sz) c.hats = { ...(c.hats || {}), [sz]: "none" }; // a gift or nothing instead of this season's hat
       if (g) c.wear = g; else delete c.wear;
       break;
     }
@@ -638,6 +645,9 @@ function comeHome(room, c) {
 const isAway = (c, t) => !!(c.away && c.away.until > t);
 // Wearing a gift it has found (action "wear")
 const WEARABLE = ["ribbon", "bell", "crown", "feather", "clover", "leaf", "sock"];
+// The seasons' hats (play/cats/room.js WEAR), which the owner picks from on the card (Nick, 2026-10-15). c.hats is
+// { season: hat key, or "none" for a gift or nothing }; a season with no pick gets one by the cat's id
+const SEASON_HATS = { halloween: ["witch", "horns", "pumpkin"], winter: ["santa", "elf", "antlers"], spring: ["flowers", "bunny", "bee"] };
 // The day (in Plano) for check-ins: tricks come from how many different days an owner has looked in
 function plano(t) { return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago" }).format(new Date(t)); }
 // The daily sunbeam (Nick, 2026-10-15: "mandatory once a day at 2pm for 2 hours but a storm should overwrite this"):

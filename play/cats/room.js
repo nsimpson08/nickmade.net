@@ -1551,7 +1551,8 @@
     return { w: sp.w, h: sp.h, px: out, ax: ax, ay: ay, facing: sp.facing, head: at(sp.head), neck: at(sp.neck), k: k };
   }
 
-  // things worn on the head or neck: a gift the cat has found (its owner picks one), or at Halloween a costume.
+  // things worn on the head or neck: a gift the cat has found, or the season's hat (its owner picks; Nick, 2026-10-15:
+  // "make the hats that cats wear during all the seasons be selectable by their owners").
   // Little pixel pictures: "#" the colour, "*" the second colour, "o" the dark edge
   var WEAR = {
     crown: { at: "top", map: [".o..o..o.", "o#oo#oo#o", "o#######o", "o#*#*#*#o", "ooooooooo"], c: ["#ffd23f", "#ff4d6d", "#7a5a10"] },
@@ -1565,11 +1566,22 @@
     witch: { at: "top", map: ["....o....", "...o#o...", "...o#o...", "..o###o..", "..o***o..", ".o#####o.", "ooooooooo"], c: ["#2a2333", "#8e5bd6", "#0d0a12"] },
     horns: { at: "horns", map: [".o.....o.", "o#o...o#o", "o#o...o#o", ".o.....o."], c: ["#d8343e", "#d8343e", "#5a1015"] },
     pumpkin: { at: "top", map: ["...oo...", "..o*o...", ".oooooo.", "o######o", "o#o##o#o", "o######o", ".oooooo."], c: ["#f08a24", "#4a8a3a", "#7a3a0a"] },
+    // winter
+    santa: { at: "top", map: [".....o**.", "....o#o**", "...o##o..", "..o####o.", ".o######o", "o*******o", "ooooooooo"], c: ["#d8343e", "#f2efe8", "#5a1015"] },
+    elf: { at: "top", map: ["....o*", "...o#o", "..o##o", ".o###o", "o####o", "o*#*#o", "oooooo"], c: ["#3f9a4a", "#d8343e", "#173d1c"] },
+    antlers: { at: "horns", map: ["#..#.....#..#", ".#.#.....#.#.", "..##.....##..", "...#.....#...", "...o.....o..."], c: ["#9a6a3a", "#9a6a3a", "#4a2e14"] },
+    // spring
+    flowers: { at: "top", map: ["#.*.#.*.#", "o#o*o#o*o", "ooooooooo"], c: ["#ff8fc0", "#ffd84a", "#4f8f3a"] },
+    bunny: { at: "horns", map: [".o.......o.", "o#o.....o#o", "o*o.....o*o", "o*o.....o*o", "o*o.....o*o", "o#o.....o#o", "o#o.....o#o", ".o.......o."], c: ["#f6f3ee", "#ffb3c8", "#8a7f78"] },
+    bee: { at: "horns", map: ["**.......**", "**.......**", ".o.......o.", "..o.....o..", "...o...o...", "....o.o...."], c: ["#2a2420", "#ffd23f", "#2a2420"] },
   };
-  var COSTUMES = ["witch", "horns", "pumpkin"];
+  var SEASON_HATS = { halloween: ["witch", "horns", "pumpkin"], winter: ["santa", "elf", "antlers"], spring: ["flowers", "bunny", "bee"] }; // the Worker's SEASON_HATS
+  var HAT_NAME = { witch: "Witch hat", horns: "Devil horns", pumpkin: "Pumpkin", santa: "Santa hat", elf: "Elf hat", antlers: "Antlers", flowers: "Flower crown", bunny: "Bunny ears", bee: "Bee antennae" };
   function wearOf(c) {
+    var sz = season(), hats = SEASON_HATS[sz], pick = sz && (c.data.hats || {})[sz];
+    if (hats && hats.indexOf(pick) >= 0) return pick; // the owner's pick for this season
     if (c.data.wear && WEAR[c.data.wear]) return c.data.wear;
-    if (season() === "halloween") return COSTUMES[hashStr(c.id) % COSTUMES.length];
+    if (hats && pick !== "none") return hats[hashStr(c.id) % hats.length]; // no pick yet: one by its id
     return null;
   }
   // what a cat is wearing, pixel by pixel in its picture's coordinates: put(x, y, colour)
@@ -2169,11 +2181,14 @@
     var kindRow = card.querySelector(".cats-card-kind");
     kindRow.hidden = mine || away || !VID;
     ["treat", "pet"].forEach(function (w) { var b = kindRow.querySelector('[data-kind="' + w + '"]'); b.disabled = kindDone(id, w); b.textContent = (w === "treat" ? "Give a treat" : "Pet") + (b.disabled ? " ✓" : ""); });
-    // what it's wearing (your cat: any wearable gift it has found)
+    // what it's wearing (your cat): this season's hats, and any wearable gift it has found
     var wearRow = card.querySelector(".cats-card-wear"), owned = Object.keys(d.gifts || {}).filter(function (g) { return WEAR[g] && d.gifts[g] > 0; });
-    wearRow.hidden = !mine || !owned.length;
-    wearRow.querySelector(".cats-chips").innerHTML = ['<button type="button" data-wear="" aria-pressed="' + !d.wear + '">Nothing</button>'].concat(owned.map(function (g) {
-      return '<button type="button" data-wear="' + g + '" aria-pressed="' + (d.wear === g) + '">' + esc(GIFT_NAME[g].replace(/^an? /, "")) + "</button>";
+    var hats = SEASON_HATS[season()] || [], now = wearOf(c);
+    wearRow.hidden = !mine || !(owned.length || hats.length);
+    wearRow.querySelector(".cats-chips").innerHTML = ['<button type="button" data-wear="" aria-pressed="' + !now + '">Nothing</button>'].concat(hats.map(function (g) {
+      return '<button type="button" data-wear="' + g + '" aria-pressed="' + (now === g) + '">' + HAT_NAME[g] + "</button>";
+    }), owned.map(function (g) {
+      return '<button type="button" data-wear="' + g + '" aria-pressed="' + (now === g) + '">' + esc(GIFT_NAME[g].replace(/^an? /, "")) + "</button>";
     })).join("");
     // tricks (your cat)
     var tr = tricksOf(d), next = TRICKS.filter(function (t) { return (d.days || 0) < t[0]; })[0], trRow = card.querySelector(".cats-card-tricks");
@@ -2207,7 +2222,7 @@
   card.querySelector(".cats-card-wear").addEventListener("click", function (e) {
     var b = e.target.closest("[data-wear]"), c = cats[cardFor];
     if (!b || !c) return;
-    send(c, { action: "wear", g: b.dataset.wear }).then(function (d) { if (d.error) toast(esc(d.error)); else { c.key = null; openCard(c.id); } });
+    send(c, { action: "wear", g: b.dataset.wear, season: season() || "" }).then(function (d) { if (d.error) toast(esc(d.error)); else { c.key = null; openCard(c.id); } });
   });
   card.querySelector(".cats-trick-go").addEventListener("click", function () {
     var c = cats[cardFor], tr = c && tricksOf(c.data);
