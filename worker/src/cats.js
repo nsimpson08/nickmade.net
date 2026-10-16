@@ -108,7 +108,7 @@ export async function catsRoute(request, url, env, cors, h) {
   }
   const m = /^\/cats\/([a-z0-9]{6,12})(\/code)?$/.exec(path);
   if (!m) return null;
-  if (m[2] && request.method === "GET") return showCode(m[1], url, env, cors, h);
+  if (m[2] && request.method === "GET") return showCode(m[1], request, url, env, cors, h);
   if (!m[2] && request.method === "POST") return act(m[1], request, env, cors, h);
   if (!m[2] && request.method === "DELETE") return removeCat(m[1], request, url, env, cors, h);
   return null;
@@ -172,7 +172,8 @@ function cat(room, id) { return room.cats.find((c) => c.id === id); }
 
 const ownerHash = (h, env, visitorId) => h.sha256((env.SALT || "nickmade") + "cat:" + visitorId);
 const validId = (v) => typeof v === "string" && /^[a-z0-9-]{8,64}$/i.test(v);
-async function ownedBy(h, env, c, visitorId) {
+async function ownedBy(h, env, c, visitorId, request) {
+  if (c && c.nick && request && h.isAdmin(request, env)) return true; // Nick in owner mode, on any device (Nick, 2026-10-15)
   return !!c && validId(visitorId) && (c.owners || []).includes(await ownerHash(h, env, visitorId));
 }
 // what everyone sees of a cat (no owners, IPs or codes)
@@ -189,7 +190,8 @@ async function getRoom(request, url, env, cors, h) {
   let mine = null, mines = [];
   if (validId(visitorId)) {
     const me = await ownerHash(h, env, visitorId);
-    mines = room.cats.filter((x) => (x.owners || []).includes(me)).map((x) => x.id); // up to CATS_EACH (plus kittens); any number for Nick
+    const nick = h.isAdmin(request, env); // owner mode: all of Nick's cats are his on every device, not just the browser that made them
+    mines = room.cats.filter((x) => (x.owners || []).includes(me) || (nick && x.nick)).map((x) => x.id); // up to CATS_EACH (plus kittens); any number for Nick
     mine = mines[0] || null;
     // a day checked in, for tricks (once a day per cat: a KV write at most once a day per owner)
     const today = plano(Date.now());
@@ -327,10 +329,10 @@ async function claim(request, env, cors, h) {
   return h.json({ cat: view(c) }, 200, cors);
 }
 
-async function showCode(id, url, env, cors, h) {
+async function showCode(id, request, url, env, cors, h) {
   const room = await load(env);
   const c = cat(room, id);
-  if (!(await ownedBy(h, env, c, url.searchParams.get("visitorId")))) return h.json({ error: "That's not your cat." }, 403, cors);
+  if (!(await ownedBy(h, env, c, url.searchParams.get("visitorId"), request))) return h.json({ error: "That's not your cat." }, 403, cors);
   return h.json({ code: c.code }, 200, cors);
 }
 
@@ -347,20 +349,20 @@ async function removeCat(id, request, url, env, cors, h) {
 }
 
 // ---------- kindness: any visitor can give someone else's cat a treat or a pet, each once a day ----------
-async function kind(c, room, body, env, cors, h) {
+async function kind(c, room, body, env, cors, h, nick) {
   if (!validId(body.visitorId)) return h.json({ error: "Your browser didn't send its id. Try reloading." }, 400, cors);
   const what = body.what === "treat" ? "treat" : body.what === "pet" ? "pet" : null;
   if (!what) return h.json({ error: "Bad request" }, 400, cors);
   const me = await ownerHash(h, env, body.visitorId);
-  if ((c.owners || []).includes(me)) return h.json({ error: "That's your own cat. Use the buttons above." }, 400, cors);
-  const now = Date.now(), day = plano(now), key = me.slice(0, 16) + ":" + what;
+  if ((c.owners || []).includes(me) || (nick && c.nick)) return h.json({ error: "That's your own cat. Use the buttons above." }, 400, cors);
+  const now = Date.now(), day = plano(now), key = (nick ? "nick" : me.slice(0, 16)) + ":" + what; // Nick: once a day across all his devices
   c.kind = Object.fromEntries(Object.entries(c.kind || {}).filter(([, d]) => d === day)); // only today's
   if (c.kind[key]) return h.json({ error: "You've already given " + c.name + " a " + what + " today." }, 429, cors);
   c.kind[key] = day;
   // who it was: the owner name on their own cat if they have one here (Nick: "Nick petted Mochi", not "A visitor"),
   // else the name they gave the site, else "A visitor"
   const theirs = room.cats.find((x) => (x.owners || []).includes(me) && x.ownerName);
-  let by = theirs ? theirs.ownerName : cleanName(body.by).slice(0, 24);
+  let by = nick ? "Nick" : theirs ? theirs.ownerName : cleanName(body.by).slice(0, 24); // owner mode is Nick on any device
   if (!by || checkOwner(by, h)) by = "A visitor";
   if (what === "treat") c.fed = Math.max(c.fed || 0, now - 12 * HOUR); // a snack, not a dinner
   else c.petted = now;
@@ -376,8 +378,8 @@ async function act(id, request, env, cors, h) {
   const room = await load(env);
   const c = cat(room, id);
   if (!c) return h.json({ error: "No such cat." }, 404, cors);
-  if (body.action === "kind") return kind(c, room, body, env, cors, h); // any visitor, to someone else's cat
-  if (!(await ownedBy(h, env, c, body.visitorId))) return h.json({ error: "Only " + c.name + "'s owner can do that." }, 403, cors);
+  if (body.action === "kind") return kind(c, room, body, env, cors, h, h.isAdmin(request, env)); // any visitor, to someone else's cat
+  if (!(await ownedBy(h, env, c, body.visitorId, request))) return h.json({ error: "Only " + c.name + "'s owner can do that." }, 403, cors);
   const now = Date.now();
   c.seen = now;
   let event = null, extra = [], message = null, write = true;
