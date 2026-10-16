@@ -62,6 +62,14 @@
           <p class="cats-card-age"></p>
           <button type="button" class="cats-snap">Snapshot</button>
         </div>
+        <button type="button" class="cats-card-photo" hidden aria-label="See the photo bigger"><img alt=""></button>
+      </div>
+      <!-- a photo of the real cat: everyone sees it; its owner adds, changes or removes it (room.js) -->
+      <img class="cats-card-photo-big" hidden alt="">
+      <div class="cats-card-photo-own" hidden>
+        <button type="button" class="cats-photo-add">Add a photo</button>
+        <button type="button" class="cats-photo-remove" hidden>Remove photo</button>
+        <input type="file" accept="image/*" hidden>
       </div>
       <dl class="cats-card-facts"></dl>
       <div class="cats-card-actions" hidden>
@@ -129,6 +137,7 @@
       <section><h3>Your cat</h3><ul>
         <li><b>Make your cat</b> in the Cat Maker: name, girl or boy, pattern, fur, eyes. Up to two cats per visitor.</li>
         <li>Open your cat’s card to <b>feed</b>, <b>pet</b>, <b>play</b>, or <b>move</b> it to a perch, a bed, or the top of a tower.</li>
+        <li>Add a <b>photo</b> of your real cat to its card. Everyone who opens the card sees it; only you can change or remove it.</li>
         <li>Keep the <b>recovery code</b> on its card to look after it from another phone or computer.</li>
         <li>Come back at least <b>every 30 days</b> (feed, pet or play), or it moves out to live with a family down the street.</li>
       </ul></section>

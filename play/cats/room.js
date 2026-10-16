@@ -2141,6 +2141,7 @@
     var d = c.data, mine = isMine(id);
     if (mine && room.mine !== id) { room.mine = id; renderMine(); } // the one you're looking after now (up to two; Nick can have several)
     card.querySelector("h2").textContent = d.name + (mine ? " (yours)" : "");
+    renderPhoto(c);
     card.querySelector(".cats-card-look").textContent = CD.describe(d.look) + (GENDER[d.gender] ? " · " + GENDER[d.gender] : "");
     var away = isAway(c);
     card.querySelector(".cats-card-age").textContent = away ? "Out on an adventure · back in about " + Math.max(1, Math.round((d.away.until - Date.now()) / 3600e3)) + " h"
@@ -2543,6 +2544,65 @@
   }
   card.querySelector(".cats-snap").addEventListener("click", function () { if (cardFor) snapshot(cardFor); });
 
+  // ---------- a photo of the real cat (Nick, 2026-10-16): everyone sees it on the card; only its owner (or Nick in
+  // owner mode, to take one off) changes it. Cropped square and shrunk to a small JPEG here before it's sent.
+  var photoBtn = card.querySelector(".cats-card-photo"), photoBig = card.querySelector(".cats-card-photo-big"), photoOwn = card.querySelector(".cats-card-photo-own");
+  var photoInput = photoOwn.querySelector("input"), photoShown = null;
+  function photoUrl(d) { return d.photo ? API + "/cats/photo/" + d.photo : ""; }
+  function renderPhoto(c) {
+    var d = c.data, url = photoUrl(d), mine = isMine(c.id);
+    photoBtn.hidden = !url;
+    if (url && photoBtn.firstChild.getAttribute("src") !== url) { photoBtn.firstChild.src = url; photoBtn.firstChild.alt = "A photo of " + d.name; }
+    if (photoShown !== c.id + url) { photoBig.hidden = true; photoShown = c.id + url; } // a different cat or photo: small again
+    if (url && photoBig.getAttribute("src") !== url) { photoBig.src = url; photoBig.alt = "A photo of " + d.name; }
+    photoOwn.hidden = !(mine || (room.owner && url)); // Nick in owner mode can take any photo off
+    photoOwn.querySelector(".cats-photo-add").hidden = !mine;
+    photoOwn.querySelector(".cats-photo-add").textContent = url ? "Change photo" : "Add a photo of " + d.name;
+    photoOwn.querySelector(".cats-photo-remove").hidden = !url;
+  }
+  photoBtn.addEventListener("click", function () { photoBig.hidden = !photoBig.hidden; });
+  photoBig.addEventListener("click", function () { photoBig.hidden = true; });
+  photoBtn.firstChild.addEventListener("error", function () { photoBtn.hidden = true; }); // gone from storage: no broken picture
+  photoOwn.querySelector(".cats-photo-add").addEventListener("click", function () { photoInput.value = ""; photoInput.click(); });
+  function shrinkPhoto(file) { // the middle square, 480 x 480, as a JPEG (the browser turns phone photos the right way up)
+    return new Promise(function (ok, fail) {
+      var img = new Image(), u = URL.createObjectURL(file);
+      img.onload = function () {
+        var S = 480, s = Math.min(img.naturalWidth, img.naturalHeight), cv = document.createElement("canvas");
+        cv.width = cv.height = S;
+        cv.getContext("2d").drawImage(img, (img.naturalWidth - s) / 2, (img.naturalHeight - s) / 2, s, s, 0, 0, S, S);
+        URL.revokeObjectURL(u);
+        ok(cv.toDataURL("image/jpeg", 0.85));
+      };
+      img.onerror = function () { URL.revokeObjectURL(u); fail(); };
+      img.src = u;
+    });
+  }
+  photoInput.addEventListener("change", function () {
+    var f = photoInput.files && photoInput.files[0], c = cats[cardFor];
+    if (!f || !c) return;
+    var add = photoOwn.querySelector(".cats-photo-add");
+    add.disabled = true; add.textContent = "Uploading…";
+    shrinkPhoto(f).then(function (image) {
+      return fetch(API + "/cats/" + c.id + "/photo", { method: "POST", headers: headers(true), body: JSON.stringify({ visitorId: VID, image: image }) }).then(function (r) { return r.json(); });
+    }).then(function (d) {
+      if (d.error) { toast(esc(d.error)); return; }
+      c.data = d.cat; var i = room.cats.findIndex(function (x) { return x.id === d.cat.id; }); if (i >= 0) room.cats[i] = d.cat;
+      toast("New photo of <b>" + esc(c.data.name) + "</b>");
+    }, function () { toast("That photo didn’t work. Try another one."); })
+      .then(function () { add.disabled = false; if (cardFor === c.id) openCard(c.id); });
+  });
+  photoOwn.querySelector(".cats-photo-remove").addEventListener("click", function () {
+    var c = cats[cardFor];
+    if (!c || !confirm("Remove the photo of " + c.data.name + "?")) return;
+    fetch(API + "/cats/" + c.id + "/photo?visitorId=" + encodeURIComponent(VID), { method: "DELETE", headers: headers() }).then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.error) { toast(esc(d.error)); return; }
+        c.data = d.cat; var i = room.cats.findIndex(function (x) { return x.id === d.cat.id; }); if (i >= 0) room.cats[i] = d.cat;
+        if (cardFor === c.id) openCard(c.id);
+      }, function () { toast("Couldn’t reach the room. Try again in a bit."); });
+  });
+
   // ---------- the Cattery's own changelog (changelog.js): the version in the header, and the list it opens ----------
   (function () {
     var log = window.CATTERY_LOG || [], btn = document.querySelector(".cats-ver"), dlg = document.querySelector(".cats-log-dlg:not(.cats-help)");
@@ -2738,7 +2798,11 @@
       .then(function (d) { if (!d.error) apply(d, arrived); })
       .catch(function (e) { if (window.console) console.error("cattery:", e); }); // offline: try again next minute
   }
-  load().then(function () { if (location.hash === "#make" && canMake()) openMaker(); });
+  load().then(function () {
+    if (location.hash === "#make" && canMake()) openMaker();
+    var hm = /^#cat=(.+)$/.exec(location.hash); // a link to one cat's card (Nick's phone notifications): its id or name
+    if (hm) { var want = decodeURIComponent(hm[1]).toLowerCase(); var hit = Object.keys(cats).filter(function (id) { return id === want || cats[id].data.name.toLowerCase() === want; })[0]; if (hit) openCard(hit); }
+  });
   setInterval(function () { if (!document.hidden) load(); }, 60000);
   window.addEventListener("hashchange", function () { if (location.hash === "#make" && canMake()) openMaker(); });
 

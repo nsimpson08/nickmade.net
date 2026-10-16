@@ -249,6 +249,18 @@ button { font: inherit; }
 @keyframes card-in { from { transform: translate(-50%, 16px); opacity: 0; } }
 .cats-card-head { display: flex; gap: 12px; align-items: center; margin-right: 24px; }
 .cats-card-face { width: 84px; height: 68px; flex: none; image-rendering: pixelated; background: #2c3c52; border-radius: 4px; }
+.cats-card-head > div { flex: 1; min-width: 0; }
+/* a photo of the real cat (its owner's upload) */
+.cats-card-photo { flex: none; width: 68px; height: 68px; padding: 0; border: 2px solid #f2f1ec; border-radius: 4px; background: #2c3c52; cursor: zoom-in; overflow: hidden; box-shadow: 2px 2px 0 #000; }
+.cats-card-photo[hidden] { display: none; }
+.cats-card-photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.cats-card-photo-big { display: block; width: 100%; max-width: 360px; aspect-ratio: 1; margin: 12px auto 0; border: 2px solid #f2f1ec; border-radius: 4px; object-fit: cover; cursor: zoom-out; box-shadow: 3px 3px 0 #000; }
+.cats-card-photo-big[hidden] { display: none; }
+.cats-card-photo-own { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.cats-card-photo-own[hidden] { display: none; }
+.cats-card-photo-own button { padding: 3px 10px; border: 1px solid #3a3a44; border-radius: 999px; background: none; color: var(--muted); font: 500 0.76rem var(--body); cursor: pointer; }
+.cats-card-photo-own button:hover, .cats-card-photo-own button:focus-visible { color: var(--fg); border-color: var(--coral); outline: none; }
+.cats-card-photo-own button:disabled { opacity: 0.5; cursor: default; }
 .cats-card h2 { margin: 0 0 2px; font: 700 1rem/1.3 var(--display); color: var(--coral); }
 .cats-card-look, .cats-card-age { margin: 0; font-size: 0.82rem; color: var(--muted); }
 .cats-card-facts { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 12px 0 0; font-size: 0.88rem; }

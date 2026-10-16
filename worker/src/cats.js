@@ -19,6 +19,10 @@
 //   DELETE /cats/:id?visitorId=       its owner lets it go, or Nick removes it (admin)
 //   POST   /cats/event                (admin) { k: "storm" | "sunbeam" | "stop" } a room event now (the cron starts one now and then)
 //   GET    /cats/times                the last 7 days of history, for the page's weekly newspaper
+//   POST   /cats/:id/photo            (its owner) { visitorId, image: a JPEG data URL, made square and small by the page }
+//                                     -> { cat }: a photo of the real cat, shown on its card to everyone (Nick, 2026-10-16)
+//   DELETE /cats/:id/photo?visitorId= (its owner, or Nick) takes it off
+//   GET    /cats/photo/<name>.jpg     the picture (from the R2 bucket nickmade-photos, cats/photo/)
 //   GET    /cats/snapshots            (admin) the daily copies kept: { snapshots: [date, ...] }
 //   POST   /cats/restore              (admin) { date } puts that copy back
 //   POST   /cats/tick                 (admin, for testing) a burst of cat life now: one meeting per cat at once
@@ -106,6 +110,10 @@ export async function catsRoute(request, url, env, cors, h) {
     await save(env, room);
     return h.json({ cats: room.cats.length, log: room.log.slice(-20).reverse() }, 200, cors);
   }
+  if (path.startsWith("/cats/photo/") && request.method === "GET") return photoFile(path.slice(12), env, cors);
+  const pm = /^\/cats\/([a-z0-9]{6,12})\/photo$/.exec(path);
+  if (pm && request.method === "POST") return setPhoto(pm[1], request, env, cors, h);
+  if (pm && request.method === "DELETE") return dropPhoto(pm[1], request, url, env, cors, h);
   const m = /^\/cats\/([a-z0-9]{6,12})(\/code)?$/.exec(path);
   if (!m) return null;
   if (m[2] && request.method === "GET") return showCode(m[1], request, url, env, cors, h);
@@ -326,6 +334,55 @@ async function claim(request, env, cors, h) {
   if (!c.owners.includes(me)) c.owners = c.owners.concat(me).slice(-6);
   c.seen = Date.now();
   await save(env, room);
+  return h.json({ cat: view(c) }, 200, cors);
+}
+
+// ---------- a photo of the real cat (Nick, 2026-10-16: "upload a profile pic on the cat card ... all visitors can
+// see it, and it can be changed or replaced only by the owner"). The page crops it square and shrinks it to a small
+// JPEG first. Stored in R2 by its contents' hash (c.photo = the file name); a new one or Remove deletes the old file.
+// Nick hears about each new one on his phone, and can take any photo off in owner mode.
+const PHOTO_MAX = 400000; // bytes, after the page's shrinking (about 60 KB is usual)
+async function photoFile(name, env, cors) {
+  if (!env.PHOTOS || !/^[0-9a-f]{24}\.jpg$/.test(name)) return new Response("Not found", { status: 404, headers: cors });
+  const obj = await env.PHOTOS.get("cats/photo/" + name);
+  if (!obj) return new Response("Not found", { status: 404, headers: cors });
+  return new Response(obj.body, { headers: { "Content-Type": "image/jpeg", "Cache-Control": "public, max-age=31536000, immutable", "Access-Control-Allow-Origin": "*" } });
+}
+async function setPhoto(id, request, env, cors, h) {
+  if (!env.PHOTOS) return h.json({ error: "Photo storage isn't set up." }, 503, cors);
+  let body;
+  try { body = await request.json(); } catch (e) { return h.json({ error: "That photo didn't come through. Try a smaller one." }, 400, cors); }
+  const room = await load(env);
+  const c = cat(room, id);
+  if (!c) return h.json({ error: "No such cat." }, 404, cors);
+  if (!(await ownedBy(h, env, c, body.visitorId, request))) return h.json({ error: "Only " + c.name + "'s owner can change its photo." }, 403, cors);
+  const m = /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(String(body.image || ""));
+  if (!m) return h.json({ error: "Send a JPEG." }, 400, cors);
+  const bytes = Uint8Array.from(atob(m[1]), (x) => x.charCodeAt(0));
+  if (bytes.length > PHOTO_MAX) return h.json({ error: "That photo is too big." }, 413, cors);
+  if (bytes[0] !== 0xff || bytes[1] !== 0xd8) return h.json({ error: "Send a JPEG." }, 400, cors);
+  const now = Date.now();
+  if (c.photoAt && now - c.photoAt < 30 * 1000) return h.json({ error: "Give it a few seconds before changing it again." }, 429, cors);
+  const name = (await h.sha256(m[1])).slice(0, 24) + ".jpg";
+  if (name === c.photo) return h.json({ cat: view(c) }, 200, cors);
+  await env.PHOTOS.put("cats/photo/" + name, bytes, { httpMetadata: { contentType: "image/jpeg" } });
+  const old = c.photo;
+  c.photo = name; c.photoAt = now;
+  await save(env, room);
+  if (old && !room.cats.some((x) => x.photo === old)) await env.PHOTOS.delete("cats/photo/" + old).catch(() => {});
+  if (!c.nick && h.tellOwner) await h.tellOwner(env, { type: "catphoto", name: c.name, owner: c.ownerName || "", photo: name }); // Nick's phone
+  return h.json({ cat: view(c) }, 200, cors);
+}
+async function dropPhoto(id, request, url, env, cors, h) {
+  const room = await load(env);
+  const c = cat(room, id);
+  if (!c) return h.json({ error: "No such cat." }, 404, cors);
+  if (!h.isAdmin(request, env) && !(await ownedBy(h, env, c, url.searchParams.get("visitorId"), request))) return h.json({ error: "Only " + c.name + "'s owner can change its photo." }, 403, cors);
+  const old = c.photo;
+  if (!old) return h.json({ cat: view(c) }, 200, cors);
+  delete c.photo; delete c.photoAt;
+  await save(env, room);
+  if (env.PHOTOS && !room.cats.some((x) => x.photo === old)) await env.PHOTOS.delete("cats/photo/" + old).catch(() => {});
   return h.json({ cat: view(c) }, 200, cors);
 }
 
