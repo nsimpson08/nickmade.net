@@ -22,6 +22,8 @@
 //                                         the holes changed since the last save, and which holes have scores at all
 //                                         (the rest are deleted). Safe to repeat; per hole, the newest change wins
 //   DELETE /scorecard/rounds/:id?visitorId=
+//   GET    /scorecard/me?visitorId=       { name }: this player's name for their cards (null when none yet)
+//   PUT    /scorecard/me                  { visitorId, name } -> { name }: saved with the player (migrations/0002)
 //   POST   /scorecard/me/code             { visitorId } -> { code }: a recovery code for using these rounds on
 //                                         another phone (visitors; Nick is the owner on every device)
 //   POST   /scorecard/me/claim            { visitorId, code } -> this browser joins the code's player (its own
@@ -163,6 +165,8 @@ export async function scorecardRoute(request, url, env, cors, h) {
     if (m === "PUT") return putRound(request, parts[2], env, cors, h);
     if (m === "DELETE") return deleteRound(request, url, parts[2], env, cors, h);
   }
+  if (parts[1] === "me" && parts.length === 2 && m === "GET") return getMe(request, url, env, cors, h);
+  if (parts[1] === "me" && parts.length === 2 && m === "PUT") return putMe(request, env, cors, h);
   if (parts[1] === "me" && parts[2] === "code" && m === "POST") return newCode(request, env, cors, h);
   if (parts[1] === "read" && parts.length === 2 && m === "POST") return readCard(request, env, cors, h);
   if (parts[1] === "lookup" && parts.length === 2 && m === "GET") return lookup(url, env, cors, h);
@@ -197,6 +201,28 @@ async function player(request, env, h, vid, create) {
 async function body(request, max) {
   if (Number(request.headers.get("Content-Length") || 0) > (max || 300000)) return null;
   try { return await request.json(); } catch (e) { return null; }
+}
+
+// a visitor's name for their cards, kept with their player (the browser's visitor id, or any browser joined to it by
+// a recovery code); Nick's is Nick
+async function getMe(request, url, env, cors, h) {
+  if (h.isAdmin(request, env)) return h.json({ name: "Nick" }, 200, cors);
+  const me = await player(request, env, h, url.searchParams.get("visitorId"), false);
+  if (!me) return h.json({ name: null }, 200, cors);
+  const row = await env.GOLF.prepare("SELECT name FROM players WHERE id = ?").bind(me.id).first();
+  return h.json({ name: (row && row.name) || null }, 200, cors);
+}
+async function putMe(request, env, cors, h) {
+  const b = (await body(request)) || {};
+  if (h.isAdmin(request, env)) return h.json({ name: "Nick" }, 200, cors);
+  const name = String(b.name || "").replace(/\s+/g, " ").trim().slice(0, 24);
+  if (name && (/https?:|www\.|\.(com|net|org|io)\b/i.test(name) || (h.BLOCKED || []).some((w) => h.normalize(name).replace(/ /g, "").includes(w)))) {
+    return h.json({ error: "Please use a different name." }, 400, cors); // the queues' and the Cattery's checks
+  }
+  const me = await player(request, env, h, b.visitorId, !!name);
+  if (!me) return h.json({ name: null }, 200, cors);
+  await env.GOLF.prepare("UPDATE players SET name = ? WHERE id = ?").bind(name || null, me.id).run();
+  return h.json({ name: name || null }, 200, cors);
 }
 
 function normCode(c) { return String(c || "").toUpperCase().replace(/[^A-Z0-9]/g, ""); }

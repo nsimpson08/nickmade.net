@@ -173,6 +173,8 @@
       if (!ok) return params.has("admin") ? login() : closed();
       if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function () {});
       if (!prefs.name && ADMIN) { prefs.name = "Nick"; savePrefs(); }
+      if (!prefs.name && !ADMIN) { try { prefs.name = (localStorage.getItem("nm-name") || "").slice(0, 24); } catch (e) {} } // the name they gave the site before
+      fetchName(); // else the one kept with their player
       if (OWNER) loadHandicap();
       // a round played before its course had a look: the saved course file's look
       // the newest card for a course: the server's saved one or the copy kept on this phone (a card made again here
@@ -505,6 +507,8 @@
           }).join("") + "</div>" : "") +
         (blank ? "" :
         '<h3 class="sc-sub">Date played</h3><input type="date" id="sc-date" class="sc-in sc-date" max="' + today() + '" value="' + esc(setupDay || today()) + '" aria-label="Date played">' +
+        // a visitor's own name on the card, not "Me" (Nick, 2026-10-18); Nick's is already Nick (boot)
+        (OWNER ? "" : '<h3 class="sc-sub">Your name</h3><input type="text" id="sc-name" class="sc-in sc-name" maxlength="24" autocomplete="nickname" placeholder="Written on your card" value="' + esc(prefs.name || "") + '" aria-label="Your name">') +
         '<p class="sc-muted small sc-date-note"' + (setupDay && setupDay !== today() ? "" : " hidden") + '>An old round: enter each hole\'s score; putts and fairways can be left blank.</p>' +
         '<details class="sc-check"' + ((src.kind === "api" && !chk) || src.kind === "photo" || src.kind === "website" && !draft.card ? " open" : "") + "><summary>" +
           (chk ? "Look over the numbers" : "Check the numbers") + "</summary>" +
@@ -1086,7 +1090,31 @@
     });
   }
 
+  // the name written on the card (the setup screen's box, or the round's menu); also the site's "Your name" (nm-name)
+  // for a visitor, as the queues and the Cattery use it
+  // ... and kept on the server with their player (their visitor id; a recovery code's other phones too), so a
+  // cleared phone or another one gets it back (Nick, 2026-10-18); sent once it's settled, not on every key
+  function setName(v, send) {
+    prefs.name = String(v || "").replace(/\s+/g, " ").trim().slice(0, 24);
+    savePrefs();
+    if (!OWNER && prefs.name) { try { localStorage.setItem("nm-name", prefs.name); } catch (e) {} }
+    if (!OWNER && send && prefs.name !== prefs.nameSent) {
+      var sent = prefs.name;
+      api("/scorecard/me", { method: "PUT", body: { visitorId: VID, name: sent } }).then(function () { prefs.nameSent = sent; savePrefs(); }, function () {});
+    }
+    cardPreview();
+  }
+  // the name kept on the server, for a phone that has none (cleared, or new and joined by a code)
+  function fetchName() {
+    if (OWNER || prefs.name) return Promise.resolve();
+    return api("/scorecard/me?visitorId=" + encodeURIComponent(VID)).then(function (d) {
+      if (d && d.name && !prefs.name) { prefs.name = prefs.nameSent = d.name; savePrefs(); var box = app.querySelector("#sc-name"); if (box && !box.value) box.value = d.name; cardPreview(); }
+    }, function () {});
+  }
+
   function startRound() {
+    var nameBox = app.querySelector("#sc-name");
+    if (nameBox) setName(nameBox.value, true);
     var tee = teeOf(draft, setupTee), n = draft.holes;
     var holes = [];
     for (var i = 1; i <= n; i++) if (setupNine === "18" || (setupNine === "front" ? i <= 9 : i > 9)) holes.push(i);
@@ -1452,7 +1480,7 @@
       if (m === "wake") { prefs.wake = prefs.wake === false; savePrefs(); if (prefs.wake === false) releaseWake(); else keepAwake(); }
       if (m === "name") {
         var v = prompt("Name on the scorecard", prefs.name || "");
-        if (v != null) { prefs.name = v.trim().slice(0, 24); savePrefs(); round.player = prefs.name; saveRound(); }
+        if (v != null) { setName(v, true); round.player = prefs.name; saveRound(); }
       }
       if (m === "quit" && confirm("Quit this round? Its scores will be deleted, here and on the server.")) {
         save(K.del, load(K.del, []).filter(function (x) { return x !== round.id; }).concat([round.id]));
@@ -1728,6 +1756,8 @@
       var codeIn = app.querySelector("#sc-claim"), errEl = app.querySelector(".sc-move .sc-error");
       api("/scorecard/me/claim", { method: "POST", body: { visitorId: VID, code: codeIn.value } }).then(function () {
         errEl.textContent = "";
+        // the name that player already has comes along (it wins over this phone's: it's the same person's cards)
+        api("/scorecard/me?visitorId=" + encodeURIComponent(VID)).then(function (d) { if (d && d.name) { prefs.name = prefs.nameSent = d.name; savePrefs(); } }, function () {});
         home();
       }).catch(function (err) { errEl.textContent = err.status === 0 ? "No signal right now." : err.message; });
       return;
@@ -1816,11 +1846,20 @@
     lookupCard(v);
   });
 
+  // the name box: the example card follows along as it's typed
+  var nameTimer = null;
+  app.addEventListener("input", function (e) {
+    if (e.target.id !== "sc-name") return;
+    clearTimeout(nameTimer);
+    nameTimer = setTimeout(function () { setName(e.target.value); }, 300);
+  });
+
   // the check table's number boxes
   app.addEventListener("change", function (e) {
     var el = e.target, d = el.dataset;
     if (el.id === "sc-upload") { if (el.files && el.files[0]) snap(el.files[0], true); return; }
     if (el.id === "sc-played") { if (el.files && el.files[0]) playedCard(el.files[0]); return; }
+    if (el.id === "sc-name") { setName(el.value, true); return; }
     if (el.id === "sc-date") {
       setupDay = /^\d{4}-\d{2}-\d{2}$/.test(el.value) && el.value <= today() ? el.value : today();
       el.value = setupDay;

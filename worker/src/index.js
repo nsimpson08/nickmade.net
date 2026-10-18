@@ -216,7 +216,7 @@ export default {
         if (res) return res;
       }
       if (url.pathname.startsWith("/scorecard/")) {
-        const res = await scorecardRoute(request, url, env, cors, { json, isAdmin, sha256, tellOwner });
+        const res = await scorecardRoute(request, url, env, cors, { json, isAdmin, sha256, normalize, BLOCKED, tellOwner });
         if (res) return res;
       }
       if (url.pathname.startsWith("/music/")) {

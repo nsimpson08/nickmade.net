@@ -311,6 +311,7 @@ a { color: inherit; }
 .sc-add { border-style: dashed; }
 
 .sc-date { height: 52px; font-size: 1rem; color-scheme: inherit; }
+.sc-name { height: 52px; font-size: 1rem; }
 .sc-date-note { margin: 6px 2px 0; }
 .sc-redate { display: grid; gap: 6px; margin-top: 10px; }
 .sc-redate label { font-size: 0.85rem; color: var(--muted); }
