@@ -121,8 +121,24 @@
       });
       cols.push([xs[i], xs[i + 1], crossed / ys.length]);
     }
-    var crossMed = cols.map(function (c) { return c[2]; }).sort(function (a, b) { return a - b; })[cols.length >> 1];
     var wid = function (c) { return c[1] - c[0]; };
+    var nines = ninesOf(cols);
+    // nothing found: a small card (Shining Mountain's 500 px website card, Nick 2026-10-18) can lose a faint rule
+    // between two holes, making one column two holes wide (and hole 18 run into In). Split those, a hole's width at a
+    // time, and look again. Cards found the first time never get here
+    if (!nines.length) {
+      var ws = cols.map(wid).sort(function (a, b) { return a - b; }), cm = ws[ws.length >> 1];
+      cols = cols.reduce(function (out, c) {
+        var k = Math.round(wid(c) / cm);
+        if (k < 2 || k > 3 || wid(c) / cm < 1.7 || Math.abs(wid(c) / cm - k) > 0.4) { out.push(c); return out; }
+        for (var q = 0; q < k; q++) out.push([c[0] + cm * q, q === k - 1 ? c[1] : c[0] + cm * (q + 1), c[2]]);
+        return out;
+      }, []);
+      nines = ninesOf(cols);
+    }
+    // nines of holes in the columns: { holes, total, after, label, next }
+    function ninesOf(cols) {
+    var crossMed = cols.map(function (c) { return c[2]; }).sort(function (a, b) { return a - b; })[cols.length >> 1];
     var nines = [], i2 = 0;
     while (i2 < cols.length) {
       var run = [cols[i2]], med = wid(cols[i2]);
@@ -138,6 +154,13 @@
       var runCross = run.map(function (c) { return c[2]; }).sort(function (a, b) { return a - b; })[run.length >> 1];
       var afterLabels = i2 > 0 && wid(cols[i2 - 1]) > med * 1.6 && cols.slice(0, i2 - 1).every(function (c) { return wid(c) <= med * 1.6; });
       while (!afterLabels && run.length > 9 && run[0][2] < runCross * 0.85) { run.shift(); i2++; }
+      // ten in a row after a nine: a blank column the width of a hole ("Int", Shining Mountain), the back nine, then
+      // its total the width of the front's Out. Any card, not just on the second look: the crisp copy of that card
+      // found both nines the first time, the back one a column early
+      if (run.length === 10 && nines.length) {
+        var tw = wid(nines[nines.length - 1].total), nx = cols[i2 + 10];
+        if (nx && Math.abs(wid(nx) - tw) <= tw * 0.15 && Math.abs(wid(run[9]) - tw) > tw * 0.15) { run.shift(); i2++; }
+      }
       if (run.length >= 9 && med > 14) {
         // nine holes, then that nine's total (Out / In / TOT 9), and again for a second nine in the same run
         var k = 0;
@@ -157,6 +180,8 @@
         }
         i2 += Math.max(run.length, 1);
       } else i2++;
+    }
+    return nines;
     }
     // a front and back nine split by a divider column of another width: the second run's nine is already found above
     if (!nines.length) return null;
