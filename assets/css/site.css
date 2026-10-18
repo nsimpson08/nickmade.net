@@ -3308,9 +3308,9 @@ img.developing { animation: develop 2.6s cubic-bezier(0.3, 0, 0.2, 1) both; }
 .gw-hours { grid-column: 2; display: grid; grid-template-columns: repeat(13, minmax(0, 1fr)); gap: 3px; margin-top: 6px; }
 .gw-h { padding: 6px 0 5px; border-radius: 6px; font-size: 0.72rem; text-align: center; font-variant-numeric: tabular-nums; cursor: default; }
 .gw-h small { display: block; font-size: 0.62rem; opacity: .75; }
-.gw-h.g2, .gw-key i.g2 { background: color-mix(in srgb, var(--mint) 26%, transparent); color: #d8fff0; }
-.gw-h.g1, .gw-key i.g1 { background: color-mix(in srgb, var(--amber) 22%, transparent); color: #ffe9c4; }
-.gw-h.g0, .gw-key i.g0 { background: color-mix(in srgb, var(--coral) 18%, transparent); color: #ffd4c8; }
+.gw-h.g2, .gw-key i.g2, .gw-rules i.g2 { background: color-mix(in srgb, var(--mint) 26%, transparent); color: #d8fff0; }
+.gw-h.g1, .gw-key i.g1, .gw-rules i.g1 { background: color-mix(in srgb, var(--amber) 22%, transparent); color: #ffe9c4; }
+.gw-h.g0, .gw-key i.g0, .gw-rules i.g0 { background: color-mix(in srgb, var(--coral) 18%, transparent); color: #ffd4c8; }
 .gw-h.in { outline: 2px solid var(--accent); outline-offset: -2px; }
 .gw-h.none { background: transparent; }
 .gw-tip { grid-column: 2; min-height: 1.2em; font-size: 0.8rem; color: var(--muted); }
@@ -3326,6 +3326,11 @@ img.developing { animation: develop 2.6s cubic-bezier(0.3, 0, 0.2, 1) both; }
 .gw-key { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 26px; font-size: 0.78rem; color: var(--faint); }
 .gw-key i { display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 3px; vertical-align: -1px; }
 .gw-key a { color: var(--muted); }
+/* the color rules, under the intro (Nick, 2026-10-17) */
+.gw-rules { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 6px; font-size: 0.9rem; color: var(--muted); }
+.gw-rules li { position: relative; padding-left: 20px; }
+.gw-rules i { position: absolute; left: 0; top: 0.32em; width: 12px; height: 12px; border-radius: 3px; }
+.gw-rules b { color: var(--fg); font-weight: 500; white-space: nowrap; }
 @media (max-width: 640px) {
   .gw-search { margin-top: -28px; }
   /* the courses in one row you swipe, not a column down the whole screen */

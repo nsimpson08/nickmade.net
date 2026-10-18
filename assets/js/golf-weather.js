@@ -2,10 +2,13 @@
 // all in the visitor's browser (no Worker): the three services below answer browsers directly.
 //   ZIP -> place     api.zippopotam.us (free, no key)
 //   the forecast     api.weather.gov (the National Weather Service: hourly, ~6.5 days, US only; its grid point for a
-//                    place is looked up once and remembered)
+//                    place is looked up once and remembered); the hours after it runs out, to the same day next week
+//                    (Nick, 2026-10-17: "go a full 7 days ahead, so I'm looking at Saturday and I want to see next
+//                    Saturday's as well"), from api.open-meteo.com (free, no key; marked "Open-Meteo" in each tip)
 //   courses nearby   api.opengolfapi.org /courses/search?lat=&lng= (nearest first; 500 lookups a day per visitor)
 // Each hour from 7 AM to 7 PM (the place's own time) is good / playable / not great on temperature, wind and rain
-// (rate(), Nick's limits: 60-85°F good, 50-59 playable, 45-49 only under 5 mph of wind, over 85 never; wind up to 10
+// (rate(), Nick's limits, 2026-10-17: 50-84°F good, 40-49 and 85-89 playable, under 40 or 90+ never (was 60-85 good,
+// 50-59 playable, 45-49 only under 5 mph of wind, over 85 never); wind up to 10
 // good, up to 20 playable; rain up to 20% good, up to 40% playable, thunder never). A day's best window is its best
 // run of 4+ playable hours (about a round), widened to every hour beside it that's as good; a day without one says why.
 // The same rules as Nick's private golf page; keep the two in step.
@@ -21,7 +24,7 @@
   var input = document.getElementById("gw-zip");
   var msg = document.getElementById("gw-msg");
   if (!root || !form) return;
-  var MIN_HOURS = 4, FIRST = 7, LAST = 19;
+  var MIN_HOURS = 4, FIRST = 7, LAST = 19, DAYS_AHEAD = 7;
   var COURSES_SHOWN = 8, COURSES_MILES = 30;
   var state = { zip: null, place: null, courses: [], course: null, data: null, holes: [] };
 
@@ -45,7 +48,7 @@
   function rate(h) {
     var t = h.temp, w = h.wind;
     var r = {
-      temp: t > 85 ? 0 : t >= 60 ? 2 : t >= 50 ? 1 : t >= 45 && w < 5 ? 1 : 0,
+      temp: t >= 90 ? 0 : t >= 85 ? 1 : t >= 50 ? 2 : t >= 40 ? 1 : 0,
       wind: w <= 10 ? 2 : w <= 20 ? 1 : 0,
       rain: /thunder/i.test(h.sky) || h.rain > 40 ? 0 : h.rain > 20 ? 1 : 2,
     };
@@ -104,12 +107,10 @@
     var wet = bad.filter(function (h) { return h.r.rain === 0 && !/thunder/i.test(h.sky); });
     if (stormy.length) out.push([stormy.length, "thunderstorms" + (stormy.length >= hours.length - 1 ? " all day" : "")]);
     if (wet.length) out.push([wet.length, "rain likely (up to " + Math.max.apply(null, wet.map(function (h) { return h.rain; })) + "%)"]);
-    var hot = bad.filter(function (h) { return h.r.temp === 0 && h.temp > 85; });
-    var cold = bad.filter(function (h) { return h.r.temp === 0 && h.temp < 45; });
-    var chilly = bad.filter(function (h) { return h.r.temp === 0 && h.temp >= 45 && h.temp < 50; });
-    if (hot.length) out.push([hot.length, "too hot (up to " + Math.max.apply(null, hot.map(function (h) { return h.temp; })) + "°F; 85°F is the limit)"]);
+    var hot = bad.filter(function (h) { return h.r.temp === 0 && h.temp >= 90; });
+    var cold = bad.filter(function (h) { return h.r.temp === 0 && h.temp < 40; });
+    if (hot.length) out.push([hot.length, "too hot (up to " + Math.max.apply(null, hot.map(function (h) { return h.temp; })) + "°F; 90°F is too hot)"]);
     if (cold.length) out.push([cold.length, "too cold (down to " + Math.min.apply(null, cold.map(function (h) { return h.temp; })) + "°F)"]);
-    if (chilly.length) out.push([chilly.length, "too cold for the wind (" + Math.min.apply(null, chilly.map(function (h) { return h.temp; })) + "°F with " + Math.max.apply(null, chilly.map(function (h) { return h.wind; })) + " mph)"]);
     out.sort(function (a, b) { return b[0] - a[0]; });
     var text = out.slice(0, 2).map(function (x) { return x[1]; }).join("; ");
     return text.charAt(0).toUpperCase() + text.slice(1) + (playable && playable < MIN_HOURS ? "; only " + playable + " playable " + (playable === 1 ? "hour" : "hours") : "");
@@ -126,7 +127,7 @@
   // the hourly forecast for a point, cached for an hour (and its grid URL for good)
   function forecast(lat, lon) {
     var key = lat.toFixed(3) + "," + lon.toFixed(3);
-    var cached = JSON.parse(get("nm-golfwx-fc:" + key) || "null");
+    var cached = JSON.parse(get("nm-golfwx-fc2:" + key) || "null");
     if (cached && Date.now() - cached.at < 3600e3) return Promise.resolve(cached.periods);
     var grid = get("nm-golfwx-grid:" + key);
     var findGrid = grid ? Promise.resolve(grid) : getJSON("https://api.weather.gov/points/" + key, { Accept: "application/geo+json" })
@@ -138,8 +139,39 @@
         return { t: p.startTime, temp: p.temperature, wind: Math.max.apply(null, speeds.map(Number)), dir: p.windDirection || "",
           rain: (p.probabilityOfPrecipitation && p.probabilityOfPrecipitation.value) || 0, sky: p.shortForecast || "" };
       });
-      set("nm-golfwx-fc:" + key, JSON.stringify({ at: Date.now(), periods: periods }));
+      return laterDays(lat, lon, periods).then(function (more) { return periods.concat(more); }, function () { return periods; });
+    }).then(function (periods) {
+      set("nm-golfwx-fc2:" + key, JSON.stringify({ at: Date.now(), periods: periods }));
       return periods;
+    });
+  }
+  // the hours after the Weather Service's forecast ends, through the same day next week, from Open-Meteo (its times
+  // are the place's own, like the Weather Service's: "2026-10-24T12:00")
+  var COMPASS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+  function skyOf(code) {
+    return code >= 95 ? "Thunderstorms" : code >= 85 ? "Snow showers" : code >= 80 ? "Rain showers" : code >= 71 ? "Snow" :
+      code >= 61 ? "Rain" : code >= 51 ? "Drizzle" : code >= 45 ? "Fog" : code >= 3 ? "Cloudy" : code >= 1 ? "Partly cloudy" : "Clear";
+  }
+  function lastDate(periods) { // the same day next week
+    var d = new Date(periods[0].t.slice(0, 10) + "T12:00:00Z");
+    d.setUTCDate(d.getUTCDate() + DAYS_AHEAD);
+    return d.toISOString().slice(0, 10);
+  }
+  function laterDays(lat, lon, periods) {
+    if (!periods.length) return Promise.resolve([]);
+    var end = periods[periods.length - 1].t.slice(0, 13), until = lastDate(periods);
+    if (end.slice(0, 10) > until || end >= until + "T" + LAST) return Promise.resolve([]);
+    return getJSON("https://api.open-meteo.com/v1/forecast?latitude=" + lat.toFixed(4) + "&longitude=" + lon.toFixed(4) +
+      "&hourly=temperature_2m,precipitation_probability,wind_speed_10m,wind_direction_10m,weather_code" +
+      "&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto&forecast_days=" + (DAYS_AHEAD + 2)).then(function (d) {
+      var h = d.hourly || {}, out = [];
+      (h.time || []).forEach(function (t, i) {
+        if (t.slice(0, 13) <= end || t.slice(0, 10) > until || h.temperature_2m[i] == null) return;
+        out.push({ t: t, temp: Math.round(h.temperature_2m[i]), wind: Math.round(h.wind_speed_10m[i] || 0),
+          dir: COMPASS[Math.round((h.wind_direction_10m[i] || 0) / 22.5) % 16], rain: h.precipitation_probability[i] || 0,
+          sky: skyOf(h.weather_code[i]), src: "om" });
+      });
+      return out;
     });
   }
   // the forecast's times are in the place's own time zone ("2026-10-14T13:00:00-05:00"): its date and hour as written
@@ -280,7 +312,7 @@
           var x = d.hours.filter(function (y) { return y.hour === h; })[0];
           var inBest = d.best && h >= d.best.start && h < d.best.end;
           var hs = state.course && state.holes.length && x && x.wind > WIND_MATTERS ? split(state.holes, x.dir) : null;
-          cells.push(x ? '<span class="gw-h g' + x.r.overall + (inBest ? " in" : "") + '" tabindex="0" data-tip="' + esc(hr(h) + ": " + x.temp + "°F, wind " + x.dir + " " + x.wind + " mph, " + x.rain + "% rain, " + x.sky +
+          cells.push(x ? '<span class="gw-h g' + x.r.overall + (inBest ? " in" : "") + '" tabindex="0" data-tip="' + esc(hr(h) + ": " + x.temp + "°F, wind " + x.dir + " " + x.wind + " mph, " + x.rain + "% rain, " + x.sky + (x.src === "om" ? " (Open-Meteo)" : "") +
             (hs ? " · on the course: " + hs.down + " downwind, " + hs.into + " into it, " + hs.across + " across" : "")) + '">' + x.temp + "°<small>" + (h % 12 || 12) + "</small></span>"
             : '<span class="gw-h none"></span>');
         }
@@ -298,10 +330,10 @@
             (d.best.temp[0] === d.best.temp[1] ? d.best.temp[0] : d.best.temp[0] + "–" + d.best.temp[1]) + "°F · wind up to " + d.best.wind + " mph · " + d.best.rain + "% rain</span>" : esc(d.why)) + "</span>" +
           course + '<span class="gw-hours">' + cells.join("") + '</span><span class="gw-tip"></span></div>';
       }).join("") +
-      '<div class="gw-key"><span><i class="g2"></i>Good: 60–85°F, wind up to 10 mph, rain up to 20%</span>' +
-      '<span><i class="g1"></i>Playable: 50–59°F (45–49°F only under 5 mph wind), wind up to 20 mph, rain up to 40%</span>' +
-      '<span><i class="g0"></i>Not great: over 85°F, too cold, over 20 mph wind, over 40% rain or thunder</span>' +
-      '<span>Forecast: <a href="https://www.weather.gov/" target="_blank" rel="noopener">National Weather Service</a>' + (state.courses.length ? ' · courses: <a href="https://opengolfapi.org/" target="_blank" rel="noopener">OpenGolfAPI</a>' : "") +
+      // (the color rules are at the top of the page, extras/golf-weather/index.html .gw-rules: keep them matching rate())
+      '<div class="gw-key"><span>Forecast: <a href="https://www.weather.gov/" target="_blank" rel="noopener">National Weather Service</a>' +
+        (state.data && state.data.some(function (d) { return d.hours.some(function (x) { return x.src === "om"; }); }) ? ', then <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a>' : "") +
+        (state.courses.length ? ' · courses: <a href="https://opengolfapi.org/" target="_blank" rel="noopener">OpenGolfAPI</a>' : "") +
       (state.course && state.holes.length ? ' · hole layout © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors' : "") + "</span></div>";
   }
 

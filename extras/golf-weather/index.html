@@ -29,7 +29,13 @@
     <header class="page-head">
       <a class="back" href="/extras/">&larr; Extras</a>
       <h1>Golf weather</h1>
-      <p>The best times to play this week near any US ZIP code, by my rules: not over 85°F, wind up to 20 mph, and a dry window of at least 4 hours.</p>
+      <p>The best times to play this week near any US ZIP code. Every hour is rated on temperature, wind, and rain, and takes its worst color. A good day needs at least 4 non-red hours in a row.</p>
+      <!-- my rules (golf-weather.js rate()), up top so the colors make sense before the grid (Nick, 2026-10-17) -->
+      <ul class="gw-rules">
+        <li><i class="g2"></i><b>Good</b> · 50–84°F · wind up&nbsp;to&nbsp;10&nbsp;mph · rain up&nbsp;to&nbsp;20%</li>
+        <li><i class="g1"></i><b>Playable</b> · 40–49°F or 85–89°F · wind up&nbsp;to&nbsp;20&nbsp;mph · rain up&nbsp;to&nbsp;40%</li>
+        <li><i class="g0"></i><b>Not great</b> · under 40°F or 90°F+ · wind over&nbsp;20&nbsp;mph · rain over&nbsp;40% or&nbsp;thunder</li>
+      </ul>
     </header>
     <form class="gw-search" id="gw-search" autocomplete="off" novalidate>
       <label class="gw-label" for="gw-zip">ZIP code</label>
