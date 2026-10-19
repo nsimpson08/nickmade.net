@@ -391,16 +391,9 @@
     function open(p) {
       var card = document.getElementById(p.r._id);
       if (!card) return;
-      if (getComputedStyle(card).display === "none" && card.parentNode) { // behind Archive: open that section first
-        card.parentNode.classList.add("show-all");
-        var btn = card.parentNode.nextElementSibling;
-        if (btn && btn.classList.contains("tiles-more")) btn.setAttribute("aria-expanded", "true");
-        labelMore();
-      }
-      card.scrollIntoView({ behavior: "smooth", block: "center" });
-      card.classList.remove("flash");
-      void card.offsetWidth;
-      card.classList.add("flash");
+      showRound(card);
+      // a Scorecard round opens its card as well, as if it was tapped (Nick, 2026-10-19)
+      if (card.dataset.scRound) openCard(card);
     }
     svg.addEventListener("pointermove", function (e) { var p = nearest(e); if (p) show(p); });
     svg.addEventListener("pointerleave", hide);
@@ -441,6 +434,9 @@
       scorecardOpen = open;
       render();
       lastW = chartBox ? chartBox.clientWidth : 0;
+      // #card=<round id>: one Scorecard round's card, opened (the home page's Lately links here; Nick, 2026-10-19)
+      var want = /^#card=(.+)$/.exec(location.hash), tile = want && root.querySelector('[data-sc-round="' + CSS.escape(decodeURIComponent(want[1])) + '"]');
+      if (tile) { showRound(tile); openCard(tile); return; }
       var target = location.hash && document.getElementById(location.hash.slice(1));
       if (target) target.scrollIntoView();
     });
@@ -510,6 +506,20 @@
       entries.forEach(function (e) { if (e.isIntersecting) { draw(e.target); tileWatch.unobserve(e.target); } });
     }, { rootMargin: "300px" });
     tiles.forEach(function (t) { tileWatch.observe(t); });
+  }
+
+  // a round's card or row brought into view and flashed (behind Archive: that section opened first)
+  function showRound(card) {
+    if (getComputedStyle(card).display === "none" && card.parentNode) {
+      card.parentNode.classList.add("show-all");
+      var btn = card.parentNode.nextElementSibling;
+      if (btn && btn.classList.contains("tiles-more")) btn.setAttribute("aria-expanded", "true");
+      labelMore();
+    }
+    card.scrollIntoView({ behavior: "smooth", block: "center" });
+    card.classList.remove("flash");
+    void card.offsetWidth;
+    card.classList.add("flash");
   }
 
   function openCard(el) {

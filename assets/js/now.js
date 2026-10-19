@@ -143,7 +143,7 @@
     try { token = localStorage.getItem("nm-admin-token"); } catch (e) {}
     return fetch(API + "/scorecard/feed", { headers: token ? { Authorization: "Bearer " + token } : {} })
       .then(function (r) { return r.ok ? r.json() : {}; })
-      .then(function (d) { return d.rounds || []; })
+      .then(function (d) { return (d.rounds || []).map(function (r) { r.card = true; return r; }); }) // Scorecard rounds have a card to open
       .catch(function () { return []; });
   }
   function latestRound() {
@@ -158,7 +158,8 @@
   function golf(r) {
     var toPar = r.toPar != null ? r.toPar : r.par ? r.score - r.par : null; // X-Golf rounds don't know par
     var par = toPar == null ? "" : ' <span class="now-par">' + (toPar === 0 ? "E" : (toPar > 0 ? "+" : "") + toPar) + (r.net ? " net" : "") + "</span>";
-    return part("golf", "/extras/golf/", 'shot <span class="now-score">' + esc(r.score) + "</span>" + par + " at", r.course, "", ago(r.date));
+    // a Scorecard round opens its own card on the Golf page (Nick, 2026-10-19); the sim's go to the page
+    return part("golf", r.card && r.id ? "/extras/golf/#card=" + encodeURIComponent(r.id) : "/extras/golf/", 'shot <span class="now-score">' + esc(r.score) + "</span>" + par + " at", r.course, "", ago(r.date));
   }
 
   // Each part shows up as soon as it loads (in its fixed order), with a spinner after them until the last one is in
