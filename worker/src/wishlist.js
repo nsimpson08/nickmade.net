@@ -11,6 +11,8 @@
 //   POST   /wishlist                   (admin) { title, url?, image?, price?, note?, group?, star? } -> { item }
 //   PATCH  /wishlist/:id               (admin) any of those -> { item }
 //   DELETE /wishlist/:id               (admin) the item (and its claim) goes
+//   PUT    /wishlist/order             (admin) { ids: [every item id, in Nick's order] } (drag and drop, Nick 2026-10-19);
+//                                      ids it doesn't name keep their place after the ones it does
 //
 // Storage (the QUEUE namespace): wishlist:items  JSON array of items
 //                                wishlist:claims { itemId: { key: hashed visitor id, at } }
@@ -26,6 +28,10 @@ export async function wishlistRoute(request, url, env, cors, h) {
   if (path === "/wishlist/preview" && m === "GET") {
     if (!admin) return h.json({ error: "Unauthorized" }, 401, cors);
     return preview(url.searchParams.get("url"), cors, h);
+  }
+  if (path === "/wishlist/order" && m === "PUT") {
+    if (!admin) return h.json({ error: "Unauthorized" }, 401, cors);
+    return reorder(request, env, cors, h);
   }
   if (path === "/wishlist" && m === "POST") {
     if (!admin) return h.json({ error: "Unauthorized" }, 401, cors);
@@ -128,6 +134,16 @@ async function edit(id, request, env, cors, h) {
   items[i] = it;
   await env.QUEUE.put(ITEMS, JSON.stringify(items));
   return h.json({ item: it }, 200, cors);
+}
+
+async function reorder(request, env, cors, h) {
+  let b = {};
+  try { b = await request.json(); } catch (e) { return h.json({ error: "Bad request." }, 400, cors); }
+  const ids = Array.isArray(b.ids) ? b.ids.map(String) : [];
+  const items = await getJSON(env, ITEMS, []), at = (it) => { const i = ids.indexOf(it.id); return i < 0 ? ids.length : i; };
+  const sorted = items.map((it, i) => [it, i]).sort((a, c) => at(a[0]) - at(c[0]) || a[1] - c[1]).map((x) => x[0]);
+  await env.QUEUE.put(ITEMS, JSON.stringify(sorted));
+  return h.json({ ids: sorted.map((it) => it.id) }, 200, cors);
 }
 
 async function remove(id, env, cors, h) {

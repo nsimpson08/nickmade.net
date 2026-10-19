@@ -15,6 +15,11 @@
     ADMIN = localStorage.getItem("nm-admin-token");
   } catch (e) {}
   var reveal = false, items = [], groups = [];
+  // how this viewer looks at the list (Nick, 2026-10-19: sort by price; tick groups on or off), remembered here
+  var view = { sort: "group", off: {} };
+  try { var saved = JSON.parse(localStorage.getItem("nm-wishlist-view") || "null"); if (saved) view = { sort: saved.sort || "group", off: saved.off || {} }; } catch (e) {}
+  function saveView() { try { localStorage.setItem("nm-wishlist-view", JSON.stringify(view)); } catch (e) {} }
+  function amount(it) { var n = parseFloat(String(it.price || "").replace(/[^0-9.]/g, "")); return n > 0 ? n : null; }
 
   // the random id this browser keeps (the queues and the Cattery use the same one)
   function visitorId() {
@@ -63,26 +68,53 @@
       '<button type="button" class="wl-reveal">' + (reveal ? "Hide what's claimed" : "Show what's claimed") + "</button>" +
       '<a href="?logout">Log out</a></div>';
     if (!items.length) html += '<p class="wl-msg">' + (ADMIN ? "Nothing on the list yet. Add something." : "Nothing on the list right now.") + "</p>";
-    order.forEach(function (g) {
-      var list = byGroup[g].slice().sort(function (a, b) { return (b.star ? 1 : 0) - (a.star ? 1 : 0); });
-      html += '<section class="wl-group">' + (order.length > 1 || g ? "<h2>" + esc(g || "Other") + "</h2>" : "") +
-        '<ul class="wl-grid">' + list.map(card).join("") + "</ul></section>";
-    });
+    var shown = order.filter(function (g) { return !view.off[g || "Other"]; });
+    if (items.length) {
+      // the bar: sort, then a chip per group to show or hide it (only when there's more than one)
+      html += '<div class="wl-bar"><label class="wl-sort">Sort <select>' +
+        [["group", "Priority"], ["low", "Price: low to high"], ["high", "Price: high to low"]] /* Priority: by group, in Nick's own (dragged) order */.map(function (o) {
+          return '<option value="' + o[0] + '"' + (view.sort === o[0] ? " selected" : "") + ">" + o[1] + "</option>";
+        }).join("") + "</select></label>" +
+        (order.length > 1 ? '<div class="wl-chips" role="group" aria-label="Groups to show">' + order.map(function (g) {
+          var name = g || "Other";
+          return '<button type="button" class="wl-chip" data-group="' + esc(name) + '" aria-pressed="' + !view.off[name] + '">' + esc(name) + "</button>";
+        }).join("") + "</div>" : "") + "</div>";
+    }
+    if (items.length && !shown.length) html += '<p class="wl-msg">Every group is hidden. Tap one above to show it.</p>';
+    if (view.sort === "group") {
+      shown.forEach(function (g) {
+        var list = byGroup[g]; // Nick's own order, top to bottom (drag and drop in owner mode)
+        html += '<section class="wl-group" data-group="' + esc(g) + '">' + (order.length > 1 || g ? "<h2>" + esc(g || "Other") + "</h2>" : "") +
+          '<ul class="wl-grid">' + list.map(function (it) { return card(it); }).join("") + "</ul></section>";
+      });
+    } else if (shown.length) {
+      // by price: one list across the groups shown, no-price items last; each card says its group
+      var all = [].concat.apply([], shown.map(function (g) { return byGroup[g]; })), dir = view.sort === "low" ? 1 : -1;
+      all.sort(function (a, b) {
+        var x = amount(a), y = amount(b);
+        if (x == null || y == null) return x == null ? (y == null ? 0 : 1) : -1;
+        return (x - y) * dir;
+      });
+      html += '<section class="wl-group"><ul class="wl-grid">' + all.map(function (it) { return card(it, order.length > 1); }).join("") + "</ul></section>";
+    }
     root.innerHTML = html;
   }
-  function card(it) {
+  function card(it, withGroup) {
     var taken = it.claimed && !it.mine;
+    var drag = ADMIN && view.sort === "group";
     return '<li class="wl-item' + (taken ? " taken" : "") + (it.mine ? " mine" : "") + '" data-id="' + it.id + '">' +
+      (drag ? '<button type="button" class="wl-handle" aria-label="Drag to reorder ' + esc(it.title) + '" title="Drag to reorder">⠿</button>' : "") +
       (it.url ? '<a class="wl-pic" href="' + esc(it.url) + '" target="_blank" rel="noopener" tabindex="-1">' : '<div class="wl-pic">') +
         (it.image ? '<img src="' + esc(it.image) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '<span class="wl-noimg" aria-hidden="true">🎁</span>') +
         (it.star ? '<span class="wl-star">★ Most wanted</span>' : "") +
       (it.url ? "</a>" : "</div>") +
       '<div class="wl-body">' +
+        (withGroup ? '<p class="wl-in">' + esc(it.group || "Other") + "</p>" : "") +
         "<h3>" + esc(it.title) + "</h3>" +
         (it.price ? '<p class="wl-price">' + esc(money(it.price)) + "</p>" : "") +
         (it.note ? '<p class="wl-note">' + esc(it.note) + "</p>" : "") +
         '<div class="wl-actions">' +
-          (it.url ? '<a class="open wl-shop" href="' + esc(it.url) + '" target="_blank" rel="noopener">View' + (host(it.url) ? '<span class="wl-host"> at ' + esc(host(it.url)) + "</span>" : "") + " ↗</a>" : "") +
+          (it.url ? '<a class="open wl-shop" href="' + esc(it.url) + '" target="_blank" rel="noopener">View' + (host(it.url) ? '<span class="wl-host">&nbsp;at ' + esc(host(it.url)) + "</span>" : "") + "&nbsp;↗</a>" : "") +
           (ADMIN && !reveal ? "" :
             it.mine ? '<span class="wl-yours">You’re getting this</span> <button type="button" class="wl-undo">Undo</button>' :
             taken ? '<span class="wl-taken">Someone’s getting this</span>' :
@@ -92,9 +124,18 @@
       "</div></li>";
   }
 
+  root.addEventListener("change", function (e) {
+    if (e.target.closest(".wl-sort")) { view.sort = e.target.value; saveView(); render(); }
+  });
   root.addEventListener("click", function (e) {
     var b = e.target.closest("button");
     if (!b) return;
+    if (b.classList.contains("wl-chip")) {
+      var g = b.dataset.group;
+      if (view.off[g]) delete view.off[g]; else view.off[g] = true;
+      saveView(); render();
+      return;
+    }
     var li = b.closest(".wl-item"), id = li && li.dataset.id, it = items.filter(function (x) { return x.id === id; })[0];
     if (b.classList.contains("wl-claim") && it) {
       if (!confirm("Mark “" + it.title + "” as yours to get? Everyone else will see it's taken (Nick won't).")) return;
@@ -115,6 +156,42 @@
       reveal = !reveal; load();
     }
   });
+
+  // ---------- Nick's order, by drag and drop (owner mode, By group): the handle drags its card within its own group,
+  // with a mouse or a finger; letting go saves the whole list's order (PUT /wishlist/order) ----------
+  var dragging = null;
+  root.addEventListener("pointerdown", function (e) {
+    var hnd = e.target.closest(".wl-handle");
+    if (!hnd || e.button > 0) return;
+    e.preventDefault();
+    var li = hnd.closest(".wl-item");
+    dragging = { li: li, grid: li.parentNode, id: li.dataset.id, before: [].map.call(li.parentNode.children, function (x) { return x.dataset.id; }).join() };
+    li.classList.add("dragging");
+    hnd.setPointerCapture(e.pointerId);
+  });
+  root.addEventListener("pointermove", function (e) {
+    if (!dragging) return;
+    var over = document.elementFromPoint(e.clientX, e.clientY), other = over && over.closest(".wl-item");
+    if (!other || other === dragging.li || other.parentNode !== dragging.grid) return;
+    var kids = [].slice.call(dragging.grid.children), from = kids.indexOf(dragging.li), to = kids.indexOf(other);
+    dragging.grid.insertBefore(dragging.li, from < to ? other.nextSibling : other);
+  });
+  function drop() {
+    if (!dragging) return;
+    var d = dragging; dragging = null;
+    d.li.classList.remove("dragging");
+    var now = [].map.call(d.grid.children, function (x) { return x.dataset.id; });
+    if (now.join() === d.before) return;
+    // the group's items take their new order in the same places in the whole list
+    var slots = [], rank = {};
+    now.forEach(function (id, i) { rank[id] = i; });
+    items.forEach(function (it, i) { if (it.id in rank) slots.push(i); });
+    var moved = now.map(function (id) { return items.filter(function (x) { return x.id === id; })[0]; });
+    slots.forEach(function (at, k) { items[at] = moved[k]; });
+    api("/wishlist/order", { method: "PUT", body: { ids: items.map(function (x) { return x.id; }) } }).catch(function (err) { alert(err.message); load(); });
+  }
+  root.addEventListener("pointerup", drop);
+  root.addEventListener("pointercancel", drop);
 
   // ---------- adding and editing (owner mode) ----------
   function editor(it) {

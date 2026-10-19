@@ -3351,6 +3351,15 @@ img.developing { animation: develop 2.6s cubic-bezier(0.3, 0, 0.2, 1) both; }
 .wl-owner { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: -24px 0 32px; }
 .wl-owner button:not(.open) { padding: 0; border: 0; background: none; color: var(--muted); font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .wl-owner .open { background: none; color: var(--fg); font: inherit; cursor: pointer; }
+.wl-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin: -20px 0 36px; }
+.wl-sort { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--muted); }
+.wl-sort select { padding: 7px 30px 7px 12px; border: 1px solid var(--line); border-radius: 999px; background: #000; color: var(--fg); font: inherit; font-size: 0.85rem; cursor: pointer; appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: right 14px top 52%, right 9px top 52%; background-size: 5px 5px; background-repeat: no-repeat; }
+.wl-owner + .wl-bar { margin-top: -16px; }
+.wl-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.wl-chip { padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px; background: #000; color: var(--faint); font: inherit; font-size: 0.82rem; cursor: pointer; text-decoration: line-through; }
+.wl-chip[aria-pressed="true"] { color: var(--fg); border-color: color-mix(in srgb, var(--accent) 55%, transparent); background: color-mix(in srgb, var(--accent) 10%, #000); text-decoration: none; }
+.wl-in { margin: 0; font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
 .wl-group { margin: 0 0 48px; }
 .wl-group h2 { margin: 0 0 16px; font: 600 1.05rem/1.3 var(--display); color: var(--accent); }
 .wl-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 18px; }
@@ -3358,6 +3367,10 @@ img.developing { animation: develop 2.6s cubic-bezier(0.3, 0, 0.2, 1) both; }
 .wl-item:hover { border-color: #2c2c33; }
 .wl-item.mine { border-color: color-mix(in srgb, var(--accent) 60%, transparent); }
 .wl-item.taken { opacity: 0.5; }
+.wl-item { position: relative; }
+.wl-handle { position: absolute; z-index: 2; top: 8px; right: 8px; width: 36px; height: 36px; border: 1px solid rgba(0, 0, 0, 0.15); border-radius: 10px; background: rgba(255, 255, 255, 0.92); color: #333; font-size: 1.1rem; line-height: 1; cursor: grab; touch-action: none; }
+.wl-item.dragging { opacity: 0.6; border-color: var(--accent); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5); }
+.wl-item.dragging .wl-handle { cursor: grabbing; }
 .wl-pic { position: relative; display: flex; align-items: center; justify-content: center; aspect-ratio: 1; background: #fff; }
 .wl-pic img { width: 100%; height: 100%; object-fit: contain; padding: 14px; box-sizing: border-box; }
 .wl-noimg { font-size: 3rem; }
@@ -3369,6 +3382,7 @@ img.developing { animation: develop 2.6s cubic-bezier(0.3, 0, 0.2, 1) both; }
 .wl-note { margin: 0; color: var(--muted); font-size: 0.85rem; }
 .wl-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: auto; padding-top: 12px; font-size: 0.85rem; }
 .wl-actions .open { padding: 7px 14px; font-size: 0.82rem; background: none; color: var(--fg); font-family: inherit; cursor: pointer; }
+.wl-actions .wl-shop { gap: 0; } /* "View" and its " at ebay.com" part read as one label */
 .wl-actions .wl-claim { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
 .wl-actions .wl-claim:disabled { opacity: 0.5; cursor: default; }
 .wl-yours { color: var(--accent); }
