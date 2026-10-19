@@ -3,6 +3,7 @@ import { musicRoute, MUSIC_SCOPES } from "./music.js";
 import { votesRoute } from "./votes.js";
 import { libraryRoute } from "./library.js";
 import { photosRoute } from "./photos.js";
+import { wishlistRoute } from "./wishlist.js";
 import { catsRoute, catsTick } from "./cats.js";
 import { scorecardRoute } from "./scorecard.js";
 import { recordTrophies, trophiesView, TROPHIES_KEY, PsnError } from "./psn.js";
@@ -205,6 +206,10 @@ export default {
       }
       if (url.pathname === "/library" || url.pathname.startsWith("/library/")) {
         const res = await libraryRoute(request, url, env, cors, { json, isAdmin });
+        if (res) return res;
+      }
+      if (url.pathname === "/wishlist" || url.pathname.startsWith("/wishlist/")) {
+        const res = await wishlistRoute(request, url, env, cors, { json, isAdmin, sha256 });
         if (res) return res;
       }
       if (url.pathname === "/photos" || url.pathname.startsWith("/photos/")) {

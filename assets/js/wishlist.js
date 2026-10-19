@@ -1,0 +1,200 @@
+// Nick's wishlist (wishlist/; the Worker's wishlist.js). Anyone with the link sees the items in Nick's groups (most
+// wanted first) and can mark one "I'm getting this" (once per item; only they can undo it). In owner mode (the admin
+// token, as on the other pages; ?admin to log in) Nick adds, edits and removes items, pasting a product link to fill
+// in its name, picture and price, and never sees what's claimed unless he asks to ("Show what's claimed").
+(function () {
+  var root = document.getElementById("wl");
+  if (!root) return;
+  var script = document.currentScript || document.querySelector('script[src*="wishlist.js"]');
+  var local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+  var API = (local && script.dataset.apiLocal) || script.dataset.api;
+  var params = new URLSearchParams(location.search);
+  var ADMIN = null;
+  try {
+    if (params.has("logout")) localStorage.removeItem("nm-admin-token");
+    ADMIN = localStorage.getItem("nm-admin-token");
+  } catch (e) {}
+  var reveal = false, items = [], groups = [];
+
+  // the random id this browser keeps (the queues and the Cattery use the same one)
+  function visitorId() {
+    var id = null;
+    try { id = localStorage.getItem("nm-visitor"); } catch (e) {}
+    if (!id) { var m = document.cookie.match(/(?:^|; )nm_visitor=([^;]+)/); id = m ? m[1] : null; }
+    if (!id) id = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2);
+    try { localStorage.setItem("nm-visitor", id); } catch (e) {}
+    document.cookie = "nm_visitor=" + id + "; max-age=31536000; path=/; SameSite=Lax";
+    return id;
+  }
+  var VID = visitorId();
+
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function headers(json) { var h = {}; if (json) h["Content-Type"] = "application/json"; if (ADMIN) h.Authorization = "Bearer " + ADMIN; return h; }
+  function api(path, opts) {
+    opts = opts || {};
+    return fetch(API + path, { method: opts.method || "GET", headers: headers(!!opts.body), body: opts.body ? JSON.stringify(opts.body) : undefined })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { if (!r.ok) throw new Error(d.error || "Something went wrong."); return d; }); });
+  }
+  function host(u) { try { return new URL(u).hostname.replace(/^www\./, ""); } catch (e) { return ""; } }
+
+  function load() {
+    return api("/wishlist?visitorId=" + encodeURIComponent(VID) + (reveal ? "&reveal=1" : "")).then(function (d) {
+      items = d.items || []; groups = d.groups || [];
+      if (ADMIN && !d.owner) { ADMIN = null; try { localStorage.removeItem("nm-admin-token"); } catch (e) {} } // an old password
+      render();
+    }, function () { root.innerHTML = '<p class="wl-msg">Couldn’t load the list. Try again in a bit.</p>'; });
+  }
+
+  // the groups in the order Nick named them (each group's newest item first), "Other" last; most wanted first in each
+  function render() {
+    var byGroup = {}, order = [];
+    items.forEach(function (it) {
+      var g = it.group || "";
+      if (!byGroup[g]) { byGroup[g] = []; if (g) order.push(g); }
+      byGroup[g].push(it);
+    });
+    order.sort(function (a, b) { return a.localeCompare(b); });
+    if (byGroup[""]) order.push("");
+    var html = "";
+    if (ADMIN) html += '<div class="owner-bar wl-owner"><span>Owner mode</span>' +
+      '<button type="button" class="open wl-add"><span aria-hidden="true">+</span> Add an item</button>' +
+      '<button type="button" class="wl-reveal">' + (reveal ? "Hide what's claimed" : "Show what's claimed") + "</button>" +
+      '<a href="?logout">Log out</a></div>';
+    if (!items.length) html += '<p class="wl-msg">' + (ADMIN ? "Nothing on the list yet. Add something." : "Nothing on the list right now.") + "</p>";
+    order.forEach(function (g) {
+      var list = byGroup[g].slice().sort(function (a, b) { return (b.star ? 1 : 0) - (a.star ? 1 : 0); });
+      html += '<section class="wl-group">' + (order.length > 1 || g ? "<h2>" + esc(g || "Other") + "</h2>" : "") +
+        '<ul class="wl-grid">' + list.map(card).join("") + "</ul></section>";
+    });
+    root.innerHTML = html;
+  }
+  function card(it) {
+    var taken = it.claimed && !it.mine;
+    return '<li class="wl-item' + (taken ? " taken" : "") + (it.mine ? " mine" : "") + '" data-id="' + it.id + '">' +
+      (it.url ? '<a class="wl-pic" href="' + esc(it.url) + '" target="_blank" rel="noopener" tabindex="-1">' : '<div class="wl-pic">') +
+        (it.image ? '<img src="' + esc(it.image) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '<span class="wl-noimg" aria-hidden="true">🎁</span>') +
+        (it.star ? '<span class="wl-star">★ Most wanted</span>' : "") +
+      (it.url ? "</a>" : "</div>") +
+      '<div class="wl-body">' +
+        "<h3>" + esc(it.title) + "</h3>" +
+        (it.price ? '<p class="wl-price">' + esc(it.price) + "</p>" : "") +
+        (it.note ? '<p class="wl-note">' + esc(it.note) + "</p>" : "") +
+        '<div class="wl-actions">' +
+          (it.url ? '<a class="open wl-shop" href="' + esc(it.url) + '" target="_blank" rel="noopener">View' + (host(it.url) ? '<span class="wl-host"> at ' + esc(host(it.url)) + "</span>" : "") + " ↗</a>" : "") +
+          (ADMIN && !reveal ? "" :
+            it.mine ? '<span class="wl-yours">You’re getting this</span> <button type="button" class="wl-undo">Undo</button>' :
+            taken ? '<span class="wl-taken">Someone’s getting this</span>' :
+            '<button type="button" class="open wl-claim">I’m getting this</button>') +
+          (ADMIN ? '<button type="button" class="wl-edit">Edit</button><button type="button" class="wl-remove">Remove</button>' : "") +
+        "</div>" +
+      "</div></li>";
+  }
+
+  root.addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b) return;
+    var li = b.closest(".wl-item"), id = li && li.dataset.id, it = items.filter(function (x) { return x.id === id; })[0];
+    if (b.classList.contains("wl-claim") && it) {
+      if (!confirm("Mark “" + it.title + "” as yours to get? Everyone else will see it's taken (Nick won't).")) return;
+      b.disabled = true;
+      api("/wishlist/" + id + "/claim", { method: "POST", body: { visitorId: VID } }).then(function () { return load(); }, function (err) { alert(err.message); load(); });
+    }
+    if (b.classList.contains("wl-undo") && it) {
+      b.disabled = true;
+      api("/wishlist/" + id + "/claim?visitorId=" + encodeURIComponent(VID), { method: "DELETE" }).then(load, function (err) { alert(err.message); load(); });
+    }
+    if (b.classList.contains("wl-add")) editor(null);
+    if (b.classList.contains("wl-edit") && it) editor(it);
+    if (b.classList.contains("wl-remove") && it && confirm("Take “" + it.title + "” off the list?")) {
+      api("/wishlist/" + id, { method: "DELETE" }).then(load, function (err) { alert(err.message); });
+    }
+    if (b.classList.contains("wl-reveal")) {
+      if (!reveal && !confirm("This shows which gifts people are getting you. Spoil the surprise?")) return;
+      reveal = !reveal; load();
+    }
+  });
+
+  // ---------- adding and editing (owner mode) ----------
+  function editor(it) {
+    var d = document.createElement("dialog");
+    d.className = "queue-dialog wl-dialog";
+    d.innerHTML = '<form novalidate>' +
+      '<button class="close" type="button" aria-label="Close">&times;</button>' +
+      "<h2>" + (it ? "Edit item" : "Add an item") + "</h2>" +
+      '<label for="wl-url">Link <span class="optional">(paste one and the rest fills in)</span></label>' +
+      '<input id="wl-url" type="url" inputmode="url" autocomplete="off" placeholder="https://…" value="' + esc(it && it.url) + '">' +
+      '<p class="hint wl-fetch" role="status"></p>' +
+      '<div class="wl-prev"' + (it && it.image ? "" : " hidden") + '><img alt="" referrerpolicy="no-referrer" src="' + esc(it && it.image) + '"></div>' +
+      '<label for="wl-title">Name</label><input id="wl-title" type="text" maxlength="140" value="' + esc(it && it.title) + '">' +
+      '<label for="wl-price">Price <span class="optional">(optional)</span></label><input id="wl-price" type="text" maxlength="24" placeholder="$49" value="' + esc(it && it.price) + '">' +
+      '<label for="wl-note">Note <span class="optional">(size, color…)</span></label><input id="wl-note" type="text" maxlength="200" placeholder="Size L, black" value="' + esc(it && it.note) + '">' +
+      '<label for="wl-group">Group <span class="optional">(optional)</span></label><input id="wl-group" type="text" maxlength="40" list="wl-groups" placeholder="Golf, Games, Clothes…" value="' + esc(it && it.group) + '">' +
+      '<datalist id="wl-groups">' + groups.map(function (g) { return '<option value="' + esc(g) + '">'; }).join("") + "</datalist>" +
+      '<label for="wl-image">Picture link <span class="optional">(filled in from the link; change it if it’s wrong)</span></label><input id="wl-image" type="url" autocomplete="off" value="' + esc(it && it.image) + '">' +
+      '<label class="wl-check"><input type="checkbox" id="wl-star"' + (it && it.star ? " checked" : "") + "> ★ Most wanted</label>" +
+      '<p class="error" role="alert"></p>' +
+      '<button class="open submit" type="submit">' + (it ? "Save" : "Add to the list") + "</button></form>";
+    document.body.appendChild(d);
+    var f = d.querySelector("form"), $ = function (s) { return d.querySelector(s); };
+    d.addEventListener("close", function () { d.remove(); });
+    $(".close").addEventListener("click", function () { d.close(); });
+    d.addEventListener("click", function (e) { if (e.target === d) d.close(); });
+    function showPic() { var u = $("#wl-image").value.trim(); $(".wl-prev").hidden = !u; $(".wl-prev img").src = u; }
+    $("#wl-image").addEventListener("change", showPic);
+    var lastFetched = it ? it.url : "";
+    function fill() {
+      var u = $("#wl-url").value.trim();
+      if (!/^https?:\/\//i.test(u) || u === lastFetched) return;
+      lastFetched = u;
+      $(".wl-fetch").textContent = "Looking up the link…";
+      api("/wishlist/preview?url=" + encodeURIComponent(u)).then(function (p) {
+        if (!p.found) { $(".wl-fetch").textContent = "That store didn't share its details. Type them in."; return; }
+        $(".wl-fetch").textContent = "";
+        if (p.title && !$("#wl-title").value.trim()) $("#wl-title").value = p.title;
+        if (p.price && !$("#wl-price").value.trim()) $("#wl-price").value = p.price;
+        if (p.image && !$("#wl-image").value.trim()) { $("#wl-image").value = p.image; showPic(); }
+      }, function () { $(".wl-fetch").textContent = "Couldn't look that up. Type the details in."; });
+    }
+    $("#wl-url").addEventListener("change", fill);
+    $("#wl-url").addEventListener("paste", function () { setTimeout(fill, 0); });
+    f.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var body = { url: $("#wl-url").value, title: $("#wl-title").value, price: $("#wl-price").value, note: $("#wl-note").value,
+        group: $("#wl-group").value, image: $("#wl-image").value, star: $("#wl-star").checked };
+      if (!body.title.trim()) { $(".error").textContent = "Give it a name."; return; }
+      var btn = f.querySelector(".submit"); btn.disabled = true;
+      api(it ? "/wishlist/" + it.id : "/wishlist", { method: it ? "PATCH" : "POST", body: body }).then(function () { d.close(); load(); },
+        function (err) { btn.disabled = false; $(".error").textContent = err.message; });
+    });
+    d.showModal();
+    (it ? $("#wl-title") : $("#wl-url")).focus();
+  }
+
+  function login() {
+    var d = document.createElement("dialog");
+    d.className = "queue-dialog";
+    d.innerHTML = '<form novalidate><h2>Owner login</h2><p class="hint">Enter your admin password. This browser will remember it.</p>' +
+      '<label for="wl-admin">Password</label><input id="wl-admin" type="password" autocomplete="current-password">' +
+      '<p class="error" role="alert"></p><button class="open submit" type="submit">Log in</button></form>';
+    document.body.appendChild(d);
+    var input = d.querySelector("input"), err = d.querySelector(".error");
+    d.addEventListener("close", function () { d.remove(); });
+    d.querySelector("form").addEventListener("submit", function (e) {
+      e.preventDefault();
+      var token = input.value.trim();
+      fetch(API + "/admin/check", { headers: { Authorization: "Bearer " + token } }).then(function (r) {
+        if (!r.ok) { err.textContent = "Wrong password."; return; }
+        ADMIN = token;
+        try { localStorage.setItem("nm-admin-token", token); } catch (e2) {}
+        history.replaceState(null, "", location.pathname);
+        d.close();
+        load();
+      }).catch(function () { err.textContent = "Couldn't reach the server."; });
+    });
+    d.showModal();
+    input.focus();
+  }
+
+  load();
+  if (!ADMIN && params.has("admin")) login();
+})();

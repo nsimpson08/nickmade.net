@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Nick's wishlist (Nick, 2026-10-19): anyone with the link can open it, but nothing on the site links here and
+       search engines are asked to leave it out (noindex below; not in robots.txt, which anyone can read) -->
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <title>Wishlist · NickMade</title>
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500&family=Unbounded:wght@500;600;700;800&display=swap">
+  <link rel="stylesheet" href="/assets/css/site.css">
+</head>
+<body class="page-wishlist">
+  <header class="topbar">
+    <a class="wordmark" href="/">Nick<span>Made</span></a>
+    <nav>
+      <a href="/games/">Games</a>
+      <a href="/movies/">Movies</a>
+      <a href="/music/">Music</a>
+      <a href="/photography/">Photography</a>
+      <a href="/play/">Play</a>
+      <a href="/extras/">Extras</a>
+    </nav>
+  </header>
+
+  <main class="content wishlist">
+    <header class="page-head">
+      <h1>Wishlist</h1>
+      <p>Things I'd love to have. Getting me one? Tap <b>I'm getting this</b> so nobody doubles up. I can't see what's been claimed, so it stays a surprise.</p>
+    </header>
+    <div id="wl" aria-live="polite"><p class="wl-msg">Loading…</p></div>
+  </main>
+  <footer id="site-footer">&copy; 2026 Nick Simpson</footer>
+  <script src="/assets/js/wishlist.js" data-api="https://api.nickmade.net" data-api-local="http://localhost:8787"></script>
+  <script src="/changelog/log.js"></script>
+  <script src="/assets/js/footer.js"></script>
+</body>
+</html>
