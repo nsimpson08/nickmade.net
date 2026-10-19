@@ -96,7 +96,7 @@ function clean(b, old) {
   if (b.title !== undefined) it.title = s(b.title, 140);
   if (b.url !== undefined) it.url = link(b.url);
   if (b.image !== undefined) it.image = link(b.image);
-  if (b.price !== undefined) it.price = s(b.price, 24);
+  if (b.price !== undefined) { it.price = s(b.price, 24); if (/^\d[\d,]*(\.\d+)?$/.test(it.price)) it.price = "$" + it.price; } // "180" -> "$180" (Nick)
   if (b.note !== undefined) it.note = s(b.note, 200);
   if (b.group !== undefined) it.group = s(b.group, 40);
   if (b.star !== undefined) it.star = !!b.star;

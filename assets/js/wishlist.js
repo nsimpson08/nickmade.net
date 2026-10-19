@@ -35,6 +35,8 @@
     return fetch(API + path, { method: opts.method || "GET", headers: headers(!!opts.body), body: opts.body ? JSON.stringify(opts.body) : undefined })
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { if (!r.ok) throw new Error(d.error || "Something went wrong."); return d; }); });
   }
+  // a price typed as just a number ("180") shows with a dollar sign (Nick, 2026-10-19); "$49" or "€30" stay as typed
+  function money(p) { p = String(p).trim(); return /^\d[\d,]*(\.\d+)?$/.test(p) ? "$" + p : p; }
   function host(u) { try { return new URL(u).hostname.replace(/^www\./, ""); } catch (e) { return ""; } }
 
   function load() {
@@ -77,7 +79,7 @@
       (it.url ? "</a>" : "</div>") +
       '<div class="wl-body">' +
         "<h3>" + esc(it.title) + "</h3>" +
-        (it.price ? '<p class="wl-price">' + esc(it.price) + "</p>" : "") +
+        (it.price ? '<p class="wl-price">' + esc(money(it.price)) + "</p>" : "") +
         (it.note ? '<p class="wl-note">' + esc(it.note) + "</p>" : "") +
         '<div class="wl-actions">' +
           (it.url ? '<a class="open wl-shop" href="' + esc(it.url) + '" target="_blank" rel="noopener">View' + (host(it.url) ? '<span class="wl-host"> at ' + esc(host(it.url)) + "</span>" : "") + " ↗</a>" : "") +
