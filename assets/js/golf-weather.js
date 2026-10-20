@@ -12,7 +12,8 @@
 // good, up to 20 playable; rain up to 20% good, up to 40% playable, thunder never). A day's best window is its best
 // run of 4+ playable hours (about a round), widened to every hour beside it that's as good; a day without one says why.
 // The same rules as Nick's private golf page; keep the two in step.
-// The ZIP and course picked are kept in the address (?zip=75074&course=<id>) and remembered (nm-golfwx-zip).
+// The ZIP and course picked are kept in the address (?zip=75074&course=<id>) and remembered (nm-golfwx-zip); a
+// visitor's remembered ZIP wins over one in a link.
 // With a course picked, the wind is laid over its holes (Nick: "how often the wind would affect you on the course"):
 // each hole's tee-to-green direction from OpenStreetMap (api.opengolfapi.org /features: the hole lines, or else each
 // hole's numbered tees and green), then for the window's wind, how many holes play downwind (helps carry), into it,
@@ -394,7 +395,11 @@
 
   // start: the ZIP in the address, else the last one used, else Plano's
   var params = new URLSearchParams(location.search);
-  var zip0 = /^\d{5}$/.test(params.get("zip") || "") ? params.get("zip") : get("nm-golfwx-zip") || "75074";
+  // the visitor's own ZIP first (Nick, 2026-10-19: "make sure it stays and doesn't default back to mine"): a ZIP in the
+  // link (a shared ?zip=75074, copied from the address bar) is only for someone who hasn't entered one yet; its course
+  // goes with it
+  var urlZip = /^\d{5}$/.test(params.get("zip") || "") ? params.get("zip") : null, savedZip = get("nm-golfwx-zip");
+  var zip0 = savedZip || urlZip || "75074";
   input.value = zip0;
-  load(zip0, params.get("course"));
+  load(zip0, zip0 === urlZip ? params.get("course") : null);
 })();
