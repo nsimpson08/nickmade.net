@@ -122,6 +122,24 @@
       cols.push([xs[i], xs[i + 1], crossed / ys.length]);
     }
     var wid = function (c) { return c[1] - c[0]; };
+    // what's printed in each column: how many of the card's rows have something in that column's cell. A hole has its
+    // number in nearly every printed row (each tee's yards, handicap, par); a blank column between the nines
+    // ("INITIAL", "Int") has a few letters or nothing (Nick, 2026-10-21: "can't read up the column to ensure it says
+    // 10?" No text is read here). Used below to tell which end of a ten-column run isn't a hole
+    function printed(c) {
+      var x0 = Math.round(c[0] + wid(c) * 0.2), x1 = Math.round(c[1] - wid(c) * 0.2), n = 0;
+      bands.forEach(function (bd) {
+        var y0 = bd[0] + Math.round((bd[1] - bd[0]) * 0.15), y1 = bd[1] - Math.round((bd[1] - bd[0]) * 0.15), vals = [];
+        for (var yy = y0; yy <= y1; yy += 2) for (var xx = x0; xx <= x1; xx += 2) vals.push(im.g[yy * w + xx]);
+        if (!vals.length) return;
+        vals.sort(function (a, b) { return a - b; });
+        var mid = vals[vals.length >> 1], ink = 0;
+        vals.forEach(function (v) { if (Math.abs(v - mid) > 70) ink++; });
+        if (ink / vals.length > 0.03) n++;
+      });
+      return n;
+    }
+    cols.forEach(function (c) { c[3] = printed(c); });
     var nines = ninesOf(cols);
     // nothing found: a small card (Shining Mountain's 500 px website card, Nick 2026-10-18) can lose a faint rule
     // between two holes, making one column two holes wide (and hole 18 run into In). Split those, a hole's width at a
@@ -134,6 +152,7 @@
         for (var q = 0; q < k; q++) out.push([c[0] + cm * q, q === k - 1 ? c[1] : c[0] + cm * (q + 1), c[2]]);
         return out;
       }, []);
+      cols.forEach(function (c) { c[3] = printed(c); });
       nines = ninesOf(cols);
     }
     // nines of holes in the columns: { holes, total, after, label, next }
@@ -154,13 +173,11 @@
       var runCross = run.map(function (c) { return c[2]; }).sort(function (a, b) { return a - b; })[run.length >> 1];
       var afterLabels = i2 > 0 && wid(cols[i2 - 1]) > med * 1.6 && cols.slice(0, i2 - 1).every(function (c) { return wid(c) <= med * 1.6; });
       while (!afterLabels && run.length > 9 && run[0][2] < runCross * 0.85) { run.shift(); i2++; }
-      // ten in a row after a nine: a blank column the width of a hole ("Int", Shining Mountain), the back nine, then
-      // its total the width of the front's Out. Any card, not just on the second look: the crisp copy of that card
-      // found both nines the first time, the back one a column early
-      if (run.length === 10 && nines.length) {
-        var tw = wid(nines[nines.length - 1].total), nx = cols[i2 + 10];
-        if (nx && Math.abs(wid(nx) - tw) <= tw * 0.15 && Math.abs(wid(run[9]) - tw) > tw * 0.15) { run.shift(); i2++; }
-      }
+      // ten hole-width columns after a nine: nine holes and one that isn't, either a blank column before hole 10
+      // ("INITIAL", "Int") or the nine's own total. The one with clearly less printed in it is the blank column: if
+      // that's the first, the holes start one column later (Waterview, Shining Mountain): the first has clearly less than
+      // the last, or less than every other of the ten (a tiny card's counts are close: Shining Mountain's 500 px "Int")
+      if (run.length === 10 && nines.length && (run[0][3] <= run[9][3] - 2 || run.slice(1).every(function (c) { return run[0][3] < c[3]; }))) { run.shift(); i2++; }
       if (run.length >= 9 && med > 14) {
         // nine holes, then that nine's total (Out / In / TOT 9), and again for a second nine in the same run
         var k = 0;

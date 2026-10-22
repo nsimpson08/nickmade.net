@@ -1151,7 +1151,12 @@
     return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2);
   }
   function waiting() {
-    var list = load(K.rounds, []).filter(function (r) { return (r.updatedAt || 0) > (r.ackAt || 0); });
+    // a round finished before that fix (2026-10-21) whose finish never went: its finish counts as its last change,
+    // so it's sent once more, and the send that carries it marks it (finishSent)
+    var all = load(K.rounds, []), fixed = false;
+    all.forEach(function (r) { if (r.finishedAt && !r.finishSent && (r.updatedAt || 0) < r.finishedAt) { r.updatedAt = r.finishedAt; fixed = true; } });
+    if (fixed) save(K.rounds, all);
+    var list = all.filter(function (r) { return (r.updatedAt || 0) > (r.ackAt || 0) || (r.finishedAt && !r.finishSent); });
     if (round && (round.updatedAt || 0) > (round.ackAt || 0)) list.unshift(round);
     return list;
   }
@@ -1194,7 +1199,11 @@
   function acked(id, sentAt) {
     // the course counts as sent only if the round hasn't changed since (a rating typed in while a send was going
     // was lost: its course went unsent, 2026-10-12)
-    var mark = function (x) { x.ackAt = Math.max(x.ackAt || 0, sentAt); if ((x.updatedAt || 0) <= sentAt) x.courseAcked = true; };
+    var mark = function (x) {
+      x.ackAt = Math.max(x.ackAt || 0, sentAt);
+      if ((x.updatedAt || 0) <= sentAt) x.courseAcked = true;
+      if (x.finishedAt && x.finishedAt <= sentAt) x.finishSent = true; // that send carried the finish
+    };
     if (round && round.id === id) { mark(round); save(K.round, round); }
     var past = load(K.rounds, []);
     past.forEach(function (x) { if (x.id === id) mark(x); });
@@ -1514,7 +1523,7 @@
     var missing = round.holes.filter(function (k) { return S(k).strokes == null; });
     if (missing.length === round.holes.length) { alert("Score at least one hole first."); return; }
     if (missing.length && !confirm((missing.length === 1 ? "Hole " + missing[0] + " has" : "Holes " + missing.join(", ") + " have") + " no score. Finish anyway?")) return;
-    round.finishedAt = Date.now();
+    round.finishedAt = round.updatedAt = Date.now(); // changed, so the finish is sent (it wasn't when every hole had already gone: Waterview, 2026-10-21)
     var past = load(K.rounds, []).filter(function (r) { return r.id !== round.id; });
     past.unshift(round);
     save(K.rounds, past.slice(0, KEEP));
