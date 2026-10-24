@@ -10,12 +10,17 @@
 //                                    the same for the imported discs)
 //   GET    /library/barcode?upc=     (admin) a scanned or typed barcode -> that exact release on blu-ray.com: { found,
 //                                    imdbId, title, year, format, edition, steelbook, criterion, hdr, upc }; not there
-//                                    (VHS tapes), UPCitemdb's product name: the same plus source: "upcitemdb", product
+//                                    (VHS tapes), a barcode database's product name: the same plus source: "upcitemdb",
+//                                    product, pictures (sellers' photos of the actual tape or case, https addresses)
+//   GET    /library/covers?imdbId=   (admin) the film's posters on TMDB for the add dialog's Cover choices (VHS):
+//                                    { posters: [{ src (500px), thumb (185px) }] }, the official one first
 //   POST   /library                  (admin) { imdbId, format: "4k"|"bluray"|"dvd"|"vhs", edition?, steelbook?, threeD?,
 //                                    criterion?, features?, hdr? } -> adds a disc (same shape as discs.js) and returns it
 //                                    (features: "On this disc", from an edition picked in the dialog or typed, one per line;
-//                                    hdr: the dialog's HDR ticks, 4K only)
-//   DELETE /library/:id              (admin) a site-added disc is deleted; a discs.js one is hidden
+//                                    hdr: the dialog's HDR ticks, 4K only; cover: the picture picked in the dialog: a TMDB
+//                                    poster is kept as its address, anything else (a seller's photo) is copied into the
+//                                    photos bucket under covers/ so it can't disappear)
+//   DELETE /library/:id              (admin) a site-added disc is deleted (with its copied cover); a discs.js one is hidden
 //
 // A new disc's facts (title, year, runtime, rating, genres, director, cast, studio, poster) come from IMDb, like the
 // rest of the site's lookups. Its blurb is the film's Wikipedia summary (free to reuse with credit; the page links
@@ -41,6 +46,7 @@ export async function libraryRoute(request, url, env, cors, h) {
   if (url.pathname === "/library/hdr" && request.method === "GET") return hdrRoute(request, url, env, cors, h);
   if (url.pathname === "/library/barcode" && request.method === "GET") return barcodeRoute(request, url, env, cors, h);
   if (url.pathname === "/library/stills" && request.method === "GET") return stillsRoute(request, url, env, cors, h);
+  if (url.pathname === "/library/covers" && request.method === "GET") return coversRoute(request, url, env, cors, h);
   if (url.pathname === "/library/film" && request.method === "GET") return filmRoute(request, url, env, cors, h);
   if (url.pathname === "/library" && request.method === "POST") return add(request, env, cors, h);
   if (url.pathname.startsWith("/library/") && request.method === "DELETE") return remove(request, url, env, cors, h);
@@ -230,7 +236,8 @@ async function filmRoute(request, url, env, cors, h) {
 // id, or by title and year (TMDB's search); one request brings its credits, US ratings, videos and IMDb id. (These came
 // from IMDb's own API at first, but it refuses Cloudflare's servers: 429.) -> { imdbId, title, year, minutes, rated,
 // genres, director, starring, tagline, trailer } or null
-async function tmdbFilm(env, { imdb, title, year }) {
+// strict: only a film or show with exactly that title; before: of several with that title, one out by then if any (a VHS)
+async function tmdbFilm(env, { imdb, title, year, strict, before }) {
   if (!env.TMDB_API_KEY) throw new Error("No TMDB key");
   const api = (path) => fetch("https://api.themoviedb.org/3" + path + (path.includes("?") ? "&" : "?") + "api_key=" + env.TMDB_API_KEY)
     .then((r) => { if (!r.ok) throw new Error("TMDB didn't answer (" + r.status + ")"); return r.json(); });
@@ -243,10 +250,11 @@ async function tmdbFilm(env, { imdb, title, year }) {
     const same = (r) => plain(r.title || r.name || "") === plain(title);
     const yr = (r) => parseInt(String(r.release_date || r.first_air_date || "").slice(0, 4), 10) || 0;
     const movies = (await api("/search/movie?query=" + encodeURIComponent(title) + (year ? "&year=" + year : ""))).results || [];
-    let pick = movies.find((r) => same(r) && (!year || Math.abs(yr(r) - year) <= 1)) || movies.find(same) || movies[0];
+    let pick = movies.find((r) => same(r) && (!year || Math.abs(yr(r) - year) <= 1) && (!before || (yr(r) && yr(r) <= before)))
+      || movies.find((r) => same(r) && (!year || Math.abs(yr(r) - year) <= 1)) || movies.find(same) || (strict ? null : movies[0]);
     if (!pick) {
       const shows = (await api("/search/tv?query=" + encodeURIComponent(title))).results || [];
-      pick = shows.find(same) || shows[0];
+      pick = shows.find(same) || (strict ? null : shows[0]);
       if (pick) kind = "tv";
     }
     if (pick) id = pick.id;
@@ -363,6 +371,12 @@ async function add(request, env, cors, h) {
     site: true,
   };
   while (items.some((x) => x.id === d.id)) d.id += "-2";
+  // the cover picked in the dialog (VHS: a photo of the actual tape, or another of the film's posters)
+  if (body.cover && String(body.cover) !== d.cover) {
+    let kept = "";
+    try { kept = await keepCover(env, String(body.cover).slice(0, 600), d.id); } catch (e) { /* the poster stays */ }
+    if (kept) d.cover = kept;
+  }
   for (const k of Object.keys(d)) if (d[k] === "" || d[k] === null || d[k] === false || (Array.isArray(d[k]) && !d[k].length)) delete d[k];
   items.unshift(d);
   await env.QUEUE.put(ITEMS, JSON.stringify(items));
@@ -377,12 +391,52 @@ async function remove(request, url, env, cors, h) {
   const kept = items.filter((d) => d.id !== id);
   if (kept.length !== items.length) {
     await env.QUEUE.put(ITEMS, JSON.stringify(kept));
+    // its cover, if it was a photo copied into the bucket
+    const gone = items.find((d) => d.id === id), base = photoBase(env);
+    if (gone && gone.cover && gone.cover.startsWith(base + "covers/") && env.PHOTOS) await env.PHOTOS.delete(gone.cover.slice(base.length)).catch(() => {});
     return h.json({ removed: id }, 200, cors);
   }
   const hidden = await list(env, HIDDEN); // a discs.js disc: hide it for everyone
   if (!hidden.includes(id)) hidden.push(id);
   await env.QUEUE.put(HIDDEN, JSON.stringify(hidden));
   return h.json({ hidden: id }, 200, cors);
+}
+
+// ---------- covers (the add dialog's Cover choices, VHS) ----------
+// The film's posters on TMDB: the official one first, then the others (older and other countries' posters often match
+// the art on a VHS box), English or wordless ones, best rated first
+async function coversRoute(request, url, env, cors, h) {
+  if (!h.isAdmin(request, env)) return h.json({ error: "Unauthorized" }, 401, cors);
+  const imdbId = url.searchParams.get("imdbId") || "";
+  if (!/^tt\d{5,12}$/.test(imdbId) || !env.TMDB_API_KEY) return h.json({ posters: [] }, 200, cors);
+  const api = (path) => fetch("https://api.themoviedb.org/3" + path + (path.includes("?") ? "&" : "?") + "api_key=" + env.TMDB_API_KEY).then((r) => (r.ok ? r.json() : {}));
+  try {
+    const found = await api("/find/" + imdbId + "?external_source=imdb_id");
+    const m = (found.movie_results || [])[0], tv = (found.tv_results || [])[0], hit = m || tv;
+    if (!hit) return h.json({ posters: [] }, 200, cors);
+    const imgs = await api("/" + (m ? "movie" : "tv") + "/" + hit.id + "/images?include_image_language=en,null");
+    const paths = [hit.poster_path].concat((imgs.posters || []).sort((a, b) => b.vote_average - a.vote_average || b.vote_count - a.vote_count).map((p) => p.file_path));
+    const uniq = [...new Set(paths.filter(Boolean))].slice(0, 10);
+    return h.json({ posters: uniq.map((p) => ({ src: "https://image.tmdb.org/t/p/w500" + p, thumb: "https://image.tmdb.org/t/p/w185" + p })) }, 200, cors);
+  } catch (e) {
+    return h.json({ posters: [] }, 200, cors);
+  }
+}
+const COVER_MAX = 5e6;
+function photoBase(env) { return (env.PHOTO_URL || "https://photos.nickmade.net/").replace(/\/?$/, "/"); }
+// The picked cover for a new disc: a TMDB poster stays an address; a seller's photo is fetched once and kept in the
+// photos bucket (covers/<disc id>.<ext>), so the shelf doesn't depend on the seller keeping it. "" if it won't load.
+async function keepCover(env, src, id) {
+  if (/^https:\/\/image\.tmdb\.org\/t\/p\/w500\/[\w.-]+$/.test(src)) return src;
+  if (!/^https:\/\/[^\s"'<>]+$/.test(src) || !env.PHOTOS) return "";
+  const res = await fetch(src, { headers: { "User-Agent": "Mozilla/5.0 (nickmade.net library)", Accept: "image/*" } });
+  const type = (res.headers.get("Content-Type") || "").split(";")[0].trim();
+  if (!res.ok || !/^image\/(jpeg|png|webp)$/.test(type)) return "";
+  const buf = await res.arrayBuffer();
+  if (!buf.byteLength || buf.byteLength > COVER_MAX) return "";
+  const key = "covers/" + id + "." + (type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg");
+  await env.PHOTOS.put(key, buf, { httpMetadata: { contentType: type, cacheControl: "public, max-age=31536000, immutable" } });
+  return photoBase(env) + key;
 }
 
 // ---------- HDR (Ver 1.4) ----------
@@ -465,19 +519,51 @@ function validBarcode(code) {
   const sum = digits.reverse().reduce((t, d, i) => t + d * (i % 2 ? 1 : 3), 0);
   return (10 - (sum % 10)) % 10 === check;
 }
-// Not on blu-ray.com (every VHS tape, and some DVDs): UPCitemdb's free lookup (no key, about 100 a day) knows most retail
-// barcodes, by a seller's product name ("The Big Lebowski VHS Jeff Bridges John Goodman 1998 Tested"). The name up to
-// its first format word (or bracket) is the title, any year in it the year, and TMDB finds the film from those. Names
-// are messy, so the dialog asks Nick to check it's the right film.
-const FORMAT_WORDS = /\b(vhs|dvd|blu-?ray|4k|uhd|ultra hd|widescreen|full ?screen|special edition|collector'?s|digital)\b|[([{]| - /i;
+// Not on blu-ray.com (every VHS tape, and some DVDs): a barcode database gives a seller's product name ("The Big
+// Lebowski VHS Jeff Bridges John Goodman 1998 Tested"). The name up to its first format word (or bracket) is the title,
+// any year in it the year, and TMDB finds the film from those. Names are messy, so the dialog asks Nick to check it's
+// the right film. Which database: upcdatabase.org first when the UPCDATABASE_KEY secret is set (a free account's key,
+// about 100 lookups a day counted for that key alone), then UPCitemdb's keyless trial. UPCitemdb counts its 100 a day
+// per IP address, and a Worker's requests leave from Cloudflare addresses shared with many other sites, so other people
+// often use that allowance up first (and it only answers browsers on its own site, so the phone can't ask it directly).
+const FORMAT_WORDS = /\b(vhs|dvd|blu-?ray|4k|uhd|ultra hd|widescreen|full ?screen|special edition|collector'?s|digital)\b|[([{]/i; // (not at dashes: the parts either side are tried below)
+// the product for a barcode: { title, category, description }, null if neither database knows it, or { busy: true }
+async function productOf(env, upc) {
+  let busy = false;
+  if (env.UPCDATABASE_KEY) {
+    try {
+      const res = await fetch("https://api.upcdatabase.org/product/" + upc + "?apikey=" + encodeURIComponent(env.UPCDATABASE_KEY), { headers: { Accept: "application/json" } });
+      const d = await res.json();
+      if (d.success && d.title) {
+        // its name; the photos too (upcdatabase.org's own, plus UPCitemdb's if it answers: they're the Cover choices)
+        const more = await upcitemdb(upc).catch(() => null);
+        return { title: d.title, category: d.category || "", description: d.description || "", images: [].concat(d.images || [], (more && more.images) || []) };
+      }
+      if (res.status === 429) busy = true;
+    } catch (e) { /* try UPCitemdb */ }
+  }
+  try {
+    const item = await upcitemdb(upc);
+    if (item && item.busy) return item;
+    if (item && item.title) return item;
+  } catch (e) { /* not found */ }
+  return busy ? { busy: true } : null;
+}
+async function upcitemdb(upc) {
+  const res = await fetch("https://api.upcitemdb.com/prod/trial/lookup?upc=" + upc, { headers: { Accept: "application/json" } });
+  if (res.status === 429) return { busy: true };
+  return ((await res.json()).items || [])[0] || null;
+}
+// sellers' photos as https addresses (they're shown straight from the seller in the dialog), at most 6, no repeats
+function pictures(list) {
+  const seen = new Set();
+  return (list || []).map((u) => String(u || "").trim().replace(/^http:\/\//, "https://"))
+    .filter((u) => /^https:\/\/[^\s"'<>]+$/.test(u) && !seen.has(u) && seen.add(u)).slice(0, 6);
+}
 async function upcItem(env, upc) {
   const none = { found: false, upc };
-  let item;
-  try {
-    const res = await fetch("https://api.upcitemdb.com/prod/trial/lookup?upc=" + upc, { headers: { Accept: "application/json" } });
-    if (res.status === 429) return { ...none, error: "Too many barcode lookups today. Search by title below." };
-    item = ((await res.json()).items || [])[0];
-  } catch (e) { return none; }
+  const item = await productOf(env, upc);
+  if (item && item.busy) return { ...none, error: "The free barcode lookup is busy today (it's shared with other sites). Search by title below." };
   if (!item || !item.title) return none;
   const name = String(item.title).replace(/\s+/g, " ").trim();
   const words = name + " " + (item.category || "") + " " + (item.description || "").slice(0, 200);
@@ -486,13 +572,28 @@ async function upcItem(env, upc) {
   const title = (cut ? name.slice(0, cut.index) : name).replace(/[\s,:;-]+$/, "").trim();
   const y = /\b(19[2-9]\d|20[0-3]\d)\b/.exec(name);
   if (!title) return none;
+  // Sellers' names often wrap the title ("A Walt Disney Masterpiece-The Lion King"): try the whole name, then without a
+  // studio's label, then each part of it split at dashes and colons, longest first. Each of those has to be a film's
+  // exact title (so "A Walt Disney Masterpiece" can't match some film); failing all of them, TMDB's best guess.
+  const label = (t) => t.replace(/^(a |an |the )?(walt disney'?s?|disney'?s?|pixar'?s?|dreamworks'?|warner bros\.?|universal)( (pictures|presents|masterpiece( collection)?|classics?|signature collection|gold collection|platinum edition|diamond edition))?\s*[-:–—]?\s*/i, "").trim();
+  const parts = title.split(/\s*[-–—:|]\s*/).map(label).filter((t) => t.length > 1).sort((a, b) => b.length - a.length);
+  const tries = [...new Set([title, label(title), ...parts])].filter(Boolean);
   let film = null;
-  try { film = await tmdbFilm(env, { title, year: y ? +y[1] : null }); } catch (e) { /* not found */ }
+  for (const t of tries) {
+    try { film = await tmdbFilm(env, { title: t, year: y ? +y[1] : null, strict: true, before: format === "vhs" ? 2006 : null }); } catch (e) { /* next */ }
+    if (film && film.imdbId) break;
+  }
+  if (!film || !film.imdbId) try { film = await tmdbFilm(env, { title, year: y ? +y[1] : null }); } catch (e) { /* not found */ }
+  // the edition, when the name has one: a studio's label in front ("A Walt Disney Masterpiece-...": "Walt Disney
+  // Masterpiece"), else an edition in brackets ("(Two-Disc Collector's Edition)"); Nick can change it in the form
+  const lab = /^(?:a |an |the )?((?:walt disney'?s?|disney'?s?|pixar'?s?|dreamworks'?|warner bros\.?|universal) (?:masterpiece(?: collection)?|classics?|signature collection|gold collection|platinum edition|diamond edition))\b/i.exec(title);
+  const br = /[([]([^)\]]*\b(?:edition|collection|masterpiece)\b[^)\]]*)[)\]]/i.exec(name);
+  const edition = (lab ? lab[1] : br ? br[1] : "").replace(/\s+/g, " ").replace(/\bCollector s\b/i, "Collector's").trim();
   if (!film || !film.imdbId) return none;
   return {
-    found: true, upc, source: "upcitemdb", product: name,
+    found: true, upc, source: "upcitemdb", product: name, pictures: pictures(item.images),
     imdbId: film.imdbId, title: film.title || title, year: film.year || (y ? +y[1] : null),
-    format, edition: "", steelbook: /steel ?book/i.test(name), criterion: /criterion/i.test(name), hdr: [],
+    format, edition, steelbook: /steel ?book/i.test(name), criterion: /criterion/i.test(name), hdr: [],
   };
 }
 

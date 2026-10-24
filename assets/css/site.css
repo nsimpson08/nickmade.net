@@ -3158,6 +3158,14 @@ html.wall-bg-on .lib-view { background-color: rgba(0, 0, 0, 0.55); }
 .lib-ed-list button span { font-size: 0.75rem; color: var(--muted); }
 .lib-ed-list button:hover { border-color: #3a3a40; }
 .lib-ed-list button[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, #000); }
+/* VHS: the Cover choices (tape photos, then posters), a row of thumbnails that scrolls sideways */
+.lib-covers { margin: 16px 0 0; }
+.lib-covers[hidden] { display: none; }
+.lib-cover-list { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.lib-cover-list button { flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; width: 84px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: #000; color: var(--muted); font: inherit; font-size: 0.7rem; cursor: pointer; }
+.lib-cover-list img { width: 74px; height: 110px; object-fit: contain; background: #111; border-radius: 6px; }
+.lib-cover-list button:hover { border-color: #3a3a40; }
+.lib-cover-list button[aria-pressed="true"] { border-color: var(--accent); color: var(--fg); background: color-mix(in srgb, var(--accent) 12%, #000); }
 .lib-add textarea { font-size: 0.85rem; }
 
 /* ---------- Photography: photos added on the site (Ver 1.4, photo-upload.js) ---------- */

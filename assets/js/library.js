@@ -608,6 +608,9 @@
             (SHOW_DVD ? '<label><input type="radio" name="lib-format" value="dvd">DVD</label>' : "") +
             '<label><input type="radio" name="lib-format" value="vhs">VHS</label>' +
           "</fieldset>" +
+          // VHS: the picture for the shelf, from photos of the actual tape (the barcode's sellers) and the film's posters
+          '<div class="lib-covers" hidden><p class="lib-ed-head">Cover <span class="optional">(the picture on the shelf)</span></p>' +
+            '<div class="lib-cover-list" role="group" aria-label="Cover"></div></div>' +
           // 4K only: ticked from blu-ray.com when a title (or an edition) is picked; untick or tick to correct it
           '<fieldset class="who lib-hdr" hidden><legend>HDR <span class="optional lib-hdr-note"></span></legend>' +
             '<label><input type="checkbox" name="hdr" value="dv">Dolby Vision</label>' +
@@ -645,6 +648,7 @@
         scanned = null;
         addDlg.querySelector(".pick-preview").hidden = true;
         addDlg.querySelector(".lib-editions").hidden = true;
+        findCovers();
         check();
         clearTimeout(searchTimer);
         searchTimer = setTimeout(function () { findTitles(q.value.trim()); }, 220);
@@ -656,7 +660,11 @@
       addDlg.querySelector("form").addEventListener("change", function (e) {
         if (e.target.name === "hdr") hdrTouched = true; // Nick's ticks win over a lookup still on its way
         check();
-        if (e.target.name === "lib-format") findHdr();
+        if (e.target.name === "lib-format") { findHdr(); findCovers(); }
+      });
+      addDlg.querySelector(".lib-cover-list").addEventListener("click", function (e) {
+        var b = e.target.closest("button[data-cover]");
+        if (b) chooseCover(b.dataset.cover);
       });
       addDlg.querySelector(".lib-ed-list").addEventListener("click", function (e) {
         var b = e.target.closest("button[data-ed]");
@@ -708,6 +716,7 @@
     addDlg.querySelector(".error").textContent = "";
     addDlg.querySelector(".lib-scan-msg").textContent = "";
     scanned = null;
+    findCovers();
     [].forEach.call(addDlg.querySelectorAll(".lib-ed-list button"), function (x) { x.setAttribute("aria-pressed", "false"); });
     syncFeatTags();
     check();
@@ -749,6 +758,55 @@
     check();
     findEditions(r);
     findHdr();
+    findCovers();
+  }
+
+  // VHS covers: the photos of the actual tape that came with a scanned barcode (sellers' photos, shown straight from
+  // them), then the film's posters on TMDB (Worker GET /library/covers). A tape photo is picked to start with, else
+  // the official poster; the Worker keeps a copy of a seller's photo when the disc is added.
+  var coverPick = null, coverSeq = 0, coverFor = "";
+  function findCovers() {
+    var box = addDlg.querySelector(".lib-covers"), list = box.querySelector(".lib-cover-list");
+    var f = addDlg.querySelector('input[name="lib-format"]:checked');
+    if (!picked || !f || f.value !== "vhs") { box.hidden = true; coverPick = null; coverFor = ""; return; }
+    var photos = scanned && scanned.imdbId === picked.id ? scanned.pictures || [] : [];
+    var key = picked.id + "|" + photos.join(" ");
+    if (key === coverFor) { box.hidden = !list.children.length; return; }
+    coverFor = key;
+    coverPick = null;
+    var seq = ++coverSeq, r = picked;
+    function show(posters) {
+      if (seq !== coverSeq || picked !== r) return;
+      var opts = photos.map(function (u) { return { src: u, thumb: u, from: "Tape photo" }; })
+        .concat(posters.map(function (p) { return { src: p.src, thumb: p.thumb, from: "Poster" }; }));
+      list.innerHTML = opts.map(function (o) {
+        return '<button type="button" data-cover="' + esc(o.src) + '" aria-pressed="false" title="' + o.from + '">' +
+          '<img src="' + esc(o.thumb) + '" alt="' + o.from + '" loading="lazy" referrerpolicy="no-referrer"><span>' + o.from + "</span></button>";
+      }).join("");
+      // a seller's photo that won't load just goes
+      [].forEach.call(list.querySelectorAll("img"), function (img) {
+        img.addEventListener("error", function () {
+          var b = img.closest("button"), was = b.getAttribute("aria-pressed") === "true";
+          b.remove();
+          if (was && list.firstElementChild) chooseCover(list.firstElementChild.dataset.cover);
+        });
+      });
+      box.hidden = !opts.length;
+      if (opts.length) chooseCover(opts[0].src);
+    }
+    show([]);
+    fetch(API + "/library/covers?imdbId=" + encodeURIComponent(r.id), { headers: authHeaders() })
+      .then(function (res) { return res.json(); })
+      .then(function (d) { show(d.posters || []); })
+      .catch(function () {});
+  }
+  function chooseCover(src) {
+    coverPick = src;
+    [].forEach.call(addDlg.querySelectorAll(".lib-cover-list button"), function (b) {
+      var on = b.dataset.cover === src;
+      b.setAttribute("aria-pressed", String(on));
+      if (on) { var pv = addDlg.querySelector(".pick-preview img"); pv.referrerPolicy = "no-referrer"; pv.src = b.querySelector("img").src; } // the preview shows it too
+    });
   }
 
   // A 4K disc's HDR from blu-ray.com (Worker GET /library/hdr): by the picked edition's barcode, else the title.
@@ -834,6 +892,7 @@
             var form = addDlg.querySelector("form");
             var f = form.querySelector('input[name="lib-format"][value="' + d.format + '"]');
             if (f) f.checked = true;
+            findCovers(); // a tape's photos, now that it's VHS
             form.querySelector("#lib-edition").value = d.edition || "";
             form.steelbook.checked = !!d.steelbook;
             form.criterion.checked = !!d.criterion;
@@ -910,6 +969,7 @@
         criterion: form.criterion.checked,
         features: form.querySelector("#lib-features").value,
         hdr: f.value === "4k" ? [].map.call(form.querySelectorAll('input[name="hdr"]:checked'), function (c) { return c.value; }) : [],
+        cover: f.value === "vhs" && coverPick ? coverPick : undefined,
       }),
     })
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })

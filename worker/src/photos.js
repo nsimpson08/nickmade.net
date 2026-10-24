@@ -115,7 +115,7 @@ async function remove(request, url, env, cors, h) {
 
 async function file(url, env) {
   const key = decodeURIComponent(url.pathname.slice("/photos/file/".length));
-  if (!env.PHOTOS || !/^site\/[a-z0-9-]+\.(jpg|webp)$/.test(key)) return new Response("Not found", { status: 404 });
+  if (!env.PHOTOS || !/^(site|covers)\/[a-z0-9-]+\.(jpg|webp|png)$/.test(key)) return new Response("Not found", { status: 404 }); // covers/: the Library's VHS covers
   const obj = await env.PHOTOS.get(key);
   if (!obj) return new Response("Not found", { status: 404 });
   return new Response(obj.body, { headers: { "Content-Type": obj.httpMetadata.contentType || "image/jpeg", "Cache-Control": "public, max-age=3600" } });
