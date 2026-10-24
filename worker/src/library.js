@@ -15,7 +15,7 @@
 //                                    others (other films it could be: [{ id, title, year, image }], one-tap in the dialog)
 //   GET    /library/covers?imdbId=   (admin) the film's posters on TMDB for the add dialog's Cover choices (VHS):
 //                                    { posters: [{ src (500px), thumb (185px) }] }, the official one first
-//   POST   /library                  (admin) { imdbId, format: "4k"|"bluray"|"dvd"|"vhs", edition?, steelbook?, threeD?,
+//   POST   /library                  (admin) { imdbId, format: "4k"|"bluray"|"dvd"|"vhs", edition?, steelbook?, threeD?, title?,
 //                                    criterion?, features?, hdr? } -> adds a disc (same shape as discs.js) and returns it
 //                                    (features: "On this disc", from an edition picked in the dialog or typed, one per line;
 //                                    hdr: the dialog's HDR ticks, 4K only; cover: the picture picked in the dialog: a TMDB
@@ -344,10 +344,13 @@ async function add(request, env, cors, h) {
   const edition = String(body.edition || "").replace(/\s+/g, " ").trim().slice(0, 80);
   const features = (Array.isArray(body.features) ? body.features : String(body.features || "").split("\n"))
     .map((f) => String(f).replace(/^[\s•\-–*]+/, "").replace(/\s+/g, " ").trim().slice(0, 160)).filter(Boolean).slice(0, FEATURE_MAX);
+  // the title as the case writes it, when that's the official one with its number in digits ("101 Dalmatians", so it
+  // shelves under #); anything else stays the official title
+  const asCase = body.title && digitTitle(t.title) && plain(String(body.title)) === plain(digitTitle(t.title)) ? digitTitle(t.title) : t.title;
   const d = {
     id: discId(t.title, t.year, format),
-    title: t.title,
-    sort: sortTitle(t.title),
+    title: asCase,
+    sort: sortTitle(asCase),
     year: t.year,
     format,
     edition,
@@ -568,6 +571,26 @@ function pictures(list) {
   return (list || []).map((u) => String(u || "").trim().replace(/^http:\/\//, "https://"))
     .filter((u) => /^https:\/\/[^\s"'<>]+$/.test(u) && !seen.has(u) && seen.add(u)).slice(0, 6);
 }
+// A title that starts with a number spelled out ("One Hundred and One Dalmatians") as digits ("101 Dalmatians"), or null
+const NUM = { zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
+  thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20, thirty: 30,
+  forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
+function digitTitle(title) {
+  const words = String(title || "").split(/\s+/);
+  let total = 0, cur = 0, used = 0;
+  for (; used < words.length; used++) {
+    const w = words[used].toLowerCase().replace(/[^a-z-]/g, "");
+    if (w === "and" && used > 0 && used < words.length - 1) continue;
+    const parts = w.split("-");
+    if (parts.every((p) => p in NUM)) { cur += parts.reduce((a, p) => a + NUM[p], 0); continue; }
+    if (w === "hundred" && used > 0) { cur = (cur || 1) * 100; continue; }
+    if (w === "thousand" && used > 0) { total += (cur || 1) * 1000; cur = 0; continue; }
+    break;
+  }
+  if (!used || used >= words.length || words[used - 1].toLowerCase() === "and") return null;
+  return String(total + cur) + " " + words.slice(used).join(" ");
+}
+
 // IMDb's title search (the add dialog's, see search()): films, TV films and series, { id, title, year, image }
 async function imdbSuggest(q) {
   q = String(q || "").trim().slice(0, 60);
@@ -677,6 +700,8 @@ async function upcItem(env, upc) {
   if (!film || !film.imdbId) return { ...none, product: name, others, error: "Found the barcode (“" + name.slice(0, 90) + "”) but couldn't match it to a film. Search by title below." };
   return {
     found: true, upc, source: "upcitemdb", product: name, pictures: pictures(item.images), others,
+    // the tape writes the number as digits ("101 Dalmatians") where the film's title spells it out: the shelf uses the tape's
+    shelfTitle: (() => { const d = digitTitle(film.title); return d && plain(both).includes(plain(d)) ? d : undefined; })(),
     imdbId: film.imdbId, title: film.title || title, year: film.year || (y ? +y[1] : null),
     format, edition, steelbook: /steel ?book/i.test(name), criterion: /criterion/i.test(name), hdr: [],
   };

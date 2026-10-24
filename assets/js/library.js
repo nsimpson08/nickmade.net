@@ -992,6 +992,8 @@
         features: form.querySelector("#lib-features").value,
         hdr: f.value === "4k" ? [].map.call(form.querySelectorAll('input[name="hdr"]:checked'), function (c) { return c.value; }) : [],
         cover: f.value === "vhs" && coverPick ? coverPick : undefined,
+        // the title as the scanned case writes it ("101 Dalmatians"; the Worker only takes the official one in digits)
+        title: scanned && scanned.shelfTitle && scanned.imdbId === picked.id ? scanned.shelfTitle : undefined,
       }),
     })
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
