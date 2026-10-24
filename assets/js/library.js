@@ -597,6 +597,8 @@
             '<div class="lib-upc"><input id="lib-upc" type="text" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="or type the barcode numbers" aria-label="Barcode">' +
               '<button type="button" class="open lib-upc-go">Look up</button></div>' +
             '<p class="lib-scan-msg" role="status"></p>' +
+            // the other films a scanned tape could be (a remake, the cartoon of a live-action film): one tap picks it
+            '<div class="lib-scan-others" hidden></div>' +
           "</div>" +
           '<div class="pick-preview" hidden><div class="pp-art"><img alt=""></div><div class="pp-what"></div></div>' +
           '<label for="lib-q">Movie or series</label>' +
@@ -715,6 +717,7 @@
     addDlg.querySelector(".lib-editions").hidden = true;
     addDlg.querySelector(".error").textContent = "";
     addDlg.querySelector(".lib-scan-msg").textContent = "";
+    addDlg.querySelector(".lib-scan-others").hidden = true;
     scanned = null;
     findCovers();
     [].forEach.call(addDlg.querySelectorAll(".lib-ed-list button"), function (x) { x.setAttribute("aria-pressed", "false"); });
@@ -870,14 +873,32 @@
     addDlg.querySelector(".lib-scan-cam").hidden = true;
     addDlg.querySelector(".lib-scan-btn").hidden = !("BarcodeDetector" in window && navigator.mediaDevices);
   }
+  function showOthers(list) {
+    var box = addDlg.querySelector(".lib-scan-others");
+    list = list || [];
+    box.innerHTML = list.length ? "<span>Or:</span>" + list.map(function (o, i) {
+      return '<button type="button" class="pill-btn" data-other="' + i + '">' + esc(o.title) + (o.year ? " (" + o.year + ")" : "") + "</button>";
+    }).join("") : "";
+    box.hidden = !list.length;
+    box.onclick = function (e) {
+      var b = e.target.closest("[data-other]");
+      if (!b) return;
+      var o = list[+b.dataset.other];
+      if (scanned) scanned.imdbId = o.id; // its tape photos still go with it
+      pick({ id: o.id, title: o.title, year: o.year, image: o.image });
+      addDlg.querySelector(".lib-scan-msg").textContent = "Picked " + o.title + (o.year ? " (" + o.year + ")" : "") + " instead.";
+      box.hidden = true;
+    };
+  }
   function lookUpBarcode(raw) {
     var code = String(raw || "").replace(/\D/g, ""), msg = addDlg.querySelector(".lib-scan-msg");
     if (!code) return;
     msg.textContent = "Looking up " + code + "…";
+    showOthers([]);
     fetch(API + "/library/barcode?upc=" + code, { headers: authHeaders() })
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        if (d.error && !d.found) { msg.textContent = d.error; return; }
+        if (d.error && !d.found) { msg.textContent = d.error; showOthers(d.others); return; }
         if (!d.found || !d.imdbId) { msg.textContent = "Couldn't find that barcode. Search by title below."; return; }
         var guessed = d.source === "upcitemdb"; // from a seller's product name (VHS tapes, mostly): worth a look
         // the title for the preview: IMDb's own search result for it (its poster), else just the name
@@ -904,6 +925,7 @@
             addDlg.querySelector(".lib-hdr-note").textContent = guessed ? "" : "(from blu-ray.com)";
             msg.textContent = "Found: " + d.title + (d.year ? " (" + d.year + ")" : "") + (FORMAT[d.format] ? ", " + FORMAT[d.format] : "") +
               (d.edition ? ", " + d.edition : "") + "." + (guessed ? " (From “" + d.product + "”: check it’s the right film.)" : "");
+            showOthers(d.others);
             check();
           });
       })

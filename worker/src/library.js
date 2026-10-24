@@ -11,7 +11,8 @@
 //   GET    /library/barcode?upc=     (admin) a scanned or typed barcode -> that exact release on blu-ray.com: { found,
 //                                    imdbId, title, year, format, edition, steelbook, criterion, hdr, upc }; not there
 //                                    (VHS tapes), a barcode database's product name: the same plus source: "upcitemdb",
-//                                    product, pictures (sellers' photos of the actual tape or case, https addresses)
+//                                    product, pictures (sellers' photos of the actual tape or case, https addresses),
+//                                    others (other films it could be: [{ id, title, year, image }], one-tap in the dialog)
 //   GET    /library/covers?imdbId=   (admin) the film's posters on TMDB for the add dialog's Cover choices (VHS):
 //                                    { posters: [{ src (500px), thumb (185px) }] }, the official one first
 //   POST   /library                  (admin) { imdbId, format: "4k"|"bluray"|"dvd"|"vhs", edition?, steelbook?, threeD?,
@@ -247,7 +248,8 @@ async function tmdbFilm(env, { imdb, title, year, strict, before }) {
     if (found.movie_results && found.movie_results[0]) id = found.movie_results[0].id;
     else if (found.tv_results && found.tv_results[0]) { kind = "tv"; id = found.tv_results[0].id; }
   } else {
-    const same = (r) => plain(r.title || r.name || "") === plain(title);
+    const bare = (t) => plain(t).replace(/^the /, ""); // "Return of the King" is "The Return of the King"
+    const same = (r) => bare(r.title || r.name || "") === bare(title);
     const yr = (r) => parseInt(String(r.release_date || r.first_air_date || "").slice(0, 4), 10) || 0;
     const movies = (await api("/search/movie?query=" + encodeURIComponent(title) + (year ? "&year=" + year : ""))).results || [];
     let pick = movies.find((r) => same(r) && (!year || Math.abs(yr(r) - year) <= 1) && (!before || (yr(r) && yr(r) <= before)))
@@ -534,10 +536,15 @@ async function productOf(env, upc) {
     try {
       const res = await fetch("https://api.upcdatabase.org/product/" + upc + "?apikey=" + encodeURIComponent(env.UPCDATABASE_KEY), { headers: { Accept: "application/json" } });
       const d = await res.json();
-      if (d.success && d.title) {
+      // what it said, for `wrangler tail` (never the key)
+      // its name is usually the title; some products only have a description (or the title is blank)
+      const named = d.success && String(d.title || d.description || "").trim();
+      console.log("upcdatabase.org", upc, res.status, named ? "found: " + named : d.success ? "found, no name: " + JSON.stringify(d).slice(0, 400) : "no: " + JSON.stringify(d.error || d).slice(0, 200));
+      if (named) {
         // its name; the photos too (upcdatabase.org's own, plus UPCitemdb's if it answers: they're the Cover choices)
         const more = await upcitemdb(upc).catch(() => null);
-        return { title: d.title, category: d.category || "", description: d.description || "", images: [].concat(d.images || [], (more && more.images) || []) };
+        // (alt: UPCitemdb's name for it, which can say more: "Walt Disney s Classic-101 Dalmatians")
+        return { title: named, alt: more && more.title ? String(more.title) : "", category: d.category || "", description: d.description || "", images: [].concat(d.images || [], (more && more.images) || []) };
       }
       if (res.status === 429) busy = true;
     } catch (e) { /* try UPCitemdb */ }
@@ -551,6 +558,7 @@ async function productOf(env, upc) {
 }
 async function upcitemdb(upc) {
   const res = await fetch("https://api.upcitemdb.com/prod/trial/lookup?upc=" + upc, { headers: { Accept: "application/json" } });
+  console.log("upcitemdb", upc, res.status);
   if (res.status === 429) return { busy: true };
   return ((await res.json()).items || [])[0] || null;
 }
@@ -559,6 +567,29 @@ function pictures(list) {
   const seen = new Set();
   return (list || []).map((u) => String(u || "").trim().replace(/^http:\/\//, "https://"))
     .filter((u) => /^https:\/\/[^\s"'<>]+$/.test(u) && !seen.has(u) && seen.add(u)).slice(0, 6);
+}
+// IMDb's title search (the add dialog's, see search()): films, TV films and series, { id, title, year, image }
+async function imdbSuggest(q) {
+  q = String(q || "").trim().slice(0, 60);
+  if (q.length < 2) return [];
+  const res = await fetch("https://v3.sg.media-imdb.com/suggestion/x/" + encodeURIComponent(q.toLowerCase()) + ".json", { cf: { cacheTtl: 3600, cacheEverything: true } });
+  const data = await res.json();
+  return (data.d || []).filter((r) => /^tt\d+$/.test(r.id) && SEARCH_TYPES.has(r.qid))
+    .map((r) => ({ id: r.id, title: r.l, year: r.y || null, image: r.i ? r.i.imageUrl : null, series: /^tv(Series|MiniSeries)$/.test(r.qid) })).slice(0, 8);
+}
+// two titles the same but for a letter or two (one per 7 letters), ignoring case, punctuation and a leading "The"
+function close(a, b) {
+  const x = plain(a).replace(/^the /, ""), y = plain(b).replace(/^the /, "");
+  if (x === y) return true;
+  const most = Math.max(1, Math.floor(Math.max(x.length, y.length) / 7));
+  if (Math.abs(x.length - y.length) > most) return false;
+  let prev = Array.from({ length: y.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= x.length; i++) {
+    const row = [i];
+    for (let j = 1; j <= y.length; j++) row[j] = Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + (x[i - 1] === y[j - 1] ? 0 : 1));
+    prev = row;
+  }
+  return prev[y.length] <= most;
 }
 async function upcItem(env, upc) {
   const none = { found: false, upc };
@@ -569,29 +600,83 @@ async function upcItem(env, upc) {
   const words = name + " " + (item.category || "") + " " + (item.description || "").slice(0, 200);
   const format = /\bvhs\b/i.test(words) ? "vhs" : /\b(4k|uhd|ultra hd)\b/i.test(words) ? "4k" : /\bblu-?ray\b/i.test(words) ? "bluray" : /\bdvd\b/i.test(words) ? "dvd" : "";
   const cut = FORMAT_WORDS.exec(name);
-  const title = (cut ? name.slice(0, cut.index) : name).replace(/[\s,:;-]+$/, "").trim();
+  let title = (cut ? name.slice(0, cut.index) : name).replace(/[\s,:;-]+$/, "").trim();
   const y = /\b(19[2-9]\d|20[0-3]\d)\b/.exec(name);
+  // Sellers' names often wrap the title ("A Walt Disney Masterpiece-The Lion King", "JRR Tolkien's Lord of the Rings
+  // 1977 VHS Tapes - Return of the King/The Hobbit"): try the name up to its format word, then without a studio's label,
+  // a year or an author's name in front, then each part of the whole name split at dashes, colons and slashes (the
+  // films in a set often come after "VHS Tapes -"), longest first. Each has to be a film's exact title (so "A Walt
+  // Disney Masterpiece" can't match some film), all with the name's year if it has one, then without it; failing all of
+  // them, TMDB's best guess.
+  const label = (t) => t.replace(/^(a |an |the )?(walt disney(?:'?s| s)?|disney(?:'?s| s)?|pixar'?s?|dreamworks'?|warner bros\.?|universal)( (pictures|presents|masterpiece( collection)?|classics?|signature collection|gold collection|platinum edition|diamond edition))?\s*[-:–—]?\s*/i, "").trim();
+  // the company that put the tape out, in front or anywhere ("WARNER HOME VIDEO, INC. Lord Of the Rings")
+  const company = (t) => t.replace(/\b(?:[\w&.'/-]+\s+){0,3}(?:home video|home entertainment|video,? inc|entertainment,? inc|pictures,? inc|studios,? inc|home video,? inc)\b\.?,?\s*/gi, " ")
+    .replace(/\b(?:warner bros|buena vista|mgm\/ua|columbia tristar|20th century fox|paramount|touchstone|vestron|orion|new line|hbo)\b\s*(?:home\s*)?(?:video|entertainment|pictures)?\b\.?,?\s*/gi, " ")
+    .replace(/\b(?:inc|llc|ltd|corp)\b\.?,?/gi, " ").replace(/\s+/g, " ").trim();
+  const tidy = (t) => company(label(t)).replace(/\b(19[2-9]\d|20[0-3]\d)\b/g, " ").replace(/\b(vhs|dvd|blu-?ray|tapes?|set|box|video|movie|film|new|sealed|tested)\b/gi, " ").replace(/\s+/g, " ").replace(/^[\s,.;-]+|[\s,.;-]+$/g, "");
+  const noAuthor = (t) => t.replace(/^(?:[A-Z][\w.]*\.?\s+){0,3}[A-Z][\w.]*['’]s\s+/, ""); // "JRR Tolkien's ", "Stephen King's "
+  // nothing but a distributor before the format word ("BUENA VISTA HOME VIDEO VHS 101 Dalmations (Full Screen)"): the
+  // title is what comes after it, up to any bracket
+  if (!tidy(title) && cut) title = name.slice(cut.index + cut[0].length).split(/[([{]/)[0].replace(/^[\s,:;-]+|[\s,:;-]+$/g, "");
   if (!title) return none;
-  // Sellers' names often wrap the title ("A Walt Disney Masterpiece-The Lion King"): try the whole name, then without a
-  // studio's label, then each part of it split at dashes and colons, longest first. Each of those has to be a film's
-  // exact title (so "A Walt Disney Masterpiece" can't match some film); failing all of them, TMDB's best guess.
-  const label = (t) => t.replace(/^(a |an |the )?(walt disney'?s?|disney'?s?|pixar'?s?|dreamworks'?|warner bros\.?|universal)( (pictures|presents|masterpiece( collection)?|classics?|signature collection|gold collection|platinum edition|diamond edition))?\s*[-:–—]?\s*/i, "").trim();
-  const parts = title.split(/\s*[-–—:|]\s*/).map(label).filter((t) => t.length > 1).sort((a, b) => b.length - a.length);
-  const tries = [...new Set([title, label(title), ...parts])].filter(Boolean);
+  const parts = name.replace(/[([{].*?[)\]}]/g, " ").split(/\s*[-–—:|/]\s*/).map(tidy).filter((t) => t.length > 1).sort((a, b) => b.length - a.length);
+  // words that describe a tape rather than name a film: never a title on their own ("Animated" is a 2017 film)
+  const DESCRIBES = /^(animated|animation|cartoon|comedy|drama|horror|action|musical|family|kids|classic|classics|special|edition|collection|widescreen|full ?screen|clamshell|case|rare|vintage|original|english|spanish|uncut|pg|pg-13|g|r)$/i;
+  const tries = [...new Set([title, label(title), tidy(title), noAuthor(tidy(title)), ...parts, ...parts.map(noAuthor)]
+    .filter((t) => t && t.length > 1 && !DESCRIBES.test(t.trim())))];
+  const yearOf = y ? +y[1] : null;
   let film = null;
-  for (const t of tries) {
-    try { film = await tmdbFilm(env, { title: t, year: y ? +y[1] : null, strict: true, before: format === "vhs" ? 2006 : null }); } catch (e) { /* next */ }
-    if (film && film.imdbId) break;
+  outer: for (const yr of yearOf ? [yearOf, null] : [null]) { // every name with the year first (a set's "1977" is The Hobbit's)
+    for (const t of tries) {
+      try { film = await tmdbFilm(env, { title: t, year: yr, strict: true, before: format === "vhs" ? 2006 : null }); } catch (e) { /* next */ }
+      if (film && film.imdbId) break outer;
+    }
   }
-  if (!film || !film.imdbId) try { film = await tmdbFilm(env, { title, year: y ? +y[1] : null }); } catch (e) { /* not found */ }
+  // still nothing: IMDb's title search, which forgives a seller's misspelling ("101 Dalmations"), for a title a letter
+  // or two off one of the names
+  let near = [];
+  if (!film || !film.imdbId) {
+    for (const t of tries.slice(0, 6)) {
+      const list = await imdbSuggest(t).catch(() => []);
+      if (!near.length) near = list;
+      const hit = list.find((r) => close(r.title, t) && (format !== "vhs" || !r.year || r.year <= 2006)) || list.find((r) => close(r.title, t));
+      if (!hit) continue;
+      try { film = await tmdbFilm(env, { imdb: hit.id }); } catch (e) { /* next */ }
+      if (film && film.imdbId) { near = list; break; }
+    }
+  }
+  const guess = tidy(title) || title;
+  if ((!film || !film.imdbId) && !DESCRIBES.test(guess)) try { film = await tmdbFilm(env, { title: guess, year: yearOf }); } catch (e) { /* not found */ }
+  // the other films it could be, as one-tap choices in the dialog (a remake, the cartoon of a live-action film...)
+  if (film && film.imdbId && !near.length) near = await imdbSuggest(film.title).catch(() => []);
+  // a Disney Classics or Masterpiece tape is always the cartoon: if the match isn't animated ("101 Dalmatians" is the
+  // 1996 live-action film), one of the other choices that is wins (One Hundred and One Dalmatians, 1961)
+  const both = name + " " + (item.alt || "");
+  if (film && film.imdbId && /disney.*(classic|masterpiece)/i.test(both) && !(film.genres || []).some((g) => /animation/i.test(g))) {
+    for (const r of near.filter((x) => x.id !== film.imdbId && !x.series && (!x.year || x.year <= 2006)).slice(0, 4)) {
+      let f = null;
+      try { f = await tmdbFilm(env, { imdb: r.id }); } catch (e) { /* next */ }
+      if (f && (f.genres || []).some((g) => /animation/i.test(g)) && close(plain(f.title).replace(/\bone hundred and one\b/, "101"), plain(film.title).replace(/\bone hundred and one\b/, "101"))) { film = f; break; }
+    }
+  }
+  const old = (r) => (format === "vhs" && r.year && r.year <= 2006 ? 0 : 1); // a tape: the films it could be on first
+  const others = near.filter((r) => (!film || r.id !== film.imdbId) && !r.series).map((r, i) => [r, i])
+    .sort((a, b) => old(a[0]) - old(b[0]) || a[1] - b[1]).map((x) => ({ id: x[0].id, title: x[0].title, year: x[0].year, image: x[0].image })).slice(0, 4);
   // the edition, when the name has one: a studio's label in front ("A Walt Disney Masterpiece-...": "Walt Disney
   // Masterpiece"), else an edition in brackets ("(Two-Disc Collector's Edition)"); Nick can change it in the form
-  const lab = /^(?:a |an |the )?((?:walt disney'?s?|disney'?s?|pixar'?s?|dreamworks'?|warner bros\.?|universal) (?:masterpiece(?: collection)?|classics?|signature collection|gold collection|platinum edition|diamond edition))\b/i.exec(title);
+  const lab = /^(?:a |an |the )?((?:walt disney(?:'?s| s)?|disney(?:'?s| s)?|pixar'?s?|dreamworks'?|warner bros\.?|universal) (?:masterpiece(?: collection)?|classics?|signature collection|gold collection|platinum edition|diamond edition))\b/i.exec(title);
   const br = /[([]([^)\]]*\b(?:edition|collection|masterpiece)\b[^)\]]*)[)\]]/i.exec(name);
-  const edition = (lab ? lab[1] : br ? br[1] : "").replace(/\s+/g, " ").replace(/\bCollector s\b/i, "Collector's").trim();
-  if (!film || !film.imdbId) return none;
+  let edition = (lab ? lab[1] : br ? br[1] : "").replace(/\s+/g, " ").replace(/\bCollector s\b/i, "Collector's").trim();
+  if (!edition && item.alt) { // the other database's name for it, when this one's says nothing
+    const a = String(item.alt), la = /^(?:a |an |the )?((?:walt disney(?:'?s| s)?|disney(?:'?s| s)?|pixar'?s?|dreamworks'?|warner bros\.?|universal) (?:masterpiece(?: collection)?|classics?|signature collection|gold collection|platinum edition|diamond edition))\b/i.exec(a);
+    const ba = /[([]([^)\]]*\b(?:edition|collection|masterpiece)\b[^)\]]*)[)\]]/i.exec(a);
+    edition = (la ? la[1] : ba ? ba[1] : "").replace(/\s+/g, " ").trim();
+  }
+  if (/disney.*classic/i.test(edition)) edition = "Walt Disney Classics"; // the line's own name ("Walt Disney s Classic")
+  else if (/disney.*masterpiece/i.test(edition)) edition = "Walt Disney Masterpiece";
+  if (!film || !film.imdbId) return { ...none, product: name, others, error: "Found the barcode (“" + name.slice(0, 90) + "”) but couldn't match it to a film. Search by title below." };
   return {
-    found: true, upc, source: "upcitemdb", product: name, pictures: pictures(item.images),
+    found: true, upc, source: "upcitemdb", product: name, pictures: pictures(item.images), others,
     imdbId: film.imdbId, title: film.title || title, year: film.year || (y ? +y[1] : null),
     format, edition, steelbook: /steel ?book/i.test(name), criterion: /criterion/i.test(name), hdr: [],
   };

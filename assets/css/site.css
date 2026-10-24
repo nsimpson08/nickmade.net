@@ -3158,6 +3158,10 @@ html.wall-bg-on .lib-view { background-color: rgba(0, 0, 0, 0.55); }
 .lib-ed-list button span { font-size: 0.75rem; color: var(--muted); }
 .lib-ed-list button:hover { border-color: #3a3a40; }
 .lib-ed-list button[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, #000); }
+/* a scanned tape's other possible films, one tap each */
+.lib-scan-others { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0 0; font-size: 0.8rem; color: var(--muted); }
+.lib-scan-others[hidden] { display: none; }
+.lib-scan-others .pill-btn { padding: 4px 10px; font-size: 0.78rem; }
 /* VHS: the Cover choices (tape photos, then posters), a row of thumbnails that scrolls sideways */
 .lib-covers { margin: 16px 0 0; }
 .lib-covers[hidden] { display: none; }
