@@ -994,6 +994,7 @@
         cover: f.value === "vhs" && coverPick ? coverPick : undefined,
         // the title as the scanned case writes it ("101 Dalmatians"; the Worker only takes the official one in digits)
         title: scanned && scanned.shelfTitle && scanned.imdbId === picked.id ? scanned.shelfTitle : undefined,
+        caseName: scanned ? [scanned.product, scanned.alt].filter(Boolean).join(" ") : undefined, // the Worker checks it for a "101"
       }),
     })
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })

@@ -15,7 +15,7 @@
 //                                    others (other films it could be: [{ id, title, year, image }], one-tap in the dialog)
 //   GET    /library/covers?imdbId=   (admin) the film's posters on TMDB for the add dialog's Cover choices (VHS):
 //                                    { posters: [{ src (500px), thumb (185px) }] }, the official one first
-//   POST   /library                  (admin) { imdbId, format: "4k"|"bluray"|"dvd"|"vhs", edition?, steelbook?, threeD?, title?,
+//   POST   /library                  (admin) { imdbId, format: "4k"|"bluray"|"dvd"|"vhs", edition?, steelbook?, threeD?, title?, caseName?,
 //                                    criterion?, features?, hdr? } -> adds a disc (same shape as discs.js) and returns it
 //                                    (features: "On this disc", from an edition picked in the dialog or typed, one per line;
 //                                    hdr: the dialog's HDR ticks, 4K only; cover: the picture picked in the dialog: a TMDB
@@ -346,7 +346,9 @@ async function add(request, env, cors, h) {
     .map((f) => String(f).replace(/^[\s•\-–*]+/, "").replace(/\s+/g, " ").trim().slice(0, 160)).filter(Boolean).slice(0, FEATURE_MAX);
   // the title as the case writes it, when that's the official one with its number in digits ("101 Dalmatians", so it
   // shelves under #); anything else stays the official title
-  const asCase = body.title && digitTitle(t.title) && plain(String(body.title)) === plain(digitTitle(t.title)) ? digitTitle(t.title) : t.title;
+  // (caseName: the scanned case's names from the barcode databases, whichever film was picked in the end)
+  const dt = digitTitle(t.title);
+  const asCase = dt && ((body.title && plain(String(body.title)) === plain(dt)) || (body.caseName && caseShows(String(body.caseName).slice(0, 400), dt))) ? dt : t.title;
   const d = {
     id: discId(t.title, t.year, format),
     title: asCase,
@@ -591,6 +593,14 @@ function digitTitle(title) {
   return String(total + cur) + " " + words.slice(used).join(" ");
 }
 
+// Whether a case's name writes this title with digits: the number itself, and each other word, allowing a misspelling
+// ("BUENA VISTA HOME VIDEO VHS 101 Dalmations" shows "101 Dalmatians")
+function caseShows(caseName, digits) {
+  const have = plain(caseName).split(" ");
+  const want = plain(digits).split(" ");
+  return want.every((w, i) => (i === 0 ? have.includes(w) : have.some((h) => close(h, w))));
+}
+
 // IMDb's title search (the add dialog's, see search()): films, TV films and series, { id, title, year, image }
 async function imdbSuggest(q) {
   q = String(q || "").trim().slice(0, 60);
@@ -701,7 +711,8 @@ async function upcItem(env, upc) {
   return {
     found: true, upc, source: "upcitemdb", product: name, pictures: pictures(item.images), others,
     // the tape writes the number as digits ("101 Dalmatians") where the film's title spells it out: the shelf uses the tape's
-    shelfTitle: (() => { const d = digitTitle(film.title); return d && plain(both).includes(plain(d)) ? d : undefined; })(),
+    alt: item.alt || undefined, // the other database's name for it
+    shelfTitle: (() => { const d = digitTitle(film.title); return d && caseShows(both, d) ? d : undefined; })(),
     imdbId: film.imdbId, title: film.title || title, year: film.year || (y ? +y[1] : null),
     format, edition, steelbook: /steel ?book/i.test(name), criterion: /criterion/i.test(name), hdr: [],
   };
