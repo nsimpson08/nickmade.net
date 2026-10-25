@@ -1866,8 +1866,10 @@
   // the check table's number boxes
   app.addEventListener("change", function (e) {
     var el = e.target, d = el.dataset;
-    if (el.id === "sc-upload") { if (el.files && el.files[0]) snap(el.files[0], true); return; }
-    if (el.id === "sc-played") { if (el.files && el.files[0]) playedCard(el.files[0]); return; }
+    // (each picked file is taken, then the box emptied: picking the same file again, a re-upload of the same card,
+    // otherwise does nothing, as the browser sees no change)
+    if (el.id === "sc-upload") { var up = el.files && el.files[0]; el.value = ""; if (up) snap(up, true); return; }
+    if (el.id === "sc-played") { var pl = el.files && el.files[0]; el.value = ""; if (pl) playedCard(pl); return; }
     if (el.id === "sc-name") { setName(el.value, true); return; }
     if (el.id === "sc-date") {
       setupDay = /^\d{4}-\d{2}-\d{2}$/.test(el.value) && el.value <= today() ? el.value : today();
