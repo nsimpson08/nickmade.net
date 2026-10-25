@@ -155,6 +155,31 @@
       cols.forEach(function (c) { c[3] = printed(c); });
       nines = ninesOf(cols);
     }
+    // one nine found where a card has two: a stray line down the middle of a hole's column (a scan's: Mesquite's
+    // hole 5, 2026-10-24) makes it two narrow columns, breaking the run of nine. Join any two side by side that make
+    // one hole's width together, and look again; keep that only if it finds more nines
+    if (nines.length === 1) {
+      var hw = wid(nines[0].holes[4]), joined = [], did = false;
+      for (var q2 = 0; q2 < cols.length; q2++) {
+        var a2 = cols[q2], b2 = cols[q2 + 1];
+        if (b2 && wid(a2) < hw * 0.72 && wid(b2) < hw * 0.72 && Math.abs(wid(a2) + wid(b2) - hw) <= hw * 0.1) {
+          joined.push([a2[0], b2[1], Math.max(a2[2], b2[2])]); q2++; did = true;
+        } else joined.push(a2);
+      }
+      if (did) {
+        joined.forEach(function (c) { c[3] = printed(c); });
+        var more = ninesOf(joined);
+        if (more.length > nines.length) {
+          cols = joined; nines = more;
+          // the row names' column, broken up the same way (Mesquite's "Black Tees", "Handicap"...): from the nearest
+          // wide column before hole 1 up to hole 1
+          if (!nines[0].label) {
+            var h1 = nines[0].holes[0], before = cols.filter(function (c) { return c[1] <= h1[0] + 1 && wid(c) > hw * 1.6; }).pop();
+            if (before) nines[0].label = [before[0], h1[0]];
+          }
+        }
+      }
+    }
     // nines of holes in the columns: { holes, total, after, label, next }
     function ninesOf(cols) {
     var crossMed = cols.map(function (c) { return c[2]; }).sort(function (a, b) { return a - b; })[cols.length >> 1];
