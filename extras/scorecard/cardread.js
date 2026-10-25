@@ -12,7 +12,8 @@
 //     mergeCloseUp() takes only those rows from it (close up, the model is worse at yardages)
 //
 //   NMCardRead.fromFile(file)  -> Promise<dataURL>        (camera photo, or a file the Worker passed through; for a PDF,
-//                                                         the page with the most numbers on it, not just page 1)
+//                                                         the page with the most numbers on it, not just page 1; for a
+//                                                         scanned PDF with no text, the page with the most ruled lines)
 //   NMCardRead.bigOf(dataURL)  -> the same card up to 3200 px (this session only; else the dataURL itself)
 //   NMCardRead.textOf(dataURL) -> the PDF page's own printed text ("" for a photo), sent along to the reader
 //   NMCardRead.ninePieces(dataURL) -> Promise<[dataURL per nine] | null>   a 27-hole card cut into its nines
@@ -84,7 +85,12 @@
           }, function () { return { page: page, text: "", nums: 0 }; });
         });
       })).then(function (all) {
-        return all.reduce(function (a, b) { return b.nums > a.nums ? b : a; }, all[0]);
+        var most = all.reduce(function (a, b) { return b.nums > a.nums ? b : a; }, all[0]);
+        if (most.nums >= 20 || all.length === 1) return most;
+        // a scanned PDF has no text to count (Mesquite's: a cover-and-map page, then the card): take the page with the
+        // most long ruled lines across it, as a card's rows have and a cover or a map doesn't
+        return Promise.all(all.map(function (p) { return ruledLines(p.page).then(function (n) { p.lines = n; return p; }); }))
+          .then(function (scored) { return scored.reduce(function (a, b) { return b.lines > a.lines ? b : a; }, scored[0]); });
       });
     }).then(function (best) {
       var page = best.page;
@@ -101,6 +107,25 @@
         return url;
       });
     });
+  }
+  // how many rows of a page have a line (or a band's edge) running across most of its width: a page drawn small,
+  // then each pixel row checked against the next for a change in brightness along at least half its width
+  function ruledLines(page) {
+    var v1 = page.getViewport({ scale: 1 }), view = page.getViewport({ scale: 900 / Math.max(v1.width, v1.height) });
+    var c = document.createElement("canvas");
+    c.width = Math.round(view.width); c.height = Math.round(view.height);
+    var ctx = c.getContext("2d");
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+    return page.render({ canvasContext: ctx, viewport: view }).promise.then(function () {
+      var w = c.width, h = c.height, d = ctx.getImageData(0, 0, w, h).data, lum = new Float32Array(w * h), n = 0, prev = -9;
+      for (var i = 0; i < w * h; i++) lum[i] = d[i * 4] * 0.3 + d[i * 4 + 1] * 0.59 + d[i * 4 + 2] * 0.11;
+      for (var y = 0; y < h - 1; y++) {
+        var edge = 0;
+        for (var x = 0; x < w; x++) if (Math.abs(lum[y * w + x] - lum[(y + 1) * w + x]) > 40) edge++;
+        if (edge > w * 0.5 && y - prev > 2) { n++; prev = y; } // (a thick line counts once)
+      }
+      return n;
+    }, function () { return 0; });
   }
   var texts = new Map();
   function textOf(dataUrl) { return texts.get(dataUrl) || ""; }
