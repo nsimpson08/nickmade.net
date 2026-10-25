@@ -589,11 +589,12 @@
 
   // A card picture read into numbers: the whole card, then (only if its par or handicap rows don't hold up) a close-up
   // of that nine for just those rows (cardread.js closeUps)
-  function readImage(img, holes, source) {
-    // each AI reading kept on this phone by the picture's contents and the part asked: the same card uploaded again
-    // costs no reads (only the matching runs again, 2026-10-12)
+  function readImage(img, holes, source, fresh) {
+    // each AI reading kept on this phone by the picture's contents and the part asked: the same card read again costs
+    // no reads (only the matching runs again, 2026-10-12). fresh: an Upload, which always reads the card again (Nick,
+    // 2026-10-24: re-uploading Mesquite's card gave back its first, wrong reading), keeping the new reading instead
     var ask = function (image, part) {
-      var key = "nm-scorecard-ask:" + part + ":" + fnv(image), kept = load(key, null);
+      var key = "nm-scorecard-ask:" + part + ":" + fnv(image), kept = fresh ? null : load(key, null);
       if (kept) return Promise.resolve(kept);
       return askAI(image, part).then(function (r) { save(key, { read: r.read }); return r; });
     };
@@ -805,7 +806,7 @@
     if (navigator.onLine === false) { ccPaint("Saved. The photo will be read when there's signal."); return; }
     ccPaint("Reading the card…");
     cc.image = waiting.img;
-    return readImage(waiting.img, draft.holes).then(function (read) {
+    return readImage(waiting.img, draft.holes, undefined, !!waiting.up).then(function (read) {
       drop(K_SNAP + id);
       if (cc.id !== id) return;
       var what = waiting.up ? "the card you uploaded" : "your photo";
@@ -834,11 +835,16 @@
     // OpenGolfAPI's numbers and no saved card yet: the course's own card wins straight away (its tees, yardages, pars),
     // since OpenGolfAPI is often off (Holiday Hills: White and Red only, at other yardages). Compare still shows
     // OpenGolfAPI's numbers beside it, to take any of them instead.
-    if (n && !draft.checked && (draft.source || {}).kind === "api" && !cc.inRound) {
+    // ...and the same for numbers that came from an earlier reading of an uploaded card or photo (not saved as checked):
+    // uploading the card again replaces that reading (Nick, 2026-10-24: Mesquite's first reading was wrong)
+    var earlierRead = (draft.source || {}).read && (draft.source || {}).kind === "photo" && meta.kind === "photo";
+    if (n && !draft.checked && ((draft.source || {}).kind === "api" || earlierRead) && !cc.inRound) {
       var card = copy(made.course);
       ["id", "name", "fullName", "place", "apiId", "nearApiId", "website", "credit", "card"].forEach(function (k) { if (draft[k] != null) card[k] = draft[k]; else delete card[k]; });
       cc.adopted = true;
-      cc.status = "Using " + label + "'s numbers. OpenGolfAPI's differ in " + n + (n === 1 ? " place" : " places") + ": Compare to see them." +
+      cc.checks = made.checks; // this reading's own checks (not the earlier reading's)
+      cc.status = (earlierRead ? "Read " + label + " again and used the new numbers. The earlier reading differed"
+        : "Using " + label + "'s numbers. OpenGolfAPI's differ") + " in " + n + (n === 1 ? " place" : " places") + ": Compare to see them." +
         (made.checks.length ? " Some of the card's own totals don't add up." : "");
       setup(card, true);
       return;

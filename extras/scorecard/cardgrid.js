@@ -159,12 +159,19 @@
     // hole 5, 2026-10-24) makes it two narrow columns, breaking the run of nine. Join any two side by side that make
     // one hole's width together, and look again; keep that only if it finds more nines
     if (nines.length === 1) {
+      // (two or more pieces: drawn on a phone, Mesquite's hole 5 measured 41 + 7 + 43 px against 91)
       var hw = wid(nines[0].holes[4]), joined = [], did = false;
       for (var q2 = 0; q2 < cols.length; q2++) {
-        var a2 = cols[q2], b2 = cols[q2 + 1];
-        if (b2 && wid(a2) < hw * 0.72 && wid(b2) < hw * 0.72 && Math.abs(wid(a2) + wid(b2) - hw) <= hw * 0.1) {
-          joined.push([a2[0], b2[1], Math.max(a2[2], b2[2])]); q2++; did = true;
-        } else joined.push(a2);
+        var took = 0;
+        for (var k2 = 2; k2 <= 4 && !took && q2 + k2 <= cols.length; k2++) {
+          var parts2 = cols.slice(q2, q2 + k2);
+          if (parts2.every(function (c) { return wid(c) < hw * 0.72; }) && Math.abs(parts2[k2 - 1][1] - parts2[0][0] - hw) <= hw * 0.1) took = k2;
+        }
+        if (took) {
+          var span = cols.slice(q2, q2 + took);
+          joined.push([span[0][0], span[took - 1][1], Math.max.apply(null, span.map(function (c) { return c[2]; }))]);
+          q2 += took - 1; did = true;
+        } else joined.push(cols[q2]);
       }
       if (did) {
         joined.forEach(function (c) { c[3] = printed(c); });
@@ -208,14 +215,18 @@
         var k = 0;
         while (k + 9 <= run.length) {
           var at = i2 + k, holes = cols.slice(at, at + 9);
-          var total = cols[at + 9] || null, after = cols[at + 10] || null;
+          var total = cols[at + 9] || null, ai = at + 10;
+          // a doubled rule after the total (Mesquite's In) measures as a sliver of a column: the round's total column is
+          // the one after it
+          while (cols[ai] && cols[ai + 1] && wid(cols[ai]) < med * 0.3) ai++;
+          var after = cols[ai] || null;
           var label = at > 0 && wid(cols[at - 1]) > med * 1.6 ? cols[at - 1] : null;
           if (!total) break;
           // a card with no rule down its outer edges (a table on a website): the label column runs from the edge to
           // the first hole, and the round's total column (Total) from the last line to the edge, when there's room
           if (!label && at === 0 && holes[0][0] > med * 1.6) label = [2, holes[0][0]];
           if (!after && w - total[1] > med * 0.8) after = [total[1], Math.min(w - 2, total[1] + Math.max(wid(total), med))];
-          nines.push({ holes: holes, total: total, after: after, label: label, next: cols[at + 11] || null });
+          nines.push({ holes: holes, total: total, after: after, label: label, next: cols[ai + 1] || null });
           k += 10;
           if (run[k] && cols[i2 + k] && Math.abs(wid(cols[i2 + k]) - med) > med * 0.16) break;
           // a divider column ("Players Initials") between the nines is a different width: the run carries on after it
