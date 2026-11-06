@@ -10,19 +10,21 @@
 // Hovering shows album, artist and where it's from; clicking plays that song in a small Spotify player at the bottom
 // of the wall (a 30-second preview for visitors not signed in to Spotify) instead of jumping to it on the page.
 //
-// Extras page: 16:9 tiles: a short looping clip of a Montage Maker montage (extras/wall/, a silent MP4 that only plays
-// while on screen) and the 8 newest Trackman rounds from the Golf page (extras/golf/trackman.js, loaded when the wall
-// opens) as course photos with the score on them. Clicking one jumps to that project's card.
+// Extras page: 16:9 tiles: the newest Trackman rounds (up to 40) from the Golf page (extras/golf/trackman.js, loaded
+// when the wall opens) as course photos with the score on them. (Until 2026-10-25 a Montage Maker clip led it.) Clicking one jumps to that project's card.
 //
 // Play page (1.3): 16:9 tiles of the two games: their gameplay clips (play/wall/) plus 5 stills from each clip, so the
 // wall (and the background) isn't just two pictures. Clicking one jumps to that game's card.
 //
 // Photography page: 3:2 tiles of every photo in the sections (their 800px copies); clicking one jumps to it.
 //
-// Movies > Library: every disc's cover (from library.js, window.NMLibrary), 2:3; clicking one opens its case.
+// Library > Movies: every disc's cover (from library.js, window.NMLibrary), 2:3; clicking one opens its case.
+// Library > Vinyl, Books, Board games (1.7): the same way, from collection.js's window.NMLibrary (its name, noun and
+// tile shape: records and games square, books 2:3); clicking one opens its card.
+// Library (the hub, 1.7): a mix of all four, each in its own shape like Home's; clicking one goes to its shelf.
 //
-// Home page: an even mix of the six other pages (the same number from each: movie and game posters from their
-// list.js, album covers from the Worker, photos from photos.js, Extras' clips and Trackman rounds), each tile in its own
+// Home page: an even mix of six of the pages (not the Library, 1.7) (the same number from each: movie and game posters from their
+// list.js, album covers from the Worker, photos from photos.js, Extras' Trackman rounds), each tile in its own
 // shape (2:3, square, 3:2, 16:9); clicking one goes to its page. Home has no top bar, so the header control floats
 // at the top right.
 //
@@ -39,16 +41,19 @@
   var CLIPS_PAGE = EXTRAS || PLAY; // 16:9 tiles, clips that play while visible
   var PHOTOS = document.body.classList.contains("page-photography");
   var LIBRARY = document.body.classList.contains("page-library");
+  var HUB = document.body.classList.contains("page-library-hub");
+  var LIB = window.NMLibrary || {}; // (the Library pages' scripts come before this one)
   var HOME = !!document.querySelector("main.home");
   var root = HOME ? document.querySelector("main.home") : CLIPS_PAGE ? document.querySelector("main.content > section")
-    : document.getElementById(MUSIC ? "playlists" : PHOTOS ? "photos" : LIBRARY ? "library" : "entries");
+    : HUB ? document.querySelector(".hub-aisles") : LIBRARY ? document.getElementById("library") || document.getElementById("collection")
+    : document.getElementById(MUSIC ? "playlists" : PHOTOS ? "photos" : "entries");
   if (!root) return;
   var local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
   var API = (local ? script.dataset.apiLocal : script.dataset.api) || "";
   var still = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var NAME = HOME ? "NickMade" : MUSIC ? "Music" : EXTRAS ? "Extras" : PLAY ? "Play" : PHOTOS ? "Photography" : LIBRARY ? "Library" : document.body.classList.contains("page-games") ? "Games" : "Movies";
-  var NOUN = HOME ? "from all six pages" : MUSIC ? "album covers" : EXTRAS ? "clips and rounds" : PLAY ? "clips" : PHOTOS ? "photos" : LIBRARY ? "discs" : "posters";
-  var RATIO = HOME ? 1 : MUSIC ? 1 : CLIPS_PAGE ? 9 / 16 : PHOTOS ? 2 / 3 : 1.5; // tile height / width (Home: each tile has its own)
+  var NAME = HOME ? "NickMade" : MUSIC ? "Music" : EXTRAS ? "Extras" : PLAY ? "Play" : PHOTOS ? "Photography" : HUB ? "Library" : LIBRARY ? LIB.name || "Library" : document.body.classList.contains("page-games") ? "Games" : "Movies";
+  var NOUN = HOME ? "from across the site" : MUSIC ? "album covers" : EXTRAS ? "golf rounds" : PLAY ? "clips" : PHOTOS ? "photos" : HUB ? "from every shelf" : LIBRARY ? LIB.noun || "discs" : "posters";
+  var RATIO = HOME || HUB ? 1 : LIBRARY && LIB.ratio ? LIB.ratio : MUSIC ? 1 : CLIPS_PAGE ? 9 / 16 : PHOTOS ? 2 / 3 : 1.5; // tile height / width (Home: each tile has its own)
   var COL_W = CLIPS_PAGE ? 280 : PHOTOS ? 240 : 190; // about how wide a column is
   var BG_DIM = 0.25, BG_MAX = PHOTOS ? 40 : 80; // background: brightness (0-1) and the most tiles it uses (photos are 800px files)
   var ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="1" width="4" height="6" rx="1"/><rect x="6" y="1" width="4" height="9" rx="1"/>' +
@@ -134,10 +139,7 @@
   }
   if (MUSIC && API) setTimeout(playlistCovers, 1500); // warm it up so the wall opens straight away
 
-  // Extras: the Montage Maker clip (see NOTES for how the clips were made) and the Trackman rounds
-  var CLIPS = [
-    { video: "/extras/wall/montage.mp4", src: "/extras/wall/montage.jpg", title: "Video Game Montage Maker", meta: "A montage it made", card: "Video Game Montage Maker" },
-  ];
+  // Extras: the Trackman rounds (the Video Game Montage Maker's clip went with the app, 2026-10-25)
   // Play: each game's clip and 5 stills taken from it (play/wall/<game>-1.jpg ... -5.jpg)
   var GAMES = [
     { slug: "cats", title: "The Cattery" }, // 1.6, first on the page
@@ -169,11 +171,10 @@
   function card(title) {
     return [].find.call(root.querySelectorAll("article.project"), function (a) { return text(a.querySelector("h2")) === title; }) || root;
   }
-  var ROUNDS = 8, CLIP_COPIES = 1; // the newest rounds; few enough that the clips aren't lost among the golf
+  var ROUNDS = 40; // the newest rounds
   function collectExtras(maxRounds) {
     return golfRounds().then(function (rounds) {
       var out = [];
-      for (var n = 0; n < CLIP_COPIES; n++) CLIPS.forEach(function (c) { out.push(Object.assign({ el: card(c.card), section: c.meta }, c)); });
       rounds.filter(function (r) { return !r.hidden && r.image && r.score; })
         .sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); })
         .slice(0, maxRounds || ROUNDS).forEach(function (r) {
@@ -259,8 +260,49 @@
     return homeReq;
   }
 
+  // Library hub: every shelf's covers, up to 40 from each, each tile its own shape; a click goes to that shelf
+  var hubReq = null;
+  var HUB_KEY = "nm-wall-hub";
+  // a shelf cover's small copy (collection.js small())
+  function smallCover(d) {
+    if (d.thumb && d.thumbOf === d.cover) return d.thumb;
+    if (/^https:\/\/is\d-ssl\.mzstatic\.com\//.test(d.cover || "")) return d.cover.replace(/\/\d+x\d+[a-z]*\.(jpg|png|webp)$/, "/400x400bb.jpg");
+    return d.cover;
+  }
+  function collectHub() {
+    if (hubReq) return hubReq;
+    var get = function (path) { return API ? fetch(API + path).then(function (r) { return r.ok ? r.json() : {}; }).catch(function () { return {}; }) : Promise.resolve({}); };
+    var SHELF = { vinyl: ["Vinyl", "/library/vinyl/", 1], books: ["Books", "/library/books/", 1.5], games: ["Board games", "/library/board-games/", 1] };
+    // the Library page's own downloads when it made them (library/index.html window.NMHubData), else fetched here
+    var D = window.NMHubData;
+    var fresh = Promise.all(D ? [D.discs, D.library, D.vinyl, D.books, D.games]
+      : [loadData("/library/movies/discs.js", "DISCS"), get("/library"), get("/collection/vinyl"), get("/collection/books"), get("/collection/games")]).then(function (x) {
+      var gone = {};
+      (x[1].hidden || []).forEach(function (id) { gone[id] = true; });
+      var discs = (x[0] || []).filter(function (d) { return !gone[d.id] && d.cover; }).concat((x[1].items || []).filter(function (d) { return d.cover; }));
+      var out = shuffle(discs).slice(0, 40).map(function (d) {
+        // (TMDB's posters at 342 px)
+        return { src: absolute(d.cover, "/library/movies/").replace("image.tmdb.org/t/p/w500/", "image.tmdb.org/t/p/w342/"), title: d.title, year: d.year || "", section: "Movies", href: "/library/movies/", ratio: 1.5 };
+      });
+      ["vinyl", "books", "games"].forEach(function (k, n) {
+        shuffle((x[2 + n].items || []).filter(function (d) { return d.cover; })).slice(0, 40).forEach(function (d) {
+          out.push({ src: smallCover(d), title: d.title, year: d.year || "", section: SHELF[k][0], href: SHELF[k][1], ratio: SHELF[k][2] });
+        });
+      });
+      try { localStorage.setItem(HUB_KEY, JSON.stringify(out)); } catch (e) {}
+      return out;
+    });
+    // drawn at once from the pictures this browser had last time (Nick, 2026-10-30: the wall waited on the Worker
+    // every visit), shuffled again; this visit's list is saved for the next. The first visit waits for it.
+    var last = null;
+    try { last = JSON.parse(localStorage.getItem(HUB_KEY) || "null"); } catch (e) {}
+    hubReq = last && last.length ? Promise.resolve(shuffle(last)) : fresh;
+    return hubReq;
+  }
+
   // Everything the wall shows on this page (a promise: Music, Extras and Home fetch theirs)
   function collectAll() {
+    if (HUB) return collectHub();
     // Photography draws its photos once the ones added on the site are in (photos.js NMPhotosReady)
     if (PHOTOS) return (window.NMPhotosReady || Promise.resolve()).then(collectPhotos);
     return HOME ? collectHome() : MUSIC ? collectMusic() : EXTRAS ? collectExtras() : PLAY ? Promise.resolve(collectPlay())
@@ -526,8 +568,9 @@
     if (bgOn) startBg(); else stopBg();
   });
 
-  // On load: right after the page's first paint (live sections that arrive later just aren't in this shuffle)
-  if (bgOn) setTimeout(startBg, 150);
+  // On load: right after the page's first paint (live sections that arrive later just aren't in this shuffle). Was a
+  // 150 ms wait; now the next frame (Nick, 2026-10-25: make it come in faster)
+  if (bgOn) requestAnimationFrame(function () { setTimeout(startBg, 0); });
 
   // Hovering or focusing the toggle or the Poster wall button gets the list and the first thumbnails coming, so a
   // click finds them ready. Only then: visitors who never go near them download nothing extra.
@@ -554,7 +597,7 @@
       if (!bgOn || bgWall || !list.length) return;
       bgItems = shuffle(list).slice(0, BG_MAX);
       bgWall = document.createElement("div");
-      bgWall.className = "wall wall-bg" + (still ? " still" : "") + (MUSIC ? " albums" : "") + (CLIPS_PAGE ? " extras" : "") + (PHOTOS ? " photos" : "") + (HOME ? " wall-home" : "") + (LIBRARY ? " wall-library" : "");
+      bgWall.className = "wall wall-bg" + (still ? " still" : "") + (MUSIC ? " albums" : "") + (CLIPS_PAGE ? " extras" : "") + (PHOTOS ? " photos" : "") + (HOME || HUB ? " wall-home" : "") + (LIBRARY ? " wall-library" : "");
       if (HOME) bgItems = shuffle(list.filter(function (x, k) { return k % 2 === 0 || x.video; })).slice(0, BG_MAX); // half of each page's share
       bgWall.setAttribute("aria-hidden", "true");
       bgWall.style.setProperty("--wall-shade", String(1 - BG_DIM));
@@ -571,6 +614,6 @@
     bgWall = null;
     document.documentElement.classList.remove("wall-bg-on");
     w.classList.remove("in");
-    setTimeout(function () { w.remove(); }, 1300);
+    setTimeout(function () { w.remove(); }, 700); // (after its .6s fade out)
   }
 })();

@@ -2,8 +2,10 @@ import { golfRoute } from "./golf.js";
 import { musicRoute, MUSIC_SCOPES } from "./music.js";
 import { votesRoute } from "./votes.js";
 import { libraryRoute } from "./library.js";
+import { collectionsRoute } from "./collections.js";
 import { photosRoute } from "./photos.js";
 import { wishlistRoute } from "./wishlist.js";
+import { fansRoute, post as fansPost, fansTick } from "./fans.js";
 import { catsRoute, catsTick } from "./cats.js";
 import { scorecardRoute } from "./scorecard.js";
 import { recordTrophies, trophiesView, TROPHIES_KEY, PsnError } from "./psn.js";
@@ -41,7 +43,9 @@ import { recordSteam, steamView, STEAM_KEY, SteamError } from "./steam.js";
 //   GET    /psn/trophies        Nick's PlayStation trophies, the same way (the Games page's second banner; psn.js)
 //   GET    /steam/achievements  Nick's Steam achievements, the same way (the third banner; steam.js)
 //                               (or refreshes their Xbox stats if already there), poster from PosterSpy or the Xbox store
+//   GET    /fans/...            "Get notified": visitors sign up for notifications when Nick posts (see fans.js)
 //   GET    /library ...         Movies > Library: discs Nick adds on the site (see library.js)
+//   GET    /collection/...      Library: vinyl, books and board games Nick adds on the site (see collections.js)
 //   GET    /photos ...          Photography: photos Nick adds on the site, stored in R2 (see photos.js)
 //   GET    /spotify/top?playlist=<id>  the first song on a public Spotify playlist (home page "Lately" strip)
 //   GET    /spotify/now         what Nick is playing on Spotify now, or his last played song (home "Lately" strip)
@@ -65,7 +69,7 @@ import { recordSteam, steamView, STEAM_KEY, SteamError } from "./steam.js";
 //   visitor:<hash> / visitor:games:<hash>  number of queue submissions from that visitor (browser id or hashed IP)
 //   spotify:refresh / spotify:access / spotify:now / spotify:state:<x>  Spotify login and a 1-minute cache
 //   spotify:scope                  the permissions granted at the last connect; music:* keys are in music.js
-//   xbox:recent                    10-minute cache of /xbox/recent (OpenXBL allows 150 requests/hour, shared with the Montage app)
+//   xbox:recent                    10-minute cache of /xbox/recent (OpenXBL allows 150 requests/hour)
 //   xbox:gamerscore                { total, at, history: [{ date, total }] }: one snapshot a night, the last 60 kept
 //   cats:room                      the Cattery: every cat, how each pair get on, the history (cats.js)
 
@@ -109,7 +113,7 @@ function queueKey(page) {
 function watchedKey(page) {
   return page === "movies" ? "watched" : "watched:" + page;
 }
-const IMG_HOSTS = ["nickmade.net", "m.media-amazon.com", "alternativemovieposters.com", "store-images.s-microsoft.com", "media.posterspy.com", "image.tmdb.org", "photos.nickmade.net"]; // photos: VHS covers kept in the bucket
+const IMG_HOSTS = ["nickmade.net", "m.media-amazon.com", "alternativemovieposters.com", "store-images.s-microsoft.com", "media.posterspy.com", "image.tmdb.org", "photos.nickmade.net", "covers.openlibrary.org", "coverartarchive.org", "books.google.com", "images-us.bookshop.org"]; // photos: VHS and Library covers kept in the bucket; Open Library: a book cover that wasn't copied (the book spines read its edge)
 const XBOX_RECENT = 30; // how many recent Xbox games /xbox/recent lists
 const GAMERSCORE_KEY = "xbox:gamerscore";
 const GAMERSCORE_NIGHTS = 60;
@@ -128,7 +132,7 @@ export default {
     try {
       if (url.pathname === "/search" && request.method === "GET") return await search(url, cors, ctx);
       if (url.pathname === "/xbox/recent" && request.method === "GET") return await xboxRecent(request, env, cors);
-      if (url.pathname === "/xbox/import" && request.method === "POST") return await xboxImport(request, env, cors);
+      if (url.pathname === "/xbox/import" && request.method === "POST") return await xboxImport(request, env, cors, ctx);
       if (url.pathname === "/xbox/sync" && request.method === "POST") {
         if (!isAdmin(request, env)) return json({ error: "Unauthorized" }, 401, cors);
         // the gamerscore, the games, PlayStation and Steam each on their own: one failing doesn't stop the others
@@ -193,7 +197,7 @@ export default {
           archive: sortWatched(await getList(env, watchedKey(wpage) + "-archive")).map((it) => archived(it, owner)),
         }, 200, cors);
       }
-      if (url.pathname === "/watched" && request.method === "POST") return await addWatched(request, env, cors);
+      if (url.pathname === "/watched" && request.method === "POST") return await addWatched(request, env, cors, ctx);
       if (url.pathname.startsWith("/watched/") && request.method === "PATCH") return await editWatched(request, url, env, cors);
       if (url.pathname.startsWith("/watched/") && request.method === "DELETE") return await removeWatched(request, url, env, cors);
       if (url.pathname.startsWith("/golf/")) {
@@ -208,12 +212,20 @@ export default {
         const res = await libraryRoute(request, url, env, cors, { json, isAdmin });
         if (res) return res;
       }
+      if (url.pathname.startsWith("/collection/")) { // Library (collections.js)
+        const res = await collectionsRoute(request, url, env, cors, { json, isAdmin, spotifyToken, spotifyUser: spotifyAccess }); // (spotifyUser: the connected account, for reading a playlist's songs)
+        if (res) return res;
+      }
+      if (url.pathname.startsWith("/fans")) { // "Get notified" on the home page (fans.js)
+        const res = await fansRoute(request, url, env, cors, { json, isAdmin, sha256 });
+        if (res) return res;
+      }
       if (url.pathname === "/wishlist" || url.pathname.startsWith("/wishlist/")) {
         const res = await wishlistRoute(request, url, env, cors, { json, isAdmin, sha256 });
         if (res) return res;
       }
       if (url.pathname === "/photos" || url.pathname.startsWith("/photos/")) {
-        const res = await photosRoute(request, url, env, cors, { json, isAdmin });
+        const res = await photosRoute(request, url, env, cors, { json, isAdmin, fans: (topic, msg) => ctx.waitUntil(fansPost(env, topic, msg).catch(() => {})) });
         if (res) return res;
       }
       if (url.pathname === "/cats" || url.pathname.startsWith("/cats/")) {
@@ -221,7 +233,7 @@ export default {
         if (res) return res;
       }
       if (url.pathname.startsWith("/scorecard/")) {
-        const res = await scorecardRoute(request, url, env, cors, { json, isAdmin, sha256, normalize, BLOCKED, tellOwner });
+        const res = await scorecardRoute(request, url, env, cors, { json, isAdmin, sha256, normalize, BLOCKED, tellOwner, fans: (topic, msg) => ctx.waitUntil(fansPost(env, topic, msg).catch(() => {})) });
         if (res) return res;
       }
       if (url.pathname.startsWith("/music/")) {
@@ -238,7 +250,7 @@ export default {
   // Cron triggers (wrangler.toml): every 4 hours, plus 05:00 and 06:00 UTC, of which only the one landing on
   // midnight in TIMEZONE (America/Chicago: 05:00 in daylight time, 06:00 in standard time) runs. That midnight run
   // takes the day's gamerscore snapshot for the banner's "+XG in the last 24h". 3 OpenXBL requests a run
-  // (/titles, /player/stats, /account), 21 a day, well inside the free plan's 150 an hour (shared with the Montage app).
+  // (/titles, /player/stats, /account), 21 a day, well inside the free plan's 150 an hour.
   async scheduled(event, env, ctx) {
     if (event.cron !== EVERY_4H && hourIn(env.TIMEZONE, new Date(event.scheduledTime)) !== 0) return;
     // each step tried twice (a minute apart) before it's given up on, and a failure kept in KV xbox:lastError, since
@@ -249,6 +261,7 @@ export default {
     if (env.PSN_NPSSO) ctx.waitUntil(twice(env, "psn", () => recordTrophies(env, NIGHT_HELPERS)));
     if (env.STEAM_API_KEY) ctx.waitUntil(twice(env, "steam", () => recordSteam(env, NIGHT_HELPERS)));
     if (event.cron === EVERY_4H) ctx.waitUntil(twice(env, "cats", () => catsTick(env))); // a few rounds of cat life
+    if (event.cron === EVERY_4H) ctx.waitUntil(twice(env, "fans", () => fansTick(env))); // "Get notified": held posts, then any backlog
   },
 };
 
@@ -386,11 +399,19 @@ async function image(url, ctx) {
   let target;
   try { target = new URL(u); } catch (e) { return new Response("Bad url", { status: 400 }); }
   if (target.protocol !== "https:" || !IMG_HOSTS.includes(target.hostname)) return new Response("Not allowed", { status: 403 });
-  const res = await fetch(target.toString(), {
-    headers: { "User-Agent": "Mozilla/5.0 (nickmade.net queue)" },
-    cf: { cacheTtl: 86400 * 30, cacheEverything: true },
-  });
-  if (!res.ok) return new Response("Not found", { status: 404 });
+  // a second try when the first fails (Open Library's covers bounce to archive.org, which drops one now and then); a
+  // failure says so with the CORS header too (else the page sees "blocked by CORS" instead of a plain failed image)
+  // and isn't cached
+  const failed = () => new Response("Not found", { status: 404, headers: { "Access-Control-Allow-Origin": "*", "Cache-Control": "no-store" } });
+  let res = null;
+  for (let i = 0; i < 2 && !(res && res.ok); i++) {
+    res = await fetch(target.toString(), {
+      headers: { "User-Agent": "Mozilla/5.0 (nickmade.net queue)" },
+      cf: { cacheTtl: 86400 * 30, cacheEverything: true },
+      signal: AbortSignal.timeout(15000),
+    }).catch(() => null);
+  }
+  if (!res || !res.ok) return failed();
   return new Response(res.body, {
     headers: {
       "Content-Type": res.headers.get("Content-Type") || "image/jpeg",
@@ -756,7 +777,7 @@ async function fitWatched(env, page) {
   await env.QUEUE.put(key + "-archive", JSON.stringify(archive.filter((it) => !ids.has(it.id))));
 }
 
-async function addWatched(request, env, cors) {
+async function addWatched(request, env, cors, ctx) {
   if (!isAdmin(request, env)) return json({ error: "Unauthorized" }, 401, cors);
   let body;
   try { body = await request.json(); } catch (e) { return json({ error: "Bad request." }, 400, cors); }
@@ -797,6 +818,11 @@ async function addWatched(request, env, cors) {
 
   const kept = queue.filter((it) => it.imdbId !== imdbId);
   if (kept.length !== queue.length) await env.QUEUE.put(queueKey(page), JSON.stringify(kept));
+
+  // "Get notified": the visitors who asked for this kind of post (fans.js; at most one every few hours, the rest held)
+  const stars = rating ? "★".repeat(Math.floor(rating)) + (rating % 1 ? "½" : "") : "";
+  const say = page === "movies" ? ["🎬 Nick watched " + item.title, "/movies/#recently-watched"] : ["🎮 Nick is playing " + item.title, "/games/#recently-played"];
+  if (ctx) ctx.waitUntil(fansPost(env, page, { title: say[0], body: [stars, review].filter(Boolean).join(" · ").slice(0, 200) || "See it on NickMade", url: say[1], name: item.title }).catch(() => {}));
 
   return json({ item, removedFromQueue: kept.length !== queue.length }, 201, cors);
 }
@@ -1051,7 +1077,7 @@ async function imdbGameYear(name) {
   }
 }
 
-async function xboxImport(request, env, cors) {
+async function xboxImport(request, env, cors, ctx) {
   if (!isAdmin(request, env)) return json({ error: "Unauthorized" }, 401, cors);
   let body;
   try { body = await request.json(); } catch (e) { return json({ error: "Bad request." }, 400, cors); }
@@ -1101,6 +1127,8 @@ async function xboxImport(request, env, cors) {
     });
     importedTitles.push(g.name);
     added++;
+    // a new game on Recently Played: the visitors who asked for games (fans.js caps it)
+    if (ctx) ctx.waitUntil(fansPost(env, "games", { title: "🎮 Nick is playing " + g.name, body: "On Xbox · see it on NickMade", url: "/games/#recently-played", name: g.name }).catch(() => {}));
   }
   await saveWatched(env, "games", items); // newest 8 by last played; older ones to the archive
 

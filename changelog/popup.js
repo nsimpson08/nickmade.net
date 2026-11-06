@@ -3,19 +3,20 @@
 // `version` sees it once, on the first page they land on. For a new release: change `version` and the text.
 //
 // page   the item's tag (its colour, like the changelog's): "site", "home", "games", "movies", "music",
-//        "photography", "play", "extras"
-// link   where the item's link goes; cta: the link's words (leave out cta for no link)
+//        "photography", "library", "play", "extras"
+// link   where the item's link goes; cta: the link's words (leave out cta for no link); gold: true for a link in
+//        moving gold instead of the tag's colour
 // intro, more: leave "" to leave them out
 window.WHATS_NEW = {
-  version: "1.6",
+  version: "1.7",
   kicker: "New since your last visit",
-  title: "Ver 1.6: The Cattery",
-  intro: "A new game to come back to, new banners on Games, and golf weather for anywhere in the US.",
+  title: "Ver 1.7: Library",
+  intro: "A new section for everything I collect on physical media, and a way to hear when I post (or when your cat needs you).",
   items: [
-    { page: "play", link: "/play/cats/", cta: "Make your cat", text: "The Cattery: make your own cat and move it into a room with everyone else’s. Come back to see who it befriended, fought, or fell for." },
-    { page: "play", link: "/extras/golf-game/", cta: "Play a round", text: "Nick’s Nine 1.2: slope arrows on the greens, new doglegs and ponds, and real lip-outs." },
-    { page: "games", link: "/games/", cta: "See the banners", text: "My PlayStation trophies and Steam achievements now sit next to Xbox." },
-    { page: "extras", link: "/extras/golf-weather/", cta: "Check your ZIP", text: "Golf weather: the best times to play this week near any US ZIP code." },
+    { page: "home", link: "/", cta: "Get notified", gold: true, text: "Get notified when I watch a movie, play a game, finish a round of golf, post a photo, or update the site. Have a cat in the Cattery? It can tell you when your cat is hungry or wants attention. No account needed." },
+    { page: "library", link: "/library/", cta: "Browse the Library", text: "Library: my movies, vinyl, books and board games, each on its own shelf. Physical. Media. Forever." },
+    { page: "library", link: "/library/vinyl/", cta: "Pull out a record", text: "Vinyl: slide a record out of its sleeve, turn it over for the back, and play the album on Spotify from its track list." },
+    { page: "library", link: "/library/movies/", cta: "Open the shelf", text: "Movies: my disc library moved into Library, now with HD and SD filters, taglines, and the DVDs and VHS tapes filled in." },
   ],
   more: "Full changelog", // a button to /changelog/
   ok: "Got it",

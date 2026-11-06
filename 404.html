@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- The not-found page (1.7). GitHub Pages serves it for any address that isn't on the site, at that address, so
+       every link here starts with / -->
+  <meta name="robots" content="noindex">
+  <title>Missing tape · NickMade</title>
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500&family=Unbounded:wght@500;600;700;800&display=swap">
+  <link rel="stylesheet" href="/assets/css/site.css">
+</head>
+<body class="page-missing">
+  <header class="topbar">
+    <a class="wordmark" href="/">Nick<span>Made</span></a>
+    <nav>
+      <a href="/games/">Games</a>
+      <a href="/movies/">Movies</a>
+      <a href="/music/">Music</a>
+      <a href="/photography/">Photography</a>
+      <a href="/library/">Library</a>
+      <a href="/play/">Play</a>
+      <a href="/extras/">Extras</a>
+    </nav>
+  </header>
+
+  <main class="content missing">
+    <!-- a video store shelf: a tape for each section, and a gap where this page should be -->
+    <div class="missing-shelf" aria-label="Sections">
+      <a class="missing-tape" href="/games/" style="--tape: var(--violet)"><span>Games</span></a>
+      <a class="missing-tape" href="/movies/" style="--tape: var(--amber)"><span>Movies</span></a>
+      <a class="missing-tape" href="/music/" style="--tape: var(--pink)"><span>Music</span></a>
+      <span class="missing-gap" aria-hidden="true"><b>?</b></span>
+      <a class="missing-tape" href="/photography/" style="--tape: var(--sky)"><span>Photography</span></a>
+      <a class="missing-tape" href="/library/" style="--tape: var(--red)"><span>Library</span></a>
+      <a class="missing-tape" href="/play/" style="--tape: var(--coral)"><span>Play</span></a>
+      <a class="missing-tape" href="/extras/" style="--tape: var(--mint)"><span>Extras</span></a>
+    </div>
+    <div class="missing-ledge"></div>
+    <h1>This tape is missing<span>.</span></h1>
+    <p class="missing-sub">Be kind, rewind.</p>
+    <p class="missing-text">There's nothing at <code id="missing-path"></code>. It may have moved, or the link has a typo. Pick a tape from the shelf, or:</p>
+    <p class="missing-links"><a class="missing-home" href="/">Back to the front of the store &rarr;</a><a href="/library/">Browse the Library</a></p>
+  </main>
+
+  <script>document.getElementById("missing-path").textContent = location.pathname;</script>
+  <script src="/changelog/log.js"></script>
+  <script src="/assets/js/footer.js"></script>
+</body>
+</html>

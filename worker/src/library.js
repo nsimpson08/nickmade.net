@@ -1,4 +1,4 @@
-// Movies > Library: discs Nick adds on the site in owner mode, on top of the ones in movies/library/discs.js (the
+// Library > Movies: discs Nick adds on the site in owner mode, on top of the ones in library/movies/discs.js (the
 // one-time import from his My Movies app export, 2026-10-03; tools/discs.py). New discs are only added here now.
 //
 //   GET    /library                  { items: [discs added on the site], hidden: [ids of discs.js discs removed on the site] }
@@ -21,7 +21,12 @@
 //                                    hdr: the dialog's HDR ticks, 4K only; cover: the picture picked in the dialog: a TMDB
 //                                    poster is kept as its address, anything else (a seller's photo) is copied into the
 //                                    photos bucket under covers/ so it can't disappear)
+//   POST   /library/read-features    (admin) { image: a JPEG data URL of the back of the case } -> { features: [...] }: its
+//                                    special features read by a Workers AI vision model, for the "On this disc" box
 //   DELETE /library/:id              (admin) a site-added disc is deleted (with its copied cover); a discs.js one is hidden
+//   POST   /library/pick             (admin) { key: the film's title as library.js norm() makes it, on: true|false } ->
+//                                    { picks }: Nick makes a film a Nick's Pick, or takes it off, from its open case
+//                                    (Nick, 2026-10-30); on top of his Movies All Time Favorites and the page's own list
 //
 // A new disc's facts (title, year, runtime, rating, genres, director, cast, studio, poster) come from IMDb, like the
 // rest of the site's lookups. Its blurb is the film's Wikipedia summary (free to reuse with credit; the page links
@@ -29,9 +34,15 @@
 //
 // Storage (the QUEUE namespace): library         JSON array of site-added discs, newest first
 //                                library:hidden  JSON array of discs.js ids removed on the site
+//                                library:picks   { on: [title keys], off: [title keys] } picks changed on the site
+import { aiRun } from "./aimeter.js"; // (every AI call is metered: aimeter.js)
 
 const ITEMS = "library";
 const HIDDEN = "library:hidden";
+const PICKS = "library:picks";
+// edits Nick made on an open case to discs.js discs (their data is a site file): { <disc id>: { cover, edition,
+// features, steelbook, threeD, criterion, hdr } }, laid over the file's disc by library.js
+const EDITS = "library:edits";
 const FORMATS = ["4k", "bluray", "dvd", "vhs"];
 const HDR_KINDS = ["dv", "hdr10+", "hdr10"];
 const SEARCH_TYPES = new Set(["movie", "tvMovie", "video", "tvSeries", "tvMiniSeries", "tvSpecial"]);
@@ -40,7 +51,7 @@ const BLURB_MAX = 600;
 
 export async function libraryRoute(request, url, env, cors, h) {
   if (url.pathname === "/library" && request.method === "GET") {
-    return h.json({ items: await list(env, ITEMS), hidden: await list(env, HIDDEN) }, 200, cors);
+    return h.json({ items: await list(env, ITEMS), hidden: await list(env, HIDDEN), picks: await pickList(env), edits: await editMap(env) }, 200, cors);
   }
   if (url.pathname === "/library/search" && request.method === "GET") return search(request, url, env, cors, h);
   if (url.pathname === "/library/editions" && request.method === "GET") return editions(request, url, env, cors, h);
@@ -49,7 +60,10 @@ export async function libraryRoute(request, url, env, cors, h) {
   if (url.pathname === "/library/stills" && request.method === "GET") return stillsRoute(request, url, env, cors, h);
   if (url.pathname === "/library/covers" && request.method === "GET") return coversRoute(request, url, env, cors, h);
   if (url.pathname === "/library/film" && request.method === "GET") return filmRoute(request, url, env, cors, h);
+  if (url.pathname === "/library/read-features" && request.method === "POST") return readFeatures(request, env, cors, h);
+  if (url.pathname === "/library/pick" && request.method === "POST") return setPick(request, env, cors, h);
   if (url.pathname === "/library" && request.method === "POST") return add(request, env, cors, h);
+  if (url.pathname.startsWith("/library/") && request.method === "PATCH") return editDisc(request, url, env, cors, h);
   if (url.pathname.startsWith("/library/") && request.method === "DELETE") return remove(request, url, env, cors, h);
   return null;
 }
@@ -310,7 +324,73 @@ async function wikipedia(imdbId) {
   if (!link) return null;
   const sum = await (await fetch("https://en.wikipedia.org/api/rest_v1/page/summary/" + encodeURIComponent(link.title.replace(/ /g, "_")), opts)).json();
   if (!sum.extract) return null;
-  return { text: trimBlurb(sum.extract), url: sum.content_urls && sum.content_urls.desktop ? sum.content_urls.desktop.page : "" };
+  const text = castless(sum.extract);
+  if (!text) return null;
+  return { text: trimBlurb(text), url: sum.content_urls && sum.content_urls.desktop ? sum.content_urls.desktop.page : "" };
+}
+
+// No cast lists in a summary (Nick, 2026-11-04: "I don't want any summaries to just have lists of actors ... we mark them
+// in the attributes at the bottom already"): a sentence that's only the cast goes; "...directed by X, and starring A,
+// B and C." keeps its first half; "Directed by X, the film stars A, B." becomes "It was directed by X."; "Starring A, B,
+// it is the third installment..." becomes "It is the third installment...". A lead tied to the plot ("It stars Jim
+// Carrey as a lawyer who...") stays. The same rules were run over the shelves' summaries that day (session scratchpad cast/).
+const CAST_ABBR = /(?:\b[A-Z]|\bJr|\bSr|\bDr|\bMr|\bMrs|\bMs|\bSt|\bvs|\bNo|\bVol|\bLtd|\bInc|\bU\.S)\.$/;
+const CAST_NAME = /\b(?:[A-Z][\p{L}'’.-]*)(?:\s+(?:[A-Z][\p{L}'’.-]*|de|da|van|von|del|la|le|di|du|St\.|Jr\.?))*/gu;
+const CAST_WORD = /\b(stars?|starred|starring|co-?stars?|co-?starred|co-?starring|cast|casts|ensemble|supporting roles?|featuring|features|alongside|also appears?|voice cast|vocal talents)\b/i;
+const CAST_FILLER = new Set(("the a an it its film film's movie this also stars star starred starring co-stars co-star co-starring costarring cast " +
+  "cast's ensemble including includes include included consisting of features featuring feature with and in as alongside supporting role roles " +
+  "lead leading leads led by his her their title titular principal main voice voices vocal talents provide provides providing play plays playing " +
+  "appear appears appeared appearing respectively while along other others another together reprising reprise reprises reprised character " +
+  "characters himself herself themselves fictionalized version major key is was are were has had who whom which all-star star-studded " +
+  "star-filled powerhouse exceptional standout phenomenal amazing big-screen favorites more best friends friend debut from that actors actor actress").split(" "));
+function castSentences(t) {
+  const out = []; let cur = "";
+  for (const p of t.split(/(?<=[.!?]["”’)]?)\s+/)) { cur = cur ? cur + " " + p : p; if (!CAST_ABBR.test(cur.replace(/["”’)]$/, ""))) { out.push(cur); cur = ""; } }
+  if (cur) out.push(cur);
+  return out;
+}
+function castResidue(s) {
+  return s.replace(/\([^)]*\)/g, " ").replace(CAST_NAME, " ").toLowerCase().replace(/[^\p{L}' -]+/gu, " ").split(/\s+/)
+    .filter((w) => w && w !== "-" && !CAST_FILLER.has(w) && !CAST_FILLER.has(w.replace(/'s$/, "")));
+}
+const castPure = (s) => castResidue(s).length <= 3;
+const lcFirst = (t) => t.charAt(0).toLowerCase() + t.slice(1), ucFirst = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+const endStop = (t) => { t = t.replace(/[,;:\s–—-]+$/, ""); return t + (/[.!?”"]$/.test(t) ? "" : "."); };
+function asSentence(lead) {
+  if (/^(Produced|Directed|Written|Co-produced|Co-written|Co-directed|Created|Animated|Released|Distributed)\b/.test(lead)) return "It was " + lcFirst(lead);
+  if (/^(Based|Loosely|Inspired|Adapted)\b/.test(lead)) return "It is " + lcFirst(lead).replace(/^based upon/, "based on");
+  if (/^An?\s/.test(lead)) return "It is " + lcFirst(lead);
+  return null;
+}
+function uncast(s) { // the sentence without its cast list, "" to drop it, or s as it is
+  if (!CAST_WORD.test(s) || (s.match(CAST_NAME) || []).length < 2) return s;
+  let m = /^(.{15,}?),\s+(?:the film|it|the movie)\s+(?:also\s+)?(?:stars|features|starred|starring)\b(.*)$/i.exec(s);
+  if (m && castPure(m[2]) && !CAST_WORD.test(m[1])) { const c = asSentence(m[1]); if (c) return endStop(c); }
+  m = /^(It|The film)\s+(?:also\s+)?stars\s+(.+?),?\s+and\s+(is|was|won|marks|became|earned|received)\s+(.*)$/i.exec(s);
+  if (m && castPure(m[2])) return endStop(m[1] + " " + m[3] + " " + m[4]);
+  m = /^(?:Also\s+)?(?:Starring|Co-?starring|Featuring)\s+(.*)$/i.exec(s);
+  if (m) {
+    const parts = m[1].split(/,\s+/);
+    for (let i = 1; i < parts.length; i++) {
+      const head = parts.slice(0, i).join(", "), rest = parts.slice(i).join(", ");
+      if (/^(it|the|this|these|its)\b/i.test(rest) && castPure("starring " + head) && castResidue(rest).length > 3) return endStop(ucFirst(rest));
+    }
+  }
+  m = /^(.{25,}?)(,?\s+(?:and\s+)?(?:it\s+)?(?:starring|stars|starred|co-?starring|featuring|features)\b.*)$/i.exec(s);
+  if (m) {
+    let keep = m[1].replace(/[,;:\s–—-]+$/, "");
+    const bad = /\b(the film|the movie|the special|it|by|with|and|of|the|a|an|also|that|which|who)$/i.test(keep);
+    if (!bad && castPure(m[2]) && !CAST_WORD.test(keep)) {
+      if (/^(Produced|Directed|Written|Co-produced|Co-written|Co-directed|Created|Animated|Released|Distributed|Based|Loosely|Inspired|Adapted)\b/.test(keep) &&
+        !/,\s+(it|the film|the movie)\s/.test(keep)) keep = asSentence(keep) || "";
+      if (keep) return endStop(keep);
+    }
+  }
+  if (/\b(is|was) an? .{0,80}\b(film|movie|comedy|drama|thriller|musical|western|documentary|series)\b/i.test(s)) return s;
+  return castPure(s) ? "" : s;
+}
+function castless(text) {
+  return String(text || "").split(/\n\s*\n/).map((p) => castSentences(p.trim()).map(uncast).filter(Boolean).join(" ")).filter(Boolean).join("\n\n");
 }
 
 // Wikipedia leads run long: whole sentences up to about BLURB_MAX characters
@@ -319,6 +399,57 @@ function trimBlurb(text) {
   const cut = text.slice(0, BLURB_MAX);
   const end = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "));
   return end > 150 ? cut.slice(0, end + 1) : cut.replace(/\s+\S*$/, "") + "\u2026";
+}
+
+// ---------- reading the back of the case (Nick, 2026-10-25: "read a picture of the back of the case with all the
+// features and have them digitally imported into the text box") ----------
+// The same model as the Scorecard's card reader (scorecard.js READ_MODEL, best on small print in its tests), on the
+// same free Workers AI allowance (10,000 neurons a day, shared), so at most FEATURE_READS a day
+const FEATURE_MODEL = "@cf/mistralai/mistral-small-3.1-24b-instruct";
+const FEATURE_READS = 40;
+const FEATURE_ASK = `This is a photo of the back of a movie or TV DVD, Blu-ray, 4K or VHS case. Find its list of special features ` +
+  `(also called bonus features, extras, or bonus material) and reply with JSON only: {"features": ["<each feature>"]}\n` +
+  `Rules:
+- One entry per feature, written as printed but without bullets, and in title case if printed in capitals.
+- Keep a feature's short description only when it is part of its name (like "Audio Commentary with Director Ridley Scott").
+- A feature with parts (a documentary in several chapters) is one entry.
+- Features can be under any heading, including one about picture and sound: music videos, trailers, featurettes, games
+  and commentaries all count, wherever they are listed. Give each named music video its own entry, like
+  "Music Video: Song Title Performed By Artist".
+- Picture and sound quality claims are not features (a new sound mix, "digitally restored", widescreen, THX), nor are
+  catch-alls like "And Much More".
+- Leave out everything that is not a bonus feature: the plot summary, quotes and reviews, the cast and crew credits,
+  running time, rating, aspect ratio, audio and subtitle languages, region, disc count, legal text, and the barcode.
+- If no special features are printed, reply {"features": []}.
+Reply with the JSON only, no other words.`;
+async function readFeatures(request, env, cors, h) {
+  if (!h.isAdmin(request, env)) return h.json({ error: "Unauthorized" }, 401, cors);
+  if (!env.AI) return h.json({ error: "The case reader isn't set up." }, 503, cors);
+  let b = null;
+  try { b = await request.json(); } catch (e) {}
+  if (!b || !/^data:image\/(jpeg|png|webp);base64,/.test(b.image || "") || b.image.length > 3400000) return h.json({ error: "Send the photo as a JPEG under about 2.5 MB." }, 400, cors);
+  const key = "library:reads:" + new Date().toISOString().slice(0, 10), used = +(await env.QUEUE.get(key)) || 0;
+  if (used >= FEATURE_READS) return h.json({ error: "That's all the case reading for today. Type them in, or try again tomorrow." }, 429, cors);
+  const ask = { messages: [{ role: "user", content: [{ type: "text", text: FEATURE_ASK }, { type: "image_url", image_url: { url: b.image } }] }], max_tokens: 1200, temperature: 0 };
+  let out = null, err = null;
+  for (let tries = 0; tries < 2 && !out; tries++) { // Workers AI now and then fails a request outright; once more usually works
+    if (tries) await new Promise((r) => setTimeout(r, 1500));
+    try { out = await aiRun(env, FEATURE_MODEL, ask, "case-reader"); } catch (e) { err = e; }
+  }
+  if (!out && /4006|daily free allocation/i.test(String(err && (err.message || err)))) return h.json({ error: "That's all the case reading for today (the free allowance). Try again tomorrow." }, 429, cors);
+  if (!out && /switched off|allowance is used up/.test(String(err && err.message))) return h.json({ error: err.message }, 429, cors); // (the AI meter: aimeter.js)
+  if (!out) return h.json({ error: "Couldn't read that photo just now. Try again in a moment.", detail: String(err && (err.message || err)) }, 502, cors);
+  await env.QUEUE.put(key, String(used + 1), { expirationTtl: 2 * 86400 });
+  const reply = out.response ?? (out.choices && out.choices[0] && out.choices[0].message && out.choices[0].message.content);
+  let read = typeof reply === "object" && reply ? reply : null;
+  if (!read) { // the first {...} in the reply (some wrap it in ```json fences)
+    const t = String(reply || "").replace(/```(?:json)?/g, ""), a = t.indexOf("{"), z = t.lastIndexOf("}");
+    try { read = a >= 0 && z > a ? JSON.parse(t.slice(a, z + 1)) : null; } catch (e) { read = null; }
+  }
+  if (!read || !Array.isArray(read.features)) return h.json({ error: "Couldn't make sense of that photo. Try a straighter, closer one of the features list." }, 502, cors);
+  const features = read.features.map((f) => String(f || "").replace(/^[\s•·\-*–—]+/, "").replace(/\s+/g, " ").trim().slice(0, 140))
+    .filter((f, i, all) => f && all.findIndex((x) => x.toLowerCase() === f.toLowerCase()) === i).slice(0, 40);
+  return h.json({ features }, 200, cors);
 }
 
 async function add(request, env, cors, h) {
@@ -362,6 +493,7 @@ async function add(request, env, cors, h) {
     genres: t.genres,
     director: t.director,
     starring: t.starring,
+    tagline: t.tagline || "", // (the amber line in the case; discs added before 2026-10-25 get it when opened)
     about: wiki ? wiki.text : "",
     aboutUrl: wiki ? wiki.url : "",
     studio: t.studio,
@@ -407,6 +539,77 @@ async function remove(request, url, env, cors, h) {
   if (!hidden.includes(id)) hidden.push(id);
   await env.QUEUE.put(HIDDEN, JSON.stringify(hidden));
   return h.json({ hidden: id }, 200, cors);
+}
+
+async function editMap(env) {
+  try { const m = JSON.parse((await env.QUEUE.get(EDITS)) || "{}"); return m && typeof m === "object" && !Array.isArray(m) ? m : {}; } catch (e) { return {}; }
+}
+// Editing a disc from its open case (owner mode): its cover, picked from the film's posters (Nick, 2026-11-04: "allow
+// me to pick the cover for any movie in the edit box like the other library pages"), and its edition, extras (steelbook,
+// 3D, Criterion), HDR and what's on the disc ("let me edit the movies in the open disc"). Only the fields sent change.
+// A disc added on the site is changed itself (a new cover's spine colour is measured again on the page); a discs.js
+// disc's changes go in library:edits. A TMDB poster stays an address; any other picture is copied into the photos bucket.
+async function editDisc(request, url, env, cors, h) {
+  if (!h.isAdmin(request, env)) return h.json({ error: "Unauthorized" }, 401, cors);
+  const id = decodeURIComponent(url.pathname.slice("/library/".length));
+  if (!/^[a-z0-9-]{1,100}$/.test(id)) return h.json({ error: "Bad id." }, 400, cors);
+  let body;
+  try { body = await request.json(); } catch (e) { return h.json({ error: "Bad request." }, 400, cors); }
+  if (!body || typeof body !== "object") return h.json({ error: "Bad request." }, 400, cors);
+  const ch = {};
+  if (body.cover !== undefined) {
+    let src = String(body.cover || "").trim();
+    if (!/^https:\/\/\S{1,600}$/.test(src)) return h.json({ error: "Pick a cover." }, 400, cors);
+    if (!/^https:\/\/image\.tmdb\.org\//.test(src) && !src.startsWith(photoBase(env))) {
+      let kept = "";
+      try { kept = await keepCover(env, src, id); } catch (e) { /* below */ }
+      if (!kept) return h.json({ error: "That picture wouldn't load. Try another." }, 502, cors);
+      src = kept;
+    }
+    ch.cover = src;
+  }
+  if (body.edition !== undefined) ch.edition = String(body.edition || "").replace(/\s+/g, " ").trim().slice(0, 80);
+  if (body.features !== undefined) ch.features = (Array.isArray(body.features) ? body.features : String(body.features || "").split("\n"))
+    .map((f) => String(f).replace(/^[\s•\-–*]+/, "").replace(/\s+/g, " ").trim().slice(0, 160)).filter(Boolean).slice(0, FEATURE_MAX);
+  for (const k of ["steelbook", "threeD", "criterion"]) if (body[k] !== undefined) ch[k] = !!body[k];
+  if (body.hdr !== undefined) ch.hdr = Array.isArray(body.hdr) ? HDR_KINDS.filter((k) => body.hdr.includes(k)) : [];
+  if (!Object.keys(ch).length) return h.json({ error: "Nothing to change." }, 400, cors);
+  const items = await list(env, ITEMS);
+  const d = items.find((x) => x.id === id);
+  if (d) {
+    for (const [k, v] of Object.entries(ch)) {
+      if (v === "" || v === false || (Array.isArray(v) && !v.length)) delete d[k]; else d[k] = v;
+    }
+    if (ch.cover) { delete d.spine; delete d.spineLight; }
+    await env.QUEUE.put(ITEMS, JSON.stringify(items));
+    return h.json({ item: d }, 200, cors);
+  }
+  const map = await editMap(env);
+  map[id] = Object.assign(map[id] || {}, ch); // (an emptied field is kept as "", false or [], so it covers the file's)
+  await env.QUEUE.put(EDITS, JSON.stringify(map));
+  return h.json({ id, edits: map[id] }, 200, cors);
+}
+
+async function pickList(env) {
+  try {
+    const p = JSON.parse((await env.QUEUE.get(PICKS)) || "{}");
+    return { on: Array.isArray(p.on) ? p.on : [], off: Array.isArray(p.off) ? p.off : [] };
+  } catch (e) { return { on: [], off: [] }; }
+}
+// a film made a Nick's Pick (or not) from its open case; kept by title, like the page's picks, so every copy of the
+// film follows (the sticker still goes on its best copy only)
+async function setPick(request, env, cors, h) {
+  if (!h.isAdmin(request, env)) return h.json({ error: "Unauthorized" }, 401, cors);
+  let body;
+  try { body = await request.json(); } catch (e) { return h.json({ error: "Bad request." }, 400, cors); }
+  const key = String((body && body.key) || "").trim();
+  if (!key || key.length > 200 || !/^[a-z0-9 ]+$/.test(key)) return h.json({ error: "Bad film." }, 400, cors);
+  const p = await pickList(env);
+  p.on = p.on.filter((k) => k !== key);
+  p.off = p.off.filter((k) => k !== key);
+  (body.on ? p.on : p.off).push(key);
+  await env.QUEUE.put(PICKS, JSON.stringify(p));
+  return h.json({ picks: p }, 200, cors);
 }
 
 // ---------- covers (the add dialog's Cover choices, VHS) ----------

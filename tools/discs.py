@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """Import Nick's disc collection (an export from the My Movies app) into the Library page.
 
-ONE TIME (2026-10-03): Nick adds new discs on the site now (owner mode on /movies/library/, stored in the Worker; see
+ONE TIME (2026-10-03): Nick adds new discs on the site now (owner mode on /library/movies/, stored in the Worker; see
 worker/src/library.js), not by re-exporting. Re-running this only rewrites discs.js from the export; site-added discs
 and removals are kept separately in the Worker and still apply (removals by disc id).
 
     python3 tools/discs.py ["My Movie Collection.txt"] [--no-covers]
 
 Reads the export (a CSV, despite the .txt name; it's git-ignored, since it's the raw personal export with barcodes)
-and writes movies/library/discs.js (window.DISCS), one entry per disc, sorted by sort title. Covers are saved to
-movies/library/covers/<slug>.webp, 400px wide: the IMDb poster for films and series (by the export's IMDb id), and for
+and writes library/movies/discs.js (window.DISCS), one entry per disc, sorted by sort title. Covers are saved to
+library/movies/covers/<slug>.webp, 400px wide: the IMDb poster for films and series (by the export's IMDb id), and for
 box sets (no IMDb id) the first portrait store photo of that barcode from UPCitemdb's free lookup (100 a day). Covers already
 there are kept, so re-running after a new export only downloads the new ones. A box set with no cover whose films are
 in BOX_SETS shows a grid of up to 4 of their posters (covers/parts/<film>.webp); any other disc with no cover gets a
@@ -363,7 +363,7 @@ def save_cover(urls, path, check_shape=False):
 
 # ---------- Spines: the film's real title logo (TMDB) on a colour taken from its cover ----------
 # Needs a TMDB API key (free, themoviedb.org > Settings > API): TMDB_API_KEY in the environment or worker/.dev.vars.
-# Without one, spines keep text titles. TMDB's terms want a credit on the page (movies/library/index.html has it).
+# Without one, spines keep text titles. TMDB's terms want a credit on the page (library/movies/index.html has it).
 LOGOS = os.path.join(ROOT, "movies", "library", "logos")
 LOGO_INDEX = os.path.join(LOGOS, "index.json")  # imdbId -> "file.webp", or "" when TMDB has no logo (not asked again)
 

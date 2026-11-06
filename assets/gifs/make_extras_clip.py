@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """The home page's Extras tile: extras.mp4 + .jpg, the real pages instead of drawings: the Golf page's Score Trend
-chart with the pointer sweeping across Nick's rounds, then the Video Game Montage Maker loading his recent Xbox games
-from his gamertag and ticking three. record_extras.js records the frames (see it for what has to be running); this
+chart with the pointer sweeping across Nick's rounds, then Golf weather: a ZIP typed in, the week's forecast loading,
+the pointer running across today's hours (until 2026-10-25 the second half was the Video Game Montage Maker, since
+taken off the site). record_extras.js records the frames (see it for what has to be running); this
 draws the pointer and its click ripples, crossfades between the two and back to the start, and encodes.
 
     node record_extras.js <work folder> && python3 make_extras_clip.py <work folder>    # Pillow, ffmpeg
@@ -12,7 +13,7 @@ from cliplib import W, H, FPS, Frames, ease, workdir
 
 WORK = workdir(os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else "clip-work"))
 RAW = os.path.join(WORK, "extras-raw")
-SCENE2 = 122       # first Montage Maker frame (6 + 14 + 60 + 18 + 24 Golf frames in record_extras.js)
+SCENE2 = 122       # first Golf weather frame (6 + 14 + 60 + 18 + 24 Golf frames in record_extras.js)
 FADE = 8           # frames of crossfade
 MINT = (126, 224, 181)
 
@@ -43,7 +44,7 @@ def main():
         frame = im.convert("RGBA")
         frame.alpha_composite(lay.resize((W, H), Image.LANCZOS))
         out.append(frame.convert("RGB"))
-    # crossfade into the Montage Maker, and from the end back into the first frame so the loop has no seam
+    # crossfade into Golf weather, and from the end back into the first frame so the loop has no seam
     for k in range(FADE):
         u = ease((k + 1) / (FADE + 1))
         out[SCENE2 - FADE + k] = Image.blend(out[SCENE2 - FADE + k], out[SCENE2], u)
@@ -51,7 +52,7 @@ def main():
     frames = Frames(WORK, "extras")
     for im in out:
         frames.add(im)
-    frames.encode(crf=30, poster_at=7.85)  # all three games ticked
+    frames.encode(crf=30, poster_at=6.9)  # Hilton Head's week, the hour tooltip up
 
 
 if __name__ == "__main__":

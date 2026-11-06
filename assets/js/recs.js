@@ -64,9 +64,9 @@
       "</div>" +
       '<p class="empty rec-closed" hidden>Song suggestions open soon.</p>' +
       '<div class="rec-sent" hidden><div class="rec-sent-head"><h3>Sent so far <small class="recent-sub"></small></h3>' +
-        '<button class="open rec-all" type="button">Play all</button></div>' +
+        '<button class="pill-btn rec-all" type="button">Play all</button></div>' +
         '<div class="recent-player rec-player" hidden><div></div></div><ol class="recent-list rec-list"></ol>' +
-        '<button class="open rec-more" type="button" hidden></button></div>' +
+        '<button class="pill-btn rec-more" type="button" hidden></button></div>' +
     "</section>";
   var lately = [].find.call(root.querySelectorAll(".playlist-group"), function (g) {
     var n = g.querySelector(".group-name");
@@ -252,7 +252,7 @@
       (out ? '<p class="rec-out">You\'ve sent ' + per + " songs. Thanks!</p>" :
         '<form class="rec-send" novalidate>' +
           (ADMIN ? "" : '<input id="rec-name" maxlength="40" placeholder="Your name (optional)" aria-label="Your name (optional)" autocomplete="nickname">') +
-          '<button class="open submit" type="submit">Add to Nick\'s playlist</button><span class="left">' + esc(leftText()) + "</span>" +
+          '<button class="pill-btn submit" type="submit">Add to Nick\'s playlist</button><span class="left">' + esc(leftText()) + "</span>" +
         "</form>");
     var name = pick.querySelector("#rec-name");
     if (name) name.value = store("nm-name") || "";

@@ -91,6 +91,8 @@ async function add(request, env, cors, h) {
   const items = await list(env);
   items.unshift(item);
   await env.QUEUE.put(KEY, JSON.stringify(items));
+  // "Get notified": the visitors who asked for photos (fans.js; one every few hours at most, the rest held)
+  if (h.fans) h.fans("photos", { title: "📷 A new photo from Nick", body: (section === "cats" ? "In Cats" : "In Pixel") + " · tap to see it", url: "/photography/#photo=" + id, name: section === "cats" ? "a cat photo" : "a Pixel photo" });
   return h.json({ item }, 200, cors);
 }
 
@@ -118,5 +120,6 @@ async function file(url, env) {
   if (!env.PHOTOS || !/^(site|covers)\/[a-z0-9-]+\.(jpg|webp|png)$/.test(key)) return new Response("Not found", { status: 404 }); // covers/: the Library's VHS covers
   const obj = await env.PHOTOS.get(key);
   if (!obj) return new Response("Not found", { status: 404 });
-  return new Response(obj.body, { headers: { "Content-Type": obj.httpMetadata.contentType || "image/jpeg", "Cache-Control": "public, max-age=3600" } });
+  // (open to any page, as photos.nickmade.net's public files are: the Library's spines read a cover in a canvas)
+  return new Response(obj.body, { headers: { "Content-Type": obj.httpMetadata.contentType || "image/jpeg", "Cache-Control": "public, max-age=3600", "Access-Control-Allow-Origin": "*" } });
 }

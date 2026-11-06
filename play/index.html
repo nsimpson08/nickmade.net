@@ -5,6 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Play · NickMade</title>
   <meta name="description" content="Browser games made by Nick Simpson: the Cattery, Nick's Office, Nick's Nine and Rapture: ADAM & Dice. Free to play, nothing to install.">
+  <!-- link previews (1.7): the image is made by tools/make_og.js -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="NickMade">
+  <meta property="og:title" content="Play · NickMade">
+  <meta property="og:description" content="Browser games made by Nick Simpson: the Cattery, Nick's Office, Nick's Nine and Rapture: ADAM & Dice. Free to play, nothing to install.">
+  <meta property="og:url" content="https://nickmade.net/play/">
+  <meta property="og:image" content="https://nickmade.net/assets/og/play.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -19,6 +29,7 @@
       <a href="/movies/">Movies</a>
       <a href="/music/">Music</a>
       <a href="/photography/">Photography</a>
+      <a href="/library/">Library</a>
       <a href="/play/" aria-current="page">Play</a>
       <a href="/extras/">Extras</a>
     </nav>
@@ -49,8 +60,8 @@
           </ul>
         </div>
         <div class="game-links">
-          <a class="open" href="/play/cats/#make">Make your cat <span>&rarr;</span></a>
-          <a class="open" href="/play/cats/">Visit the room <span>&rarr;</span></a>
+          <a class="pill-btn" href="/play/cats/#make">Make your cat <span>&rarr;</span></a>
+          <a class="pill-btn" href="/play/cats/">Visit the room <span>&rarr;</span></a>
         </div>
       </article>
       <!-- Ver 1.4: built here, not in its own project (play/office/: plain canvas, no build step) -->
@@ -68,7 +79,7 @@
             <li>Live data</li>
           </ul>
         </div>
-        <a class="open" href="/play/office/">Look around <span>&rarr;</span></a>
+        <a class="pill-btn" href="/play/office/">Look around <span>&rarr;</span></a>
       </article>
       <article class="project game-card" data-game="nine">
         <a class="game-clip" href="/extras/golf-game/" tabindex="-1" aria-hidden="true">
@@ -84,7 +95,7 @@
             <li>Leaderboard</li>
           </ul>
         </div>
-        <a class="open" href="/extras/golf-game/">Play <span>&rarr;</span></a>
+        <a class="pill-btn" href="/extras/golf-game/">Play <span>&rarr;</span></a>
       </article>
       <article class="project game-card" data-game="rapture">
         <a class="game-clip" href="/extras/rapture/" tabindex="-1" aria-hidden="true">
@@ -100,7 +111,7 @@
             <li>Web Audio</li>
           </ul>
         </div>
-        <a class="open" href="/extras/rapture/">Play <span>&rarr;</span></a>
+        <a class="pill-btn" href="/extras/rapture/">Play <span>&rarr;</span></a>
       </article>
     </section>
   </main>

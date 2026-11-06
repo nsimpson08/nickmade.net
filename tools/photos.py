@@ -221,7 +221,7 @@ def sync_r2(photos):
 
     def put(name):
         r = wrangler("r2", "object", "put", BUCKET + "/" + name, "--file", local(name),
-                     "--content-type", "image/jpeg", "--cache-control", "public, max-age=86400")
+                     "--content-type", "image/jpeg", "--cache-control", "public, max-age=86400", "--remote")
         return name, r.returncode == 0, (r.stderr or r.stdout).strip().splitlines()[-1:]
 
     failed = []
@@ -238,7 +238,7 @@ def sync_r2(photos):
                     failed.append(name)
                     print("  FAILED", name, *err)
     for name in gone:
-        r = wrangler("r2", "object", "delete", BUCKET + "/" + name)
+        r = wrangler("r2", "object", "delete", BUCKET + "/" + name, "--remote")
         if r.returncode == 0:
             uploaded.pop(name)
             print("  removed from R2", name)

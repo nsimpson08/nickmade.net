@@ -73,21 +73,23 @@
   }
 
   function ownerBar() {
-    var bar = document.createElement("div");
-    bar.className = "owner-bar";
-    bar.innerHTML = "<span>Owner mode</span> <a href=\"?logout\">Log out</a>";
-    var head = document.querySelector(".page-head");
-    head.parentNode.insertBefore(bar, head.nextSibling);
-    // Nick's own links for this page, kept in the Worker (GET /owner/links), so they're never in the site's code
+    document.dispatchEvent(new Event("nm-owner")); // "Owner mode · Log out" by the wordmark (footer.js)
+    // Nick's own links for this page, kept in the Worker (GET /owner/links), so they're never in the site's code: a
+    // line under the page's heading, only when there are some
     fetch(API + "/owner/links?" + PQ, { headers: authHeaders() })
       .then(function (r) { return r.ok ? r.json() : { links: [] }; })
       .then(function (d) {
+        if (!(d.links || []).length) return;
+        var bar = document.createElement("div");
+        bar.className = "owner-bar owner-links";
+        var head = document.querySelector(".page-head");
+        head.parentNode.insertBefore(bar, head.nextSibling);
         (d.links || []).forEach(function (l) {
           var a = document.createElement("a");
           a.href = l.href;
           a.textContent = l.label;
           a.rel = "noreferrer"; // same tab, so Back returns here (Nick)
-          bar.insertBefore(a, bar.lastElementChild);
+          bar.appendChild(a);
         });
       })
       .catch(function () {});
@@ -101,7 +103,7 @@
         '<form novalidate><h2>Owner login</h2>' +
         '<p class="hint">Enter your admin password. This browser will remember it.</p>' +
         '<label for="q-admin">Password</label><input id="q-admin" type="password" autocomplete="current-password">' +
-        '<p class="error" role="alert"></p><button class="open submit" type="submit">Log in</button></form>';
+        '<p class="error" role="alert"></p><button class="pill-btn submit" type="submit">Log in</button></form>';
       document.body.appendChild(d);
       var input = d.querySelector("input");
       var err = d.querySelector(".error");
@@ -627,7 +629,7 @@
             "; ones already there get their playtime and achievements refreshed.</p>" +
           '<ul class="xbox-list"></ul>' +
           '<p class="error" role="alert"></p>' +
-          '<button class="open submit" type="submit" disabled>Add selected</button>' +
+          '<button class="pill-btn submit" type="submit" disabled>Add selected</button>' +
         "</form>";
       document.body.appendChild(xbox);
       xbox.querySelector(".close").addEventListener("click", function () { xbox.close(); });
@@ -815,7 +817,7 @@
         '<label><input type="radio" name="q-who" value="private"> Just Nick</label>' +
       "</fieldset>" +
       '<p class="error" role="alert"></p>' +
-      '<button class="open submit" type="submit" disabled>Add to the queue</button>' +
+      '<button class="pill-btn submit" type="submit" disabled>Add to the queue</button>' +
     "</form>";
   document.body.appendChild(dialog);
 
@@ -1054,7 +1056,14 @@
   }
   dialog.querySelector(".close").addEventListener("click", function () { dialog.close(); });
   dialog.addEventListener("close", function () { resetFields(); errorEl.textContent = ""; });
-  dialog.addEventListener("click", function (e) { if (e.target === dialog) dialog.close(); });
+  // only its × closes it: not a tap outside, Escape or the phone's Back (Nick lost a review tapping outside it).
+  // back-close.js reads data-close-only and keeps it open on Back.
+  dialog.dataset.closeOnly = "1";
+  dialog.addEventListener("cancel", function (e) { e.preventDefault(); });
+  // and if Back gets past that (or the tab is closed) with something typed, the browser asks first
+  window.addEventListener("beforeunload", function (e) {
+    if (dialog.open && (commentInput.value.trim() || reviewInput.value.trim())) { e.preventDefault(); e.returnValue = ""; }
+  });
 
   function validate() {
     // a date is only needed when logging or editing something watched/played

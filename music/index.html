@@ -5,6 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Music · NickMade</title>
   <meta name="description" content="What Nick Simpson is listening to.">
+  <!-- link previews (1.7): the image is made by tools/make_og.js -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="NickMade">
+  <meta property="og:title" content="Music · NickMade">
+  <meta property="og:description" content="What Nick Simpson is listening to.">
+  <meta property="og:url" content="https://nickmade.net/music/">
+  <meta property="og:image" content="https://nickmade.net/assets/og/music.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -19,6 +29,7 @@
       <a href="/movies/">Movies</a>
       <a href="/music/" aria-current="page">Music</a>
       <a href="/photography/">Photography</a>
+      <a href="/library/">Library</a>
       <a href="/play/">Play</a>
       <a href="/extras/">Extras</a>
     </nav>
@@ -28,12 +39,15 @@
     <header class="page-head">
       <h1>Music</h1>
       <p>What I've got on repeat.</p>
+      <!-- the steps for a logged-in player (spotify-help.js; Nick, 2026-11-02) -->
+      <p class="sp-help-line"><a href="#" class="sp-help-link">Not recognizing your Spotify Premium?</a></p>
     </header>
 
     <div class="playlists" id="playlists"></div>
   </main>
   <footer id="site-footer">&copy; 2026 Nick Simpson</footer>
   <script src="playlist.js"></script>
+  <script src="/assets/js/spotify-help.js"></script>
   <script>
     (function () {
       var root = document.getElementById("playlists");

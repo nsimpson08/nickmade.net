@@ -20,6 +20,9 @@ SPOTIFY_CLIENT_ID = "1c18f59367834eaf9edd982c5858fa9b"
 SPOTIFY_REDIRECT = "https://api.nickmade.net/spotify/callback"
 # Time zone for Recently Played's "Last played" dates
 TIMEZONE = "America/Chicago"
+# "Get notified" (src/fans.js): the public half of the key that signs visitors' notifications; its private half
+# is a secret: npx wrangler secret put VAPID_PRIVATE (a P-256 private JWK, also in .dev.vars)
+VAPID_PUBLIC = "BIjjSBuo5hQK-nbbynj9hUiCGmOuhkd_CG680e-GQVwNx2LrCHPMch6cGiGZTSTA9Ev5HcglL98fiAsYZE6TY4g"
 # Extras > Scorecard (src/scorecard.js): "1" = open to everyone (public since Ver 1.5, 2026-10-10); "0" makes it owner
 # only again (page, Extras card, routes, Golf page rounds) as soon as the Worker is redeployed.
 SCORECARD_PUBLIC = "1"
@@ -56,3 +59,10 @@ database_id = "8df64932-30bf-4909-8ee8-b67757dd4e69"
 # POST /scorecard/read sends a scorecard photo to a vision model and gets its numbers back as JSON.
 [ai]
 binding = "AI"
+
+# The most processing time one request or cron run may use (Nick, 2026-10-30: against a runaway loop running up a bill).
+# TURN THIS ON WHEN MOVING TO WORKERS PAID (its default is 30 s): delete the two "#" below. The free plan refuses the
+# setting ("CPU limits are not supported for the Free plan", code 100328) and has its own lower limit anyway.
+# [limits]
+# cpu_ms = 5000
+

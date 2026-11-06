@@ -5,7 +5,7 @@
 
 The My Movies export has no HDR field, so this looks each 4K disc up on blu-ray.com, whose release pages list it
 ("HDR: Dolby Vision, HDR10"): by the disc's barcode from the export (the exact edition), else by title among 4K
-releases of the same year. Results go to movies/library/hdr.json (disc id -> ["dv", "hdr10+", "hdr10"], [] = no HDR
+releases of the same year. Results go to library/movies/hdr.json (disc id -> ["dv", "hdr10+", "hdr10"], [] = no HDR
 listed); discs found before aren't asked again (--retry asks again for the ones not found). Then every disc in
 discs.js gets its "hdr" field from that file (tools/discs.py does the same when it rewrites discs.js).
 Blu-ray (1080p) discs have no HDR, so only 4K discs are looked up. blu-ray.com turns away quick runs ("Error42"),

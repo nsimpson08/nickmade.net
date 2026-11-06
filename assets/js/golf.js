@@ -435,12 +435,21 @@
       render();
       lastW = chartBox ? chartBox.clientWidth : 0;
       // #card=<round id>: one Scorecard round's card, opened (the home page's Lately links here; Nick, 2026-10-19)
-      var want = /^#card=(.+)$/.exec(location.hash), tile = want && root.querySelector('[data-sc-round="' + CSS.escape(decodeURIComponent(want[1])) + '"]');
-      if (tile) { showRound(tile); openCard(tile); return; }
+      if (cardFromHash()) return;
       var target = location.hash && document.getElementById(location.hash.slice(1));
       if (target) target.scrollIntoView();
     });
   }
+
+  // #card=<round id>: that round's card opened, on load and when only the hash changes (a golf notification tapped
+  // while this page is already open in a tab: the browser just changes the hash; Nick, 2026-10-27)
+  function cardFromHash() {
+    var want = /^#card=(.+)$/.exec(location.hash), tile = want && root.querySelector('[data-sc-round="' + CSS.escape(decodeURIComponent(want[1])) + '"]');
+    if (!tile) return false;
+    showRound(tile); openCard(tile);
+    return true;
+  }
+  window.addEventListener("hashchange", cardFromHash);
 
   // A Scorecard round's card, full screen: the card drawing code, the viewer and the card's fonts load on the first tap
   var cardKit = null;

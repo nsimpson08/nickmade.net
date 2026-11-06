@@ -5,6 +5,33 @@
 // It also loads whats-new.js (the newest version's features, once, for returning visitors), adds the "Back to top" button (below) to every page with this footer except Home and Photography, and loads
 // back-close.js (the phone's Back button closes an open photo or dialog instead of leaving the page).
 (function () {
+  // Owner mode (the site's one password, localStorage nm-admin-token): "Owner mode · Log out" beside the NickMade
+  // wordmark at the top of every page, on Home (no top bar) floating at the top left (Nick, 2026-10-25: it used to be
+  // a line under each page's heading, on the pages with owner tools only). ?logout on any page forgets the password.
+  // Pages that sign in or find an old password send "nm-owner" and it's checked again.
+  (function owner() {
+    var params = new URLSearchParams(location.search);
+    if (params.has("logout")) {
+      try { localStorage.removeItem("nm-admin-token"); } catch (e) {}
+      params.delete("logout");
+      history.replaceState(null, "", location.pathname + (params.toString() ? "?" + params : "") + location.hash);
+    }
+    function sync() {
+      var token = null, tag = document.querySelector(".owner-tag");
+      try { token = localStorage.getItem("nm-admin-token"); } catch (e) {}
+      if (!token) { if (tag) tag.remove(); return; }
+      if (tag) return;
+      tag = document.createElement("span");
+      tag.className = "owner-tag";
+      tag.innerHTML = 'Owner mode <a href="?logout">Log out</a>';
+      var mark = document.querySelector(".topbar .wordmark");
+      if (mark) mark.insertAdjacentElement("afterend", tag);
+      else { tag.classList.add("floating"); document.body.appendChild(tag); }
+    }
+    sync();
+    document.addEventListener("nm-owner", sync);
+  })();
+
   // Back closes the open photo/dialog/wall instead of leaving the page (assets/js/back-close.js)
   var bc = document.createElement("script");
   bc.src = "/assets/js/back-close.js";

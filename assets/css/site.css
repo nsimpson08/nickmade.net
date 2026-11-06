@@ -12,6 +12,7 @@
   --sky: #7cc4ff;
   --coral: #ff8a66; /* Play (1.3) */
   --lime: #c8f04f; /* the Wishlist, a color no section uses (Nick, 2026-10-19) */
+  --red: #ff4f5e; /* the Library (1.7), its own section (Nick, 2026-10-25: red, not the beige it started with); redder than Play's coral */
   --accent: var(--fg);
   --display: "Unbounded", system-ui, sans-serif;
   --body: "Space Grotesk", system-ui, -apple-system, sans-serif;
@@ -37,6 +38,7 @@ img { display: block; max-width: 100%; }
 .page-music { --accent: var(--pink); }
 .page-photography { --accent: var(--sky); }
 .page-play { --accent: var(--coral); }
+.page-libraries { --accent: var(--red); }
 
 /* ---------- Home ---------- */
 
@@ -170,6 +172,7 @@ img { display: block; max-width: 100%; }
 .tile.music { --accent: var(--pink); }
 .tile.photography { --accent: var(--sky); }
 .tile.play { --accent: var(--coral); }
+.tile.library { --accent: var(--red); }
 .tile .frame {
   aspect-ratio: 8 / 5;
   border: 1px solid var(--line);
@@ -284,6 +287,7 @@ a.tag:hover, a.tag:focus-visible { background: color-mix(in srgb, var(--tag) 14%
 .tag-photography { --tag: var(--sky); }
 .tag-extras { --tag: var(--mint); }
 .tag-play { --tag: var(--coral); }
+.tag-library { --tag: var(--red); }
 @media (max-width: 560px) {
   .release-changes li { grid-template-columns: 1fr; gap: 6px; }
   .release-head time { margin-left: 0; width: 100%; }
@@ -325,7 +329,7 @@ html.wall-bg-on .topbar nav a[href="/play/"]::before { background: rgba(255, 255
 /* phones: Play / Extras start their own line instead (a full-width break between the groups), no line needed */
 @media (max-width: 560px) {
   .topbar nav::before { content: ""; order: 1; flex-basis: 100%; height: 0; }
-  .topbar nav a[href="/play/"], .topbar nav a[href="/extras/"] { order: 2; }
+  .topbar nav a[href="/library/"], .topbar nav a[href="/play/"], .topbar nav a[href="/extras/"] { order: 2; } /* (Library too: five didn't fit on a phone's first line) */
   .topbar nav a[href="/play/"] { margin-left: 0; }
   .topbar nav a[href="/play/"]::before { display: none; }
 }
@@ -374,7 +378,9 @@ html.wall-bg-on .topbar nav a[href="/play/"]::before { background: rgba(255, 255
   border-radius: 999px;
   padding: 2px 10px;
 }
-.open {
+/* the pill button ("Open →", Submit, Add). Was .open until 1.7: that name clashed with pages using "open" as a state
+   (the Events page's descriptions, the Photography dock, Notes' image links all picked up the pill by accident) */
+.pill-btn {
   align-self: start;
   display: inline-flex;
   gap: 8px;
@@ -386,7 +392,7 @@ html.wall-bg-on .topbar nav a[href="/play/"]::before { background: rgba(255, 255
   font-size: 0.9rem;
   transition: border-color .2s, color .2s;
 }
-.open:hover, .open:focus-visible { border-color: var(--accent); color: var(--accent); outline: none; }
+.pill-btn:hover, .pill-btn:focus-visible { border-color: var(--accent); color: var(--accent); outline: none; }
 
 /* ---------- Play (game cards: the gameplay clip, the description, Play) ---------- */
 .project.game-card { grid-template-columns: minmax(200px, 300px) 1fr auto; column-gap: 28px; align-items: start; }
@@ -992,7 +998,7 @@ html.wall-on { overflow: hidden; }
   cursor: pointer;
   transition: opacity .3s;
 }
-.wall-tile img { display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: transform .5s cubic-bezier(.2,.8,.2,1), opacity .6s; }
+.wall-tile img { display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: transform .5s cubic-bezier(.2,.8,.2,1), opacity .3s; } /* (fade halved, Nick 2026-10-25: was .6s) */
 .wall-tile img.in { opacity: 1; } /* fades in once loaded (the page's own posters load lazily) */
 .wall-cols:hover .wall-tile { opacity: 0.5; }
 .wall-cols:hover .wall-tile:hover, .wall-tile:focus-visible { opacity: 1; }
@@ -1110,7 +1116,7 @@ body:has(.wall-ctl.floating) .home { padding-top: max(14vh, 96px); } /* room for
   .topbar:has(.wall-ctl) nav { order: 3; margin-left: 0; width: 100%; }
 }
 /* the background wall runs behind the page, dimmed by --wall-shade, with no hover, captions or clicks */
-.wall.wall-bg { z-index: -1; pointer-events: none; transition: opacity 1.2s; }
+.wall.wall-bg { z-index: -1; pointer-events: none; transition: opacity .6s; } /* (was 1.2s: the background took too long to come in, Nick 2026-10-25) */
 /* Phones: a constant height, the tallest the viewport gets (address bar hidden), so it doesn't resize and shift
    while the address bar slides in and out as you scroll */
 .wall.wall-bg { bottom: auto; height: 100vh; height: 100lvh; }
@@ -1159,7 +1165,7 @@ html.wall-bg-on .wall:not(.wall-bg) { text-shadow: none; } /* the popup wall has
 html.wall-bg-on :is(.sticker, .case-band, .case-art, .spine-cap, .spine.light, .spine-letter) { text-shadow: none; } /* .case-art: the Criterion "C" */
 /* gradient-filled text (Home's "Made"): a shadow would paint over the see-through letters, so a glow behind instead */
 html.wall-bg-on .banner h1 .made { text-shadow: none; filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.85)); }
-html.wall-bg-on :is(.jump a, .wall-ctl, .open, .vote:not(.on), .archive-toggle, .layout-toggle, .tags li, .lib-aisles button:not([aria-pressed="true"]), .lib-formats button:not([aria-pressed="true"])) {
+html.wall-bg-on :is(.jump a, .wall-ctl, .pill-btn, .vote:not(.on), .archive-toggle, .layout-toggle, .tags li, .lib-aisles button:not([aria-pressed="true"]), .lib-formats button:not([aria-pressed="true"])) {
   background-color: rgba(0, 0, 0, 0.55);
 }
 html.wall-bg-on .group.panel {
@@ -1696,6 +1702,20 @@ html.wall-bg-on .poster .xbox-stats .complete { text-shadow: none; filter: drop-
 }
 .owner-bar a { margin-left: 8px; color: var(--muted); }
 .banner .owner-bar.home-owner { margin: 14px 0 0; font-size: 0.8rem; color: var(--faint); } /* Home: under the banner (now.js) */
+/* "Owner mode · Log out" beside the wordmark (footer.js), the nav still at the right; on Home, floating top left */
+.owner-tag { display: inline-flex; align-items: baseline; gap: 8px; font-size: 0.78rem; color: var(--accent); white-space: nowrap; }
+.owner-tag a { color: var(--muted); }
+.owner-tag a:hover { color: var(--fg); }
+/* the tag takes the free space after it, so it stays by the wordmark at every width and the nav (and the wall switch)
+   keep to the right, or start their own line on a phone */
+.topbar .owner-tag { margin-right: auto; }
+.topbar:has(.owner-tag) nav { margin-left: 0; }
+@media (max-width: 560px) { /* phones: the wordmark, the tag and the wall switch on one line */
+  .topbar:has(.owner-tag) { column-gap: 10px; }
+  .owner-tag { gap: 6px; font-size: 0.72rem; }
+}
+.owner-tag.floating { position: absolute; z-index: 5; top: 36px; left: max(16px, calc((100vw - 960px) / 2 + 16px)); color: var(--mint); }
+html.wall-bg-on .owner-tag { text-shadow: 0 0 6px #000, 0 0 2px #000; }
 /* Games, owner mode: "Refresh" from Xbox at the right of Recently Played's heading (live.js syncXbox) */
 .xbox-sync {
   margin-left: auto;
@@ -2172,8 +2192,8 @@ html.wall-bg-on .xbox-sync-btn { background-color: rgba(0, 0, 0, 0.55); }
   font-size: 0.95rem;
 }
 .rec-send input:focus { outline: none; border-color: var(--accent); }
-.rec-send .open { cursor: pointer; background: transparent; color: var(--fg); font: inherit; font-size: 0.9rem; border-color: var(--accent); }
-.rec-send .open[disabled] { opacity: 0.6; cursor: default; }
+.rec-send .pill-btn { cursor: pointer; background: transparent; color: var(--fg); font: inherit; font-size: 0.9rem; border-color: var(--accent); }
+.rec-send .pill-btn[disabled] { opacity: 0.6; cursor: default; }
 .rec-send .left { font-size: 0.8rem; color: var(--faint); }
 .rec-out { margin: 8px 4px 4px; color: var(--muted); font-size: 0.9rem; }
 .rec-msg { margin: 12px 0 0; min-height: 1.2em; font-size: 0.9rem; color: var(--muted); }
@@ -2231,7 +2251,7 @@ html.wall-bg-on .xbox-sync-btn { background-color: rgba(0, 0, 0, 0.55); }
   margin-top: -24px;
 }
 /* the Poster wall button (wall.js) beside the Instagram link, the same size as it */
-.photo-controls > *, .photo-controls .open { align-self: center; margin-top: 0; } /* .open pills default to align-self: start, and get a top margin on phones (for the Extras cards) */
+.photo-controls > *, .photo-controls .pill-btn { align-self: center; margin-top: 0; } /* .pill-btn pills default to align-self: start, and get a top margin on phones (for the Extras cards) */
 .layout-toggle {
   display: inline-flex;
   border: 1px solid var(--line);
@@ -2472,7 +2492,7 @@ html.wall-bg-on .xbox-sync-btn { background-color: rgba(0, 0, 0, 0.55); }
   .poster-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 16px; }
   .project { grid-template-columns: 1fr; }
   .photos[data-cols="4"] { columns: 2; }
-  .open { justify-self: start; margin-top: 12px; }
+  .pill-btn { justify-self: start; margin-top: 12px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2484,8 +2504,14 @@ html.wall-bg-on .xbox-sync-btn { background-color: rgba(0, 0, 0, 0.55); }
 
 .content.library { max-width: 1180px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.lib-count { font-size: 0.9rem; }
-.lib-count b { color: var(--fg); font-weight: 500; }
+/* the count under a library page's title (Nick, 2026-10-30: "more bold and flashy and prominent"): a big number in the
+   section's colour with a glow, its word beside it, and (movies) the formats under them */
+.lib-count { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin: 14px 0 0; font-size: 0.9rem; }
+.lib-count:empty { display: none; }
+.lib-count .lib-num { font-family: var(--display); font-weight: 800; font-size: clamp(1.4rem, 4.5vw, 2.2rem); line-height: 0.95; letter-spacing: -0.03em; font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--accent) 82%, #fff); text-shadow: 0 0 22px color-mix(in srgb, var(--accent) 60%, transparent), 0 0 4px color-mix(in srgb, var(--accent) 40%, transparent), 0 3px 0 rgba(0, 0, 0, 0.45); }
+.lib-count .lib-noun { font-family: var(--display); font-weight: 600; font-size: clamp(0.5rem, 1.5vw, 0.68rem); text-transform: uppercase; letter-spacing: 0.12em; color: var(--fg); }
+.lib-count .lib-fmts { flex-basis: 100%; color: var(--muted); }
 .lib-showing { color: var(--faint); }
 
 /* the aisle chips, format chips, search and "Pick for tonight", pinned to the top while you browse */
@@ -2519,6 +2545,7 @@ html.wall-bg-on .xbox-sync-btn { background-color: rgba(0, 0, 0, 0.55); }
 .lib-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-top: 10px; }
 .lib-formats { display: flex; gap: 6px; }
 .lib-formats button { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; font-size: 0.78rem; }
+.lib-formats button.fg { font-weight: 600; letter-spacing: 0.04em; } /* HD / SD: the groups, no colour dot */
 .lib-formats button[hidden] { display: none; } /* a format with nothing on the shelves (library.js render) */
 .lib-formats button[class^="f-"]::before { content: ""; width: 8px; height: 8px; border-radius: 2px; }
 .lib-formats .f-4k::before { background: #f2f2f2; box-shadow: inset 0 -3px 0 #111; }
@@ -2526,7 +2553,7 @@ html.wall-bg-on .xbox-sync-btn { background-color: rgba(0, 0, 0, 0.55); }
 .lib-formats .f-dvd::before { background: #8a8a8a; }
 .lib-formats .f-vhs::before { background: #f2f2f2; box-shadow: inset 0 0 0 2px #111; }
 .lib-formats .f-dv::before { background: linear-gradient(135deg, #ff3c78, #ffb400, #3ce6c8, #3c8cff); }
-.lib-search { flex: 1 1 220px; }
+.lib-search { flex: 1 1 170px; } /* (was 220px: with the HD and SD chips, Pick for tonight wrapped onto its own line) */
 .lib-search input {
   width: 100%;
   padding: 8px 16px;
@@ -2598,6 +2625,26 @@ html.wall-bg-on .xbox-sync-btn { background-color: rgba(0, 0, 0, 0.55); }
   text-align: center;
 }
 .slot-meta { margin-top: 2px; font-size: 0.7rem; color: var(--faint); text-align: center; }
+/* A–Z in Covers: one continuous shelf like the vinyl (library.js); the first case of each letter wears a divider tab on
+   its top edge, solid and outlined so the letters stand out down the page (Nick, 2026-11-05) */
+.aisle-flow .shelf:not(.spines) { row-gap: 54px; padding-top: 36px; }
+.slot.letter-start .slot-btn { position: relative; }
+.slot.letter-start .case { position: relative; z-index: 1; }
+.case-tab {
+  position: absolute;
+  z-index: 0; /* behind the case: its bottom edge tucks in under the case's top (Nick, 2026-11-05) */
+  bottom: calc(100% - 10px);
+  left: 6px;
+  min-width: 43px;
+  padding: 4px 13px 12px;
+  border-radius: 10px 10px 0 0;
+  background: linear-gradient(180deg, #ffd166, var(--amber));
+  color: #111;
+  font: 800 1.2rem/1.1 var(--display);
+  text-align: center;
+  box-shadow: 0 0 0 2px #000, 0 -6px 16px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  scroll-margin-top: 200px;
+}
 
 /* a case: format band on top, the cover under it, a plastic sheen over both */
 .case {
@@ -2802,7 +2849,7 @@ html:has(dialog[open]) { overflow: hidden; }
 .lib-credits dt { color: var(--muted); }
 .lib-credits dd { margin: 0; }
 .lib-links { display: flex; flex-wrap: wrap; gap: 10px; margin: 22px 0 0; }
-.lib-dialog .lib-links .open { margin: 0; } /* the dialog sits outside .library, on body */
+.lib-dialog .lib-links .pill-btn { margin: 0; } /* the dialog sits outside .library, on body */
 /* the Movies page's poster details (film-dialog.js): the poster on the left in place of the case */
 .film-dialog .film-poster { display: block; width: 100%; border-radius: 6px; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5); }
 .film-loading { margin: 16px 0 0; font-size: 0.9rem; color: var(--muted); }
@@ -2832,7 +2879,7 @@ html:has(dialog[open]) { overflow: hidden; }
 .trailer iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 .trailer-btn { display: inline-flex; align-items: center; gap: 6px; }
 .trailer-btn svg { width: 14px; height: 14px; fill: currentColor; }
-.lib-links button.open { background: transparent; color: var(--fg); font: inherit; font-size: 0.9rem; cursor: pointer; }
+.lib-links button.pill-btn { background: transparent; color: var(--fg); font: inherit; font-size: 0.9rem; cursor: pointer; }
 @media (prefers-reduced-motion: no-preference) {
   .lib-dialog.flip .lib-back { animation: lib-flip .55s cubic-bezier(.2, .8, .2, 1); }
 }
@@ -2865,15 +2912,13 @@ html:has(dialog[open]) { overflow: hidden; }
   .shelf { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 24px 14px; padding: 0; }
   .ledge { margin: 0 -7px; height: 8px; }
   .slot-title { font-size: 0.74rem; }
+  .aisle-flow .shelf:not(.spines) { row-gap: 44px; padding-top: 28px; }
+  .case-tab { left: 4px; min-width: 30px; padding: 2px 8px 11px; font-size: 0.88rem; }
   .lib-back { grid-template-columns: 1fr; gap: 20px; padding: 24px 20px; }
   .lib-front { position: static; width: 150px; }
   .lib-info { padding-right: 0; }
 }
 @media (prefers-reduced-motion: reduce) { .slot-btn:hover { transform: none; } }
-/* Movies page: the link to the Library, under the tagline */
-.page-head .library-link { display: inline-flex; align-items: center; gap: 8px; margin-top: 20px; }
-.library-link svg { width: 15px; height: 15px; fill: var(--accent); }
-html.wall-bg-on .library-link { background-color: rgba(0, 0, 0, 0.55); }
 /* Library, owner mode (library.js): Add a disc, and Remove on the back of a case */
 .library .lib-add-btn { margin: 0; padding: 8px 16px; background: transparent; color: var(--accent); font: inherit; font-size: 0.85rem; cursor: pointer; }
 .library .lib-add-btn[hidden] { display: none; }
@@ -2885,9 +2930,36 @@ html.wall-bg-on .library-link { background-color: rgba(0, 0, 0, 0.55); }
 .lib-source { margin: -2px 0 0; font-size: 0.75rem; }
 .lib-source a { color: var(--faint); }
 .lib-source a:hover { color: var(--muted); }
-.lib-owner { margin: 18px 0 0; padding-top: 14px; border-top: 1px dashed var(--line); }
+.lib-owner { display: flex; flex-wrap: wrap; gap: 10px 26px; margin: 18px 0 0; padding-top: 14px; border-top: 1px dashed var(--line); } /* gap: the owner's buttons were too close together (Nick, 2026-10-29) */
 .lib-owner .remove { padding: 0; border: 0; background: none; color: #ff8a8a; font: inherit; font-size: 0.85rem; cursor: pointer; }
 .lib-owner .remove:hover { text-decoration: underline; }
+.lib-owner .lib-pick-btn { color: var(--amber); } /* Make it a Nick's Pick (Nick, 2026-10-30) */
+/* Change its cover on a movie case (Nick, 2026-11-04): the film's posters, tap one to save it */
+.lib-case-covers { margin: 14px 0 0; }
+.lib-case-covers.busy { opacity: .6; pointer-events: none; }
+.lib-cover-msg { margin: 6px 0 0; font-size: 0.8rem; color: var(--muted); }
+.lib-cover-msg:empty { display: none; }
+/* Edit the disc, in the open case (owner mode; Nick, 2026-11-04): the add dialog's fields and quick options */
+.lib-case-edit { margin: 16px 0 0; padding: 14px 16px 16px; border: 1px solid var(--line); border-radius: 14px; background: rgba(0,0,0,.35); }
+.lib-case-edit[hidden] { display: none; }
+.lib-case-edit label { display: block; margin: 14px 0 6px; font-size: 0.8rem; color: var(--muted); }
+.lib-case-edit label .optional { color: var(--faint); }
+.lib-case-edit input[type="text"], .lib-case-edit textarea { display: block; width: 100%; margin-top: 6px; padding: 10px 13px; border: 1px solid var(--line); border-radius: 10px; background: #000; color: var(--fg); font: inherit; font-size: 0.92rem; line-height: 1.45; }
+.lib-case-edit textarea { resize: vertical; min-height: 120px; }
+.lib-case-edit input:focus, .lib-case-edit textarea:focus { outline: none; border-color: var(--accent); }
+.lib-case-edit .who { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0 0; padding: 0; border: 0; }
+.lib-case-edit .who:first-child { margin-top: 0; }
+.lib-case-edit .who legend { float: left; margin-right: 6px; padding: 0; font-size: 0.8rem; color: var(--muted); }
+.lib-case-edit .who label { position: relative; display: inline-flex; align-items: center; margin: 0; padding: 6px 13px; border: 1px solid var(--line); border-radius: 999px; font-size: 0.82rem; color: var(--muted); cursor: pointer; }
+.lib-case-edit .who input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; pointer-events: none; }
+.lib-case-edit .who label:has(input:checked) { border-color: var(--accent); color: var(--fg); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.lib-case-edit .who label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.lib-case-edit .lib-edit-feat { margin-bottom: 8px; }
+.lib-case-edit .lib-editions { margin-top: 14px; }
+.lib-edit-msg { margin: 10px 0 0; font-size: 0.8rem; color: var(--muted); }
+.lib-edit-msg:empty { display: none; }
+.lib-edit-actions { display: flex; gap: 10px; margin: 14px 0 0; }
+.lib-owner .lib-saved { font-size: 0.85rem; color: var(--muted); }
 .slot-btn.just-added .case { animation: lead-glow 2.4s ease-out; }
 
 /* "Back to top" (footer.js): every page but Home and Photography, bottom right once you've scrolled a screen */
@@ -3020,17 +3092,18 @@ html.wall-bg-on .lib-view { background-color: rgba(0, 0, 0, 0.55); }
 .shelf.spines { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 30px 0; padding: 0 6px; }
 .spine-slot { display: flex; flex-direction: column; }
 /* A–Z in Spines: one continuous shelf, each letter's first spine with the letter above it (library.js) */
-.aisle-flow .shelf.spines { gap: 40px 0; padding-top: 26px; }
+.aisle-flow .shelf.spines { gap: 46px 0; padding-top: 32px; }
 .spine-slot.letter-start { position: relative; margin-left: 10px; }
 .spine-letter {
   position: absolute;
   bottom: calc(100% + 6px);
   left: -4px;
-  padding: 2px 7px;
-  border-radius: 4px;
-  background: var(--accent);
-  color: #000;
-  font: 800 0.75rem/1.2 var(--display);
+  padding: 2px 8px 3px;
+  border-radius: 7px 7px 0 0;
+  background: linear-gradient(180deg, #ffd166, var(--amber)); /* the same tab as the covers' (Nick, 2026-11-05) */
+  color: #111;
+  font: 800 0.84rem/1.1 var(--display);
+  box-shadow: 0 0 0 2px #000, inset 0 1px 0 rgba(255, 255, 255, 0.5);
   scroll-margin-top: 190px;
 }
 .spine-slot .ledge { margin: 0; }
@@ -3274,13 +3347,19 @@ img.developing { animation: develop 2.6s cubic-bezier(0.3, 0, 0.2, 1) both; }
 .lib-scan-stop { position: absolute; right: 10px; bottom: 10px; padding: 6px 14px; border: 1px solid rgba(255, 255, 255, 0.4); border-radius: 999px; background: rgba(0, 0, 0, 0.6); color: #fff; font: inherit; font-size: 0.8rem; cursor: pointer; }
 .lib-upc { display: flex; align-items: center; gap: 8px; }
 .queue-dialog .lib-upc input { flex: 1; min-width: 0; margin: 0; letter-spacing: 0.06em; }
-.lib-upc .open { flex: none; }
+.lib-upc .pill-btn { flex: none; }
 .lib-scan-msg { margin: 8px 0 0; font-size: 0.8rem; color: var(--muted); }
 /* Add + another beside Add to the shelves; the common extras as tags over the "On this disc" box (Nick, 2026-10-16) */
 .lib-submits { display: flex; }
 .lib-submits { flex-wrap: wrap; column-gap: 10px; row-gap: 0; }
 .lib-submits .submit { flex: 1 1 auto; width: auto; }
 .lib-feat-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+/* "Read the back of the case": a photo's special features into the box (library.js readBack) */
+.lib-read-back { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 8px 0 0; }
+.lib-read-back .lib-read-btn { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; font-size: 0.85rem; cursor: pointer; }
+.lib-read-back .lib-read-btn svg { flex: none; margin: 0; width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; }
+.lib-read-btn.busy { opacity: .6; pointer-events: none; }
+.lib-read-msg { font-size: 0.8rem; color: var(--muted); }
 .lib-feat-tags button { padding: 4px 11px; border: 1px solid var(--line); border-radius: 999px; background: #000; color: var(--muted); font: inherit; font-size: 0.78rem; cursor: pointer; }
 .lib-feat-tags button:hover { color: var(--fg); border-color: #3a3a40; }
 .lib-feat-tags button[aria-pressed="true"] { color: var(--fg); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, #000); }
@@ -3312,7 +3391,7 @@ img.developing { animation: develop 2.6s cubic-bezier(0.3, 0, 0.2, 1) both; }
 .gw-pick span { font-size: 0.85rem; color: var(--muted); }
 .gw-day { display: grid; grid-template-columns: 120px 1fr; gap: 6px 18px; padding: 16px 0; border-top: 1px solid var(--line); }
 .gw-best + .gw-day { border-top: 0; }
-.gw-date { font-weight: 500; }
+.gw-date { grid-row: span 2; font-weight: 500; } /* (beside the window and rain lines both) */
 .gw-date small { display: block; font-weight: 400; font-size: 0.78rem; color: var(--faint); }
 .gw-window { font-size: 0.9rem; }
 .gw-window b { font-weight: 500; color: var(--accent); }
@@ -3327,6 +3406,10 @@ img.developing { animation: develop 2.6s cubic-bezier(0.3, 0, 0.2, 1) both; }
 .gw-h.in { outline: 2px solid var(--accent); outline-offset: -2px; }
 .gw-h.none { background: transparent; }
 .gw-tip { grid-column: 2; min-height: 1.2em; font-size: 0.8rem; color: var(--muted); }
+/* each day's rain (golf-weather.js rainLine): the day's chance and amount; "Forecasts disagree" in amber when they do */
+.gw-rain { grid-column: 2; font-size: 0.82rem; color: var(--muted); cursor: default; }
+.gw-rain b { font-weight: 500; color: #9fd3ff; }
+.gw-disagree { color: var(--amber); }
 /* with a course picked: the window's wind over its holes (a compass of the holes + counts) */
 .gw-course-wind { grid-column: 2; display: flex; align-items: center; gap: 12px; margin-top: 4px; font-size: 0.82rem; color: var(--muted); }
 .gw-course-wind b, .gw-map-note b { font-weight: 500; }
@@ -3352,7 +3435,8 @@ img.developing { animation: develop 2.6s cubic-bezier(0.3, 0, 0.2, 1) both; }
   .gw-courses button, .gw-courses-label { flex: none; white-space: nowrap; }
   .gw-best { margin: 0 -8px 32px; padding: 20px 18px; border-radius: 16px; }
   .gw-day { grid-template-columns: 1fr; }
-  .gw-hours, .gw-tip, .gw-course-wind { grid-column: 1; }
+  .gw-hours, .gw-tip, .gw-course-wind, .gw-rain { grid-column: 1; }
+  .gw-date { grid-row: auto; }
   .gw-h { font-size: 0.64rem; padding: 5px 0 4px; }
   .gw-h small { font-size: 0.56rem; }
 }
@@ -3361,8 +3445,8 @@ img.developing { animation: develop 2.6s cubic-bezier(0.3, 0, 0.2, 1) both; }
 .page-wishlist { --accent: var(--lime); }
 .wl-msg { color: var(--muted); }
 .wl-owner { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: -24px 0 32px; }
-.wl-owner button:not(.open) { padding: 0; border: 0; background: none; color: var(--muted); font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
-.wl-owner .open { background: none; color: var(--fg); font: inherit; cursor: pointer; }
+.wl-owner button:not(.pill-btn) { padding: 0; border: 0; background: none; color: var(--muted); font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.wl-owner .pill-btn { background: none; color: var(--fg); font: inherit; cursor: pointer; }
 .wl-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin: -20px 0 36px; }
 .wl-sort { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--muted); }
 .wl-sort select { padding: 7px 30px 7px 12px; border: 1px solid var(--line); border-radius: 999px; background: #000; color: var(--fg); font: inherit; font-size: 0.85rem; cursor: pointer; appearance: none;
@@ -3393,7 +3477,7 @@ img.developing { animation: develop 2.6s cubic-bezier(0.3, 0, 0.2, 1) both; }
 .wl-price { margin: 0; color: var(--accent); font-size: 0.92rem; }
 .wl-note { margin: 0; color: var(--muted); font-size: 0.85rem; }
 .wl-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: auto; padding-top: 12px; font-size: 0.85rem; }
-.wl-actions .open { padding: 7px 14px; font-size: 0.82rem; background: none; color: var(--fg); font-family: inherit; cursor: pointer; }
+.wl-actions .pill-btn { padding: 7px 14px; font-size: 0.82rem; background: none; color: var(--fg); font-family: inherit; cursor: pointer; }
 .wl-actions .wl-shop { gap: 0; } /* "View" and its " at ebay.com" part read as one label */
 .wl-actions .wl-claim { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
 .wl-actions .wl-claim:disabled { opacity: 0.5; cursor: default; }
@@ -3407,4 +3491,631 @@ img.developing { animation: develop 2.6s cubic-bezier(0.3, 0, 0.2, 1) both; }
 .wl-dialog .wl-check { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
 .wl-dialog .wl-check input { width: auto; margin: 0; }
 .wl-fetch:empty { display: none; }
-@media (max-width: 480px) { .wl-host { display: none; } .wl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } .wl-body { padding: 12px; } .wl-actions .open { padding: 6px 11px; } }
+@media (max-width: 480px) { .wl-host { display: none; } .wl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } .wl-body { padding: 12px; } .wl-actions .pill-btn { padding: 6px 11px; } }
+
+/* ---------- "Get notified" on the home page (fans.js, Nick 2026-10-22) ---------- */
+.fans-cta { margin: 18px 0 0; text-align: center; }
+.fans-cta button { padding: 7px 16px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-size: 0.85rem; cursor: pointer; transition: color .2s, border-color .2s; }
+.fans-cta button:hover, .fans-cta button:focus-visible { color: var(--fg); border-color: #3a3a40; outline: none; }
+.fans-cta button.on { color: var(--mint); border-color: color-mix(in srgb, var(--mint) 40%, transparent); }
+.fans-topics { display: grid; gap: 10px; margin: 14px 0 6px; }
+.fans-topics label { display: flex; align-items: center; gap: 10px; font-size: 0.95rem; }
+.fans-topics input { width: 18px; height: 18px; margin: 0; accent-color: var(--mint); }
+.fans-dialog .hint.small { font-size: 0.78rem; }
+/* "My cats" (only for a browser with a cat in the Cattery): set apart under the other four */
+.fans-cats { margin: 12px 0 4px; padding-top: 12px; border-top: 1px dashed var(--line); }
+.fans-cats label { display: flex; align-items: center; gap: 10px; font-size: 0.95rem; }
+.fans-cats input { width: 18px; height: 18px; margin: 0; accent-color: var(--mint); }
+.fans-cats .hint { margin: 4px 0 0 28px; }
+.fans-off { display: block; margin: 12px auto 0; padding: 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: 0.82rem; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.fans-steps { margin: 10px 0 0; padding-left: 20px; color: var(--fg); line-height: 1.6; }
+.fans-steps li + li { margin-top: 6px; }
+.release-notify { margin: -6px 0 14px; padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-size: 0.82rem; cursor: pointer; }
+.release-notify:hover:not(:disabled) { color: var(--fg); border-color: #3a3a40; }
+
+/* ---------- Not found (404.html, 1.7): a video store shelf with one tape missing ---------- */
+
+.page-missing { --accent: var(--amber); }
+.content.missing { max-width: 760px; text-align: center; }
+.missing-shelf { display: flex; justify-content: center; align-items: flex-end; gap: 4px; margin: 24px auto 0; }
+.missing-tape, .missing-gap { width: 58px; height: 230px; border-radius: 4px 4px 2px 2px; }
+.missing-tape {
+  display: flex; align-items: center; justify-content: center;
+  color: #0b0b0d; text-decoration: none;
+  background: linear-gradient(90deg, rgba(255, 255, 255, .22), rgba(255, 255, 255, 0) 30%, rgba(0, 0, 0, 0) 70%, rgba(0, 0, 0, .3)), var(--tape);
+  box-shadow: 0 10px 14px -8px rgba(0, 0, 0, .85);
+  transition: transform .25s cubic-bezier(.2, .8, .2, 1);
+}
+.missing-tape span { writing-mode: vertical-rl; transform: rotate(180deg); font-family: var(--display); font-weight: 700; font-size: 0.86rem; letter-spacing: 0.02em; }
+.missing-tape:hover, .missing-tape:focus-visible { transform: translateY(-14px); outline: none; }
+.missing-gap {
+  display: flex; align-items: center; justify-content: center;
+  border: 2px dashed color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+.missing-gap b { font-family: var(--display); font-size: 1.6rem; color: var(--accent); animation: missing-blink 1.6s steps(2, start) infinite; }
+@keyframes missing-blink { to { visibility: hidden; } }
+.missing-ledge { height: 14px; margin: 0 auto 48px; max-width: 520px; border-radius: 3px; background: linear-gradient(#2a2a2e, #141416); box-shadow: 0 12px 24px -10px #000; }
+.missing h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(2rem, 7vw, 3.4rem); letter-spacing: -0.04em; line-height: 1.05; }
+.missing h1 span { color: var(--accent); }
+.missing-sub { margin: 10px 0 0; font-family: var(--display); font-weight: 600; color: var(--accent); }
+.missing-text { margin: 22px auto 0; max-width: 520px; color: var(--muted); }
+.missing-text code { color: var(--fg); overflow-wrap: anywhere; }
+.missing-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 24px; margin-top: 26px; }
+.missing-links a { color: var(--muted); }
+.missing-links .missing-home { color: var(--accent); font-weight: 500; text-decoration: none; }
+@media (max-width: 560px) {
+  .missing-shelf { gap: 3px; }
+  .missing-tape, .missing-gap { width: 40px; height: 170px; }
+  .missing-tape span { font-size: 0.72rem; }
+}
+@media (prefers-reduced-motion: reduce) { .missing-gap b { animation: none; } .missing-tape { transition: none; } }
+
+/* ---------- Library (1.7): the hub, and the vinyl, books and board games shelves (collection.js) ---------- */
+/* the hub (Nick, 2026-10-30: "Option A" of three mockups): each collection is a video store aisle, a full-width row with
+   its name, its count glowing in the aisle's colour (--c) and a strip of covers fading off the right edge;
+   an aisle with nothing on it yet shows dim spines and "Shelving soon" */
+.hub-aisles { margin-top: 8px; padding: 0 28px; border: 1px solid var(--line); border-radius: 18px; background: rgba(11, 11, 13, 0.9); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); } /* a dark panel over the poster wall (Nick, 2026-10-30: "put the poster wall back") */
+.hub-aisle:first-child { border-top: 0; }
+.hub-aisle { position: relative; display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 28px; align-items: center; padding: 26px 0; border-top: 1px solid var(--line); color: var(--fg); text-decoration: none; outline: none; }
+.hub-lab { display: flex; flex-direction: column; align-items: flex-start; }
+.hub-aisle h2 { margin: 0 0 6px; font-family: var(--display); font-weight: 800; font-size: clamp(1.6rem, 3vw, 2rem); line-height: 1.1; letter-spacing: -0.02em; }
+.hub-n { font-family: var(--display); font-weight: 700; font-size: 1.05rem; color: var(--c); text-shadow: 0 0 18px color-mix(in srgb, var(--c) 50%, transparent); }
+.hub-go { margin-top: 14px; padding: 6px 14px; border: 1px solid #2a2a2e; border-radius: 999px; font-size: 0.85rem; color: var(--muted); transition: border-color .2s, color .2s; }
+.hub-aisle:hover .hub-go, .hub-aisle:focus-visible .hub-go { border-color: var(--c); color: var(--fg); }
+.hub-strip { position: relative; display: flex; gap: 12px; box-sizing: content-box; height: 150px; padding: 16px 0; margin: -16px 0; overflow: hidden; -webkit-mask-image: linear-gradient(90deg, #000 70%, transparent); mask-image: linear-gradient(90deg, #000 70%, transparent); }
+.hub-strip img { flex: none; height: 100%; width: 150px; object-fit: cover; border-radius: 6px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6); }
+.hub-discs .hub-strip img, .hub-books .hub-strip img { width: 100px; } /* 2:3 cases and books; records and game boxes square */
+.hub-games .hub-strip img { border-radius: 4px; }
+/* hovering an aisle shuffles its covers: each hops, tilts and settles, one after another along the row, like flipping
+   through a crate (Nick, 2026-10-30: "instead of them just raising up a little"); --i is the cover's place (index.html) */
+.hub-aisle:hover .hub-strip img, .hub-aisle:focus-visible .hub-strip img { animation: hub-shuffle .55s cubic-bezier(.3, .7, .4, 1) calc(var(--i, 0) * 45ms) both; }
+@keyframes hub-shuffle {
+  0% { transform: none; }
+  30% { transform: translate(6px, -12px) rotate(-4deg); }
+  60% { transform: translate(-3px, 2px) rotate(2deg); }
+  100% { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) { .hub-aisle:hover .hub-strip img, .hub-aisle:focus-visible .hub-strip img { animation: none; } }
+.hub-spine { flex: none; align-self: flex-end; width: 34px; border-radius: 3px; opacity: 0.35; }
+.hub-soon { position: absolute; right: 18%; top: 50%; transform: translateY(-50%); padding: 8px 14px; border: 1px dashed var(--c); border-radius: 999px; background: rgba(0, 0, 0, 0.6); font-size: 0.75rem; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase; color: var(--c); }
+.hub-aisle.empty .hub-strip { -webkit-mask-image: none; mask-image: none; }
+@media (max-width: 640px) {
+  .hub-aisles { padding: 0 16px; border-radius: 14px; }
+  .hub-aisle { grid-template-columns: 1fr; gap: 14px; padding: 22px 0; }
+  .hub-aisle h2 { margin: 0 0 2px; }
+  .hub-go { display: none; }
+  .hub-strip { height: 110px; gap: 10px; }
+  .hub-strip img { width: 110px; }
+  .hub-discs .hub-strip img, .hub-books .hub-strip img { width: 73px; }
+  .hub-soon { right: 50%; transform: translate(50%, -50%); white-space: nowrap; }
+}
+
+/* vinyl's genre shelves (the Movie Library's aisle buttons), wrapping rather than scrolling */
+.coll-genres { flex-wrap: wrap; overflow: visible; margin: -8px 0 26px; }
+.coll-genres[hidden] { display: none; }
+.coll-genres .n { margin-left: 3px; font-size: 0.72rem; opacity: 0.6; }
+.coll-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 6px 0 22px; }
+.coll-search { flex: 1 1 220px; min-width: 0; padding: 9px 14px; border: 1px solid var(--line); border-radius: 999px; background: #0c0c0f; color: var(--fg); font: inherit; font-size: 0.9rem; }
+.coll-search:focus { outline: none; border-color: var(--accent); }
+.coll-sort { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--muted); }
+.coll-sort select { padding: 7px 10px; border: 1px solid var(--line); border-radius: 999px; background: #0c0c0f; color: var(--fg); font: inherit; font-size: 0.85rem; }
+.coll-add-btn[hidden] { display: none; }
+.coll-bar + .coll-filters { margin-top: -12px; gap: 8px 14px; }
+.coll-filters .to { margin: 0 2px; color: var(--faint); }
+.coll-match { display: inline-flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--fg); }
+.coll-match[hidden] { display: none; }
+.coll-clear { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.coll-caps { padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px; background: #0c0c0f; font: inherit; font-size: 0.85rem; color: var(--muted); cursor: pointer; }
+.coll-caps svg { width: 13px; height: 13px; fill: currentColor; }
+.coll-caps[aria-pressed="true"] { color: var(--fg); border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.coll-shelves.no-caps .game-title, .coll-shelves.no-caps .game-cap, .coll-shelves.no-caps .book-cap { display: none; }
+/* a book's title and author under its cover (as .record-cap) */
+.book-cap { display: flex; flex-direction: column; gap: 1px; min-width: 0; margin-top: 8px; font-size: 0.78rem; color: #fff; text-align: left; text-shadow: 0 1px 2px #000, 0 0 10px rgba(0,0,0,.85); }
+.book-cap b { font-weight: 500; font-size: 0.86rem; color: #fff; }
+.book-cap b, .book-cap span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* a game that's a Nick's Pick (collection.js fitPick sizes the frame to the box art as drawn): the disc library's
+   ribbon across its top left corner and a 2px amber edge, both riding up with the box on hover */
+.game-box .pick-frame, .book-cover .pick-frame { position: absolute; z-index: 1; container-type: inline-size; overflow: hidden; pointer-events: none; box-shadow: inset 0 0 0 2px var(--amber); transition: transform .2s; }
+.book-cover { position: relative; }
+.book-cover .pick-frame { border-radius: 2px 6px 6px 2px; } /* (a book: the same, 2026-11-04) */
+.game-box:hover .pick-frame, .game-box:focus-visible .pick-frame, .book-cover:hover .pick-frame, .book-cover:focus-visible .pick-frame { transform: translateY(-8px); }
+.game-box .pick-frame .sticker.pick, .book-cover .pick-frame .sticker.pick { position: absolute; }
+/* a record that's one of Nick's Picks (2026-11-02): the ribbon over its sleeve's corner, lifting with it */
+.record .pick-frame.rec-pick { position: absolute; z-index: 2; left: 0; top: 0; width: 100%; aspect-ratio: 1; container-type: inline-size; overflow: hidden; pointer-events: none; border-radius: 3px; background: none; margin: 0; right: auto; bottom: auto; box-shadow: inset 0 0 0 2px var(--amber); } /* (background, margin and bottom reset: shelf rules for a record's spans) */
+.record .pick-frame.rec-pick .sticker.pick { position: absolute; }
+.coll-picks-g .star { margin-right: 5px; color: var(--amber); }
+.coll-picks-g[aria-pressed="true"] { border-color: var(--amber); }
+.coll-pick-f .star { margin-right: 5px; color: var(--amber); }
+.lib-aisles [data-aisle="picks"] .star { margin-right: 5px; color: var(--amber); }
+.coll-pick-f[aria-pressed="true"] { border-color: var(--amber); }
+.coll-pick-tag { margin: -4px 0 10px; color: var(--amber); font-size: 0.85rem; font-weight: 500; letter-spacing: 0.02em; }
+.coll-pick-tag[hidden] { display: none; }
+/* a game's How to Play video, at the bottom of its card */
+.coll-scan { margin: 12px 0 10px; }
+.coll-edit { display: grid; gap: 10px; margin: 14px 0 0; }
+.coll-edit[hidden] { display: none; }
+.coll-edit label { display: grid; gap: 4px; font-size: 0.8rem; color: var(--muted); }
+.coll-edit .optional { color: var(--faint); }
+.coll-edit input, .coll-edit textarea { padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; background: #0c0c0f; color: var(--fg); font: inherit; font-size: 0.9rem; }
+.coll-edit input:focus, .coll-edit textarea:focus { outline: none; border-color: var(--accent); }
+.coll-edit-row { display: flex; align-items: center; gap: 14px; margin: 0; }
+.coll-edit-row .coll-msg { font-size: 0.8rem; color: var(--muted); }
+.coll-edit-cancel { padding: 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: 0.85rem; cursor: pointer; }
+.coll-edit-cancel:hover { color: var(--fg); text-decoration: underline; }
+.coll-scan .coll-scan-btn[disabled] { opacity: 0.6; }
+.coll-howto { margin: 22px 0 0; }
+.coll-howto[hidden] { display: none; }
+.coll-howto h3 { margin: 0 0 10px; font-family: var(--display); font-size: 1.05rem; font-weight: 600; letter-spacing: -0.01em; }
+.coll-howto iframe { display: block; width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 12px; background: #000; }
+.coll-howto-title { margin: 8px 0 0; font-size: 0.8rem; color: var(--muted); }
+.coll-unopened-f .seal { margin-right: 5px; color: var(--sky); }
+.coll-unopened-f[aria-pressed="true"] { border-color: var(--sky); }
+.lib-owner .coll-unopened { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--fg); cursor: pointer; }
+.lib-owner .coll-unopened input { width: 16px; height: 16px; margin: 0; accent-color: var(--sky); }
+.lib-owner .coll-unopened small { color: var(--faint); font-size: 0.75rem; }
+.coll-add .coll-add-unopened { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; font-size: 0.9rem; color: var(--fg); cursor: pointer; }
+.coll-add .coll-add-unopened input { width: 18px; height: 18px; margin: 0; accent-color: var(--sky); }
+.coll-add .coll-add-unopened small { color: var(--faint); font-size: 0.75rem; }
+.coll-empty { padding: 40px 0; text-align: center; color: var(--muted); }
+.coll-item { padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.coll-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.coll-item.just-added { animation: lead-glow 2.4s ease-out; }
+.coll-item .blank { display: flex; align-items: center; justify-content: center; padding: 8px; font-size: 0.75rem; text-align: center; color: var(--muted); background: #1a1a20; }
+
+/* vinyl: every cover whole in a grid, record-store divider cards where the letter changes; the black record sits
+   behind its sleeve and slides out to the right when pointed at */
+.coll-sleeves .coll-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 46px 26px; padding: 30px 24px 0 0; }
+/* the divider tab over the first record of each letter */
+.bin-tab { position: absolute; z-index: 2; top: -30px; left: 8px; min-width: 44px; padding: 3px 14px 5px; border-radius: 9px 9px 0 0; background: var(--accent); color: #000; font-family: var(--display); font-weight: 800; font-size: 1.15rem; line-height: 1.3; text-align: center;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55), 0 -4px 14px rgba(0, 0, 0, 0.45); } /* (bigger and outlined, to see where you are in the list: Nick, 2026-11-02) */
+.record { position: relative; display: flex; flex-direction: column; gap: 8px; text-align: left; }
+.record .sleeve { position: relative; z-index: 1; display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 3px; box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55); }
+.record .disc { position: absolute; z-index: 0; top: 4%; left: 4%; width: 92%; aspect-ratio: 1; border-radius: 50%;
+  background: radial-gradient(circle, #d8c7a0 0 15%, #111 15.5% 17%, transparent 17.5%), repeating-radial-gradient(circle, #151515 0 1.5px, #0a0a0a 1.5px 3px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6); transition: transform .35s cubic-bezier(.2, .8, .2, 1); }
+.record:hover .disc, .record:focus-visible .disc { transform: translateX(30%) rotate(40deg); }
+.record-cap { display: flex; flex-direction: column; gap: 1px; min-width: 0; font-size: 0.78rem; color: #fff; text-shadow: 0 1px 2px #000, 0 0 10px rgba(0,0,0,.85); } /* white, shadowed over the collage (Nick, 2026-10-29: the grey was hard to read) */
+.record-cap b { font-weight: 500; font-size: 0.86rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* book covers and board game boxes: on shelves too */
+.coll-covers .coll-row, .coll-stack .coll-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 26px 20px; }
+.book-cover .art { display: block; width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 2px 6px 6px 2px; box-shadow: inset 4px 0 0 rgba(0, 0, 0, 0.2), 0 12px 24px rgba(0, 0, 0, 0.5); transition: transform .2s; }
+.game-box { position: relative; align-self: end; }
+.game-box .art { display: block; width: 100%; aspect-ratio: 1; object-fit: contain; object-position: bottom; transition: transform .2s; filter: drop-shadow(6px 8px 0 rgba(0, 0, 0, 0.35)) drop-shadow(0 14px 16px rgba(0, 0, 0, 0.45)); }
+.game-box::after { content: ""; display: block; height: 10px; margin: 0 -10px; border-radius: 2px; background: linear-gradient(#6b4325, #3d2615); }
+/* under each game's shelf board: players, play time and complexity dots (BoardGameGeek's numbers) */
+.game-box { display: flex; flex-direction: column; }
+.game-box::after { order: 1; }
+.game-cap { order: 2; display: flex; flex-wrap: wrap; justify-content: center; align-content: flex-start; gap: 4px 10px; min-height: 34px; margin-top: 8px; /* the same height on every game, so a row's boards line up */ font-size: 0.74rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.game-title { order: 2; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; min-height: 2.6em; margin-top: 10px; font-size: 0.82rem; line-height: 1.3; font-weight: 500; text-align: center; color: #fff; text-shadow: 0 1px 2px #000, 0 0 10px rgba(0,0,0,.85); } /* 2 lines on every game, so a row's boards line up */
+.game-title b { font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
+.game-title + .game-cap { margin-top: 4px; }
+.game-cap .gs { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.game-cap svg { width: 13px; height: 13px; fill: var(--faint); }
+.game-cap small { margin-left: 2px; font-size: 0.66rem; }
+/* the game card's stats bar */
+.weight-dots { display: inline-flex; gap: 3px; }
+.weight-dots i { width: 7px; height: 7px; border-radius: 50%; background: linear-gradient(90deg, var(--accent) calc(var(--f) * 100%), rgba(255, 255, 255, 0.14) 0); }
+.game-stats .weight-dots { margin: 2px 0 1px; }
+.game-stats { display: flex; flex-wrap: wrap; margin: 16px 0 4px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #111115; }
+.game-stats > div { flex: 1 1 112px; display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; box-shadow: -1px -1px 0 var(--line); } /* the lines between cells, none on the outer edge */
+.game-stats .k { font-size: 0.66rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+.game-stats .v { white-space: nowrap; font-family: var(--display); font-size: 1.15rem; font-weight: 700; color: var(--fg); font-variant-numeric: tabular-nums; }
+.game-stats .v small { font-family: var(--body); font-size: 0.72rem; font-weight: 400; color: var(--muted); }
+.game-stats .s { font-size: 0.74rem; color: var(--muted); }
+.book-cover:hover .art, .game-box:hover .art, .book-cover:focus-visible .art, .game-box:focus-visible .art { transform: translateY(-8px); }
+
+/* the details card */
+.coll-dialog .coll-cover { display: block; width: 100%; border-radius: 4px; box-shadow: 0 14px 34px rgba(0, 0, 0, 0.55); }
+.coll-dialog .coll-cover.blank { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; background: #1a1a20; color: var(--muted); }
+/* a record's card: the record is pulled out of its sleeve to the right as the card opens, rolling round once as it
+   comes, and stays half out, the album's cover printed on its label */
+.coll-vinyl .lib-back { grid-template-columns: 330px 1fr; }
+.coll-vinyl .lib-front { width: 240px; }
+.coll-vinyl .coll-cover { position: relative; z-index: 1; aspect-ratio: 1; object-fit: cover; }
+.coll-disc { position: absolute; z-index: 0; top: 3%; left: 3%; width: 94%; aspect-ratio: 1; border-radius: 50%;
+  background: conic-gradient(from 20deg, transparent 0 8%, rgba(255, 255, 255, 0.07) 13%, transparent 18% 58%, rgba(255, 255, 255, 0.05) 63%, transparent 68%),
+    repeating-radial-gradient(circle, #161616 0 1.5px, #0a0a0a 1.5px 3px);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1), 0 10px 26px rgba(0, 0, 0, 0.6); transform: translateX(38%); }
+/* a coloured record (collection.js discLook: --vc its colour, --vc2 a second one): the grooves drawn over the colour,
+   splatter as flecks of the second, marble/swirl as a swirl of both, split as two halves; "see" ones see-through */
+.record .disc.colored, .coll-disc.colored { --g: repeating-radial-gradient(circle, rgba(0, 0, 0, 0.16) 0 1.5px, rgba(255, 255, 255, 0.05) 1.5px 3px); }
+.record .disc.colored { background: radial-gradient(circle, #d8c7a0 0 15%, rgba(0, 0, 0, 0.35) 15.5% 17%, transparent 17.5%), var(--g), var(--vc); }
+.coll-disc.colored { background: conic-gradient(from 20deg, transparent 0 8%, rgba(255, 255, 255, 0.14) 13%, transparent 18% 58%, rgba(255, 255, 255, 0.1) 63%, transparent 68%), var(--g), var(--vc); }
+/* splatter (Nick, 2026-10-29, with a photo: "a disorganized splash of colour from inside the middle outwards"): uneven,
+   soft-edged rays of the second colour flung from just outside the label to the rim, over the first; a second, turned
+   set of thinner rays and a ring of the first colour round the label so the splash starts beyond it */
+/* splatter (Nick, 2026-10-29, with a photo: "a disorganized splash of colour from inside the middle outwards"): a few
+   big uneven clumps of the second colour flung from just outside the label to the rim, a set of fine streaks between
+   them, and wide gaps of the first; a ring of the first round the label so the splash starts beyond it */
+.colored.splatter { --splat: radial-gradient(circle, var(--vc) 0 22%, transparent 31%),
+  conic-gradient(from 12deg, transparent 0deg, color-mix(in srgb, var(--vc2) 92%, transparent) 7deg 19deg, transparent 26deg, transparent 41deg, color-mix(in srgb, var(--vc2) 80%, transparent) 45deg 49deg, transparent 53deg, transparent 66deg, color-mix(in srgb, var(--vc2) 95%, transparent) 74deg 89deg, transparent 97deg, transparent 118deg, color-mix(in srgb, var(--vc2) 70%, transparent) 121deg 124deg, transparent 127deg, transparent 139deg, color-mix(in srgb, var(--vc2) 90%, transparent) 145deg 155deg, transparent 161deg, transparent 178deg, color-mix(in srgb, var(--vc2) 75%, transparent) 183deg 187deg, transparent 192deg, transparent 214deg, color-mix(in srgb, var(--vc2) 93%, transparent) 223deg 239deg, transparent 248deg, transparent 268deg, color-mix(in srgb, var(--vc2) 72%, transparent) 272deg 275deg, transparent 279deg, transparent 296deg, color-mix(in srgb, var(--vc2) 90%, transparent) 303deg 313deg, transparent 320deg, transparent 334deg, color-mix(in srgb, var(--vc2) 80%, transparent) 338deg 343deg, transparent 347deg, transparent 360deg),
+  conic-gradient(from 203deg, transparent 5deg, color-mix(in srgb, var(--vc2) 55%, transparent) 5.6deg 6.4deg, transparent 7deg, transparent 23deg, color-mix(in srgb, var(--vc2) 60%, transparent) 24deg 25deg, transparent 26deg, transparent 52deg, color-mix(in srgb, var(--vc2) 50%, transparent) 52.5deg 53deg, transparent 53.5deg, transparent 97deg, color-mix(in srgb, var(--vc2) 60%, transparent) 97.8deg 98.7deg, transparent 99.5deg, transparent 125deg, color-mix(in srgb, var(--vc2) 50%, transparent) 125.6deg 126.4deg, transparent 127deg, transparent 160deg, color-mix(in srgb, var(--vc2) 65%, transparent) 161deg 162deg, transparent 163deg, transparent 199deg, color-mix(in srgb, var(--vc2) 50%, transparent) 199.5deg 200deg, transparent 200.5deg, transparent 250deg, color-mix(in srgb, var(--vc2) 60%, transparent) 250.8deg 251.7deg, transparent 252.5deg, transparent 283deg, color-mix(in srgb, var(--vc2) 55%, transparent) 283.6deg 284.4deg, transparent 285deg, transparent 321deg, color-mix(in srgb, var(--vc2) 60%, transparent) 322deg 323deg, transparent 324deg, transparent 352deg, color-mix(in srgb, var(--vc2) 50%, transparent) 352.5deg 353deg, transparent 353.5deg, transparent 360deg); }
+.record .disc.colored.splatter { background-image: radial-gradient(circle, #d8c7a0 0 15%, rgba(0, 0, 0, 0.35) 15.5% 17%, transparent 17.5%), var(--g), var(--splat), linear-gradient(var(--vc), var(--vc)); }
+.record .disc.colored.marble, .coll-disc.colored.marble { background-image: radial-gradient(circle, #d8c7a0 0 15%, rgba(0, 0, 0, 0.35) 15.5% 17%, transparent 17.5%), var(--g),
+  conic-gradient(from 30deg, var(--vc) 0 14%, var(--vc2) 22% 30%, var(--vc) 40% 52%, var(--vc2) 60% 66%, var(--vc) 76% 88%, var(--vc2) 95%, var(--vc)); }
+.record .disc.colored.split, .coll-disc.colored.split { background-image: radial-gradient(circle, #d8c7a0 0 15%, rgba(0, 0, 0, 0.35) 15.5% 17%, transparent 17.5%), var(--g), linear-gradient(90deg, var(--vc) 50%, var(--vc2) 50%); }
+.coll-disc.colored:is(.splatter, .marble, .split) { background-image: conic-gradient(from 20deg, transparent 0 8%, rgba(255, 255, 255, 0.14) 13%, transparent 18% 58%, rgba(255, 255, 255, 0.1) 63%, transparent 68%), var(--g),
+  var(--mixbg, linear-gradient(var(--vc), var(--vc))); }
+.coll-disc.colored.splatter { --mixbg: var(--splat), linear-gradient(var(--vc), var(--vc)); }
+.coll-disc.colored.marble { --mixbg: conic-gradient(from 30deg, var(--vc) 0 14%, var(--vc2) 22% 30%, var(--vc) 40% 52%, var(--vc2) 60% 66%, var(--vc) 76% 88%, var(--vc2) 95%, var(--vc)); }
+.coll-disc.colored.split { --mixbg: linear-gradient(90deg, var(--vc) 50%, var(--vc2) 50%); }
+.record .disc.colored.see, .coll-disc.colored.see { opacity: 0.86; }
+.coll-label { position: absolute; inset: 33%; border-radius: 50%; background: #d8c7a0 center / cover; box-shadow: 0 0 0 3px #0d0d0d; }
+.coll-label::after { content: ""; position: absolute; inset: 46%; border-radius: 50%; background: #0a0a0a; } /* the spindle hole */
+/* its real label photos (Nick, 2026-11-01): cropped to the circle, zoomed into the photo's centre (--z); side B shows when
+   the record is turned over (the disc turns 180°, so side B turns back upright) */
+.coll-label.has-pic { overflow: hidden; background: #1a1a1a; }
+.coll-label.has-pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scale(var(--z, 1)) translate(var(--x, 0%), var(--y, 0%)); transition: opacity .35s; }
+.coll-label.has-pic .lab-b { opacity: 0; }
+.coll-vinyl .lib-front.turned .coll-label { transform: rotate(180deg); } /* (the disc is turned 180° on that side: its label, whichever it shows, turned back upright) */
+.coll-vinyl .lib-front.turned .coll-label.two-sides .lab-a { opacity: 0; }
+.coll-vinyl .lib-front.turned .coll-label.two-sides .lab-b { opacity: 1; }
+/* the record flipped over while out (collection.js flipRecord): edge-on and open again (the `scale` property, apart from
+   its transform's spin and place), now showing its other label: B, or A when the sleeve is turned over */
+@media (prefers-reduced-motion: no-preference) { /* (alongside its way out, which stays finished rather than playing again) */
+  .coll-vinyl .lib-front.rec-out.rec-flipping .coll-disc { animation: rec-out-r .9s cubic-bezier(.4, 0, .2, 1) both, rec-flip .5s ease-in-out; }
+  .coll-vinyl .lib-front.turned.rec-out.rec-flipping .coll-disc { animation-name: rec-out-l, rec-flip; }
+}
+@keyframes rec-flip { 0%, 100% { scale: 1 1; } 50% { scale: 0.04 1; } }
+.coll-vinyl .lib-front.rec-flipped .coll-label.two-sides .lab-a { opacity: 0; }
+.coll-vinyl .lib-front.rec-flipped .coll-label.two-sides .lab-b { opacity: 1; }
+.coll-vinyl .lib-front.turned.rec-flipped .coll-label.two-sides .lab-a { opacity: 1; }
+.coll-vinyl .lib-front.turned.rec-flipped .coll-label.two-sides .lab-b { opacity: 0; }
+.coll-vinyl .lib-front.rec-flipping .coll-label img { transition: none; }
+/* while its label is being picked, the record shows the side being picked (whichever way the sleeve is turned) */
+.coll-vinyl .lib-front .coll-label.two-sides.show-a .lab-a, .coll-vinyl .lib-front .coll-label.two-sides.show-b .lab-b { opacity: 1; }
+.coll-vinyl .lib-front .coll-label.two-sides.show-a .lab-b, .coll-vinyl .lib-front .coll-label.two-sides.show-b .lab-a { opacity: 0; }
+.coll-label.has-pic::after { z-index: 1; }
+.coll-lab-sides { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 0 0 10px; }
+.coll-lab-sides button { padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-size: 0.82rem; cursor: pointer; }
+.coll-lab-sides button[aria-pressed="true"] { border-color: var(--accent); color: var(--fg); }
+.coll-lab-zoom { display: inline-flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--muted); }
+.coll-lab-zoom input { width: 140px; accent-color: var(--accent); }
+.coll-lab-preview { position: relative; flex: none; width: 76px; height: 76px; cursor: grab; touch-action: none; overflow: hidden; border-radius: 50%; background: #1a1a1a; box-shadow: 0 0 0 4px #0d0d0d, 0 0 0 5px #2a2a2e; }
+.coll-lab-preview img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scale(var(--z, 1)) translate(var(--x, 0%), var(--y, 0%)); pointer-events: none; user-select: none; }
+.coll-lab-center { padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-size: 0.78rem; cursor: pointer; }
+.coll-lab-preview::after { content: ""; position: absolute; inset: 46%; border-radius: 50%; background: #0a0a0a; }
+/* a record with a back cover: the sleeve turns over to it (collection.js), once the record has slid out */
+.sleeve-flip { position: relative; z-index: 1; display: block; width: 100%; padding: 0; border: 0; background: none; font: inherit; color: inherit; perspective: 1400px; cursor: default; }
+.coll-dialog.settled .sleeve-flip { cursor: pointer; }
+.sleeve-flip:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
+/* the turn (collection.js turnSleeve): the sleeve swings to edge-on, swaps front for back there, and swings on round;
+   one face at a time, so no backface-visibility (Safari showed the front mirrored instead of the back) */
+.sleeve-inner { position: relative; display: block; }
+.sleeve-flip .face { display: block; }
+.sleeve-flip .face-back, .sleeve-flip.over .face-front { display: none; }
+.sleeve-flip.over .face-back { display: block; }
+/* turned over, the record sticks out on the LEFT (Nick, 2026-10-25): the sleeve moves right by as much as the record
+   stuck out (35.7% of the sleeve: the record is 94% of it, 3% in, 38% of itself out), and the record slides behind it,
+   rolling, to its own starting place, so the two take up the same room as before */
+/* the record and sleeve turn as one (collection.js turnSleeve), about the middle of the two together: the sleeve plus
+   the 32.7% of it the record sticks out = 132.7% wide, so its middle is 66.35% across the sleeve; the sides swap at
+   the edge-on moment, out of sight */
+.rec-turn { position: relative; transform-origin: 66.35% 50%; }
+/* the record out of its sleeve and laid on top of it (collection.js moveRecord): out past the open side, then over
+   the sleeve, its middle on the sleeve's (in front: no move; turned over: 38% of itself to the right), a little
+   bigger, still turning; and back the same way */
+.coll-dialog.settled .coll-disc { cursor: pointer; }
+.coll-vinyl .lib-front { z-index: 2; } /* (the record passes over the text beside it on its way out, not under it) */
+.coll-disc:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.coll-vinyl .lib-front.rec-out .coll-disc { z-index: 3; transform: translateX(0) rotate(360deg) scale(1.04); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.7); }
+.coll-vinyl .lib-front.turned.rec-out .coll-disc { transform: translateX(38%) rotate(540deg) scale(1.04); } /* (both end right side up: Nick, 2026-11-01, it ended upside down) */
+@media (prefers-reduced-motion: no-preference) {
+  .coll-vinyl .lib-front.rec-out .coll-disc { animation: rec-out-r .9s cubic-bezier(.4, 0, .2, 1) both; }
+  .coll-vinyl .lib-front.turned.rec-out .coll-disc { animation-name: rec-out-l; }
+  .coll-vinyl .lib-front.rec-back .coll-disc { animation: rec-back-r .9s cubic-bezier(.4, 0, .2, 1) both; }
+  .coll-vinyl .lib-front.turned.rec-back .coll-disc { animation-name: rec-back-l; }
+}
+@keyframes rec-out-r {
+  0% { transform: translateX(38%); z-index: 0; }
+  45% { transform: translateX(92%) rotate(90deg); z-index: 0; }
+  46% { z-index: 3; }
+  100% { transform: translateX(0) rotate(360deg) scale(1.04); z-index: 3; }
+}
+@keyframes rec-back-r {
+  0% { transform: translateX(0) rotate(360deg) scale(1.04); z-index: 3; }
+  54% { transform: translateX(92%) rotate(90deg); z-index: 3; }
+  55% { z-index: 0; }
+  100% { transform: translateX(38%); z-index: 0; }
+}
+@keyframes rec-out-l {
+  0% { transform: translateX(0) rotate(180deg); z-index: 0; }
+  45% { transform: translateX(-44%) rotate(270deg); z-index: 0; }
+  46% { z-index: 3; }
+  100% { transform: translateX(38%) rotate(540deg) scale(1.04); z-index: 3; }
+}
+@keyframes rec-back-l {
+  0% { transform: translateX(38%) rotate(540deg) scale(1.04); z-index: 3; }
+  54% { transform: translateX(-44%) rotate(270deg); z-index: 3; }
+  55% { z-index: 0; }
+  100% { transform: translateX(0) rotate(180deg); z-index: 0; }
+}
+.coll-vinyl .lib-front.turned .sleeve-flip { transform: translateX(35.7%); }
+.coll-vinyl .lib-front.turned .coll-disc { transform: translateX(0) rotate(180deg); }
+.flip-hint { position: relative; z-index: 1; margin: 10px 0 0; font-size: 0.74rem; color: var(--faint); opacity: 0; transition: opacity .4s; }
+.coll-dialog.settled .flip-hint { opacity: 1; }
+@media (prefers-reduced-motion: no-preference) {
+  .coll-dialog.pull .lib-back { animation: coll-in .35s cubic-bezier(.2, .8, .2, 1); }
+  .coll-dialog.pull .coll-disc { animation: coll-pull 1.15s cubic-bezier(.3, .7, .25, 1) both; }
+  .coll-dialog.pull .coll-cover { animation: coll-tug 1.15s ease-out; }
+}
+@keyframes coll-in { from { opacity: 0; transform: translateY(18px) scale(0.97); } to { opacity: 1; transform: none; } }
+@keyframes coll-pull { /* waits in the sleeve while the card comes up, then slides out, overshoots a touch and settles */
+  0%, 28% { transform: translateX(0) rotate(-360deg); }
+  82% { transform: translateX(41%) rotate(12deg); }
+  100% { transform: translateX(38%) rotate(0); }
+}
+@keyframes coll-tug { /* the sleeve gives as the record is pulled */
+  0%, 30% { transform: none; }
+  48% { transform: translateX(-7px) rotate(-1.2deg); }
+  100% { transform: none; }
+}
+.coll-books .coll-cover { border-radius: 2px 8px 8px 2px; }
+/* a book's card: the book is open a little as the card comes up (with its details, like a record's), the pages close
+   one after another and the cover shuts last, leaving the closed book, its cover on top. Opened only part way and
+   seen from far off (a long perspective), so nothing grows past the book's height */
+.book-3d { position: relative; perspective: 2400px; }
+.book-block, .book-leaf { position: absolute; top: 1.5%; bottom: 1.5%; left: 2px; border-radius: 1px 6px 6px 1px; }
+/* the pages: printed lines on the open page, the stack of page edges down the right side */
+.book-block { right: -9px; background: linear-gradient(90deg, rgba(0, 0, 0, 0.18), transparent 6%), #efe8d6; box-shadow: 0 14px 30px rgba(0, 0, 0, 0.55); }
+.book-block::before, .book-leaf::before { content: ""; position: absolute; inset: 13% 14% 15% 16%; background: repeating-linear-gradient(transparent 0 8px, rgba(60, 50, 35, 0.22) 8px 9.5px); }
+.book-block::after { content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 9px; border-radius: 0 6px 6px 0; background: repeating-linear-gradient(90deg, #f4efe2 0 1px, #cfc5ab 1px 2px); }
+.book-leaf { top: 3%; bottom: 3%; right: 4px; background: linear-gradient(90deg, rgba(0, 0, 0, 0.12), transparent 10%), #f4eee0; transform-origin: left center; box-shadow: 1px 0 3px rgba(0, 0, 0, 0.18); }
+.book-leaf.l1 { --open: -44deg; }
+.book-leaf.l2 { --open: -30deg; }
+.book-leaf.l3 { --open: -16deg; }
+.book-lid { position: relative; z-index: 1; transform-origin: left center; }
+@media (prefers-reduced-motion: no-preference) {
+  .coll-dialog.open .lib-back { animation: coll-in .35s cubic-bezier(.2, .8, .2, 1); }
+  .coll-dialog.open .book-lid { animation: book-shut .9s cubic-bezier(.5, 0, .3, 1) both; }
+  .coll-dialog.open .book-leaf { animation: book-leaf .9s cubic-bezier(.5, 0, .3, 1) both; }
+  .coll-dialog.open .book-leaf.l3 { animation-duration: .5s; }
+  .coll-dialog.open .book-leaf.l2 { animation-duration: .62s; }
+  .coll-dialog.open .book-leaf.l1 { animation-duration: .74s; }
+}
+@keyframes book-shut { /* the cover, open a little, waits for the pages and shuts last */
+  0%, 30% { transform: rotateY(-58deg); }
+  100% { transform: rotateY(0); }
+}
+@keyframes book-leaf { /* each page falls shut: the one nearest the book first, the top page last */
+  0%, 12% { transform: rotateY(var(--open)); }
+  100% { transform: rotateY(0); }
+}
+.coll-games .coll-cover { box-shadow: none; filter: drop-shadow(0 14px 24px rgba(0, 0, 0, 0.55)); }
+.coll-creator { margin: 0 0 6px; font-size: 1rem; color: var(--fg); }
+.coll-note { margin: 14px 0 0; padding: 10px 12px; border-left: 3px solid var(--accent); border-radius: 4px; background: rgba(255, 255, 255, 0.04); font-size: 0.9rem; }
+.coll-dialog .lib-disc { color: var(--accent); }
+.coll-dialog .lib-about-box { margin-top: 16px; }
+.coll-tracks { columns: 2 220px; margin: 18px 0 0; padding: 0; list-style: none; font-size: 0.82rem; }
+.coll-tracks li { display: flex; gap: 8px; padding: 3px 0; break-inside: avoid; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+.coll-tracks .n { flex: none; width: 2.6em; color: var(--faint); }
+.coll-tracks .by { color: var(--muted); } /* a compilation song's own artist, after its title */
+.coll-tracks .t { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+/* a track the Spotify album has: a play button before its number, always showing (Nick, 2026-10-25); bars while it
+   plays, a pause button on hover then. A track the album doesn't have lines up with them, without one */
+.coll-tracks:has(.can-play) .n { box-sizing: content-box; padding-left: 20px; }
+.coll-tracks .coll-play { position: relative; padding: 0; border: 0; background: none; font: inherit; text-align: left; color: var(--faint); cursor: pointer; }
+.coll-tracks .coll-play svg, .coll-tracks .coll-play .i-eq { position: absolute; left: 0; top: 50%; width: 12px; height: 12px; margin-top: -6px; opacity: 0; color: var(--text, #fff); transition: color .15s; }
+.coll-tracks .coll-play .i-play { opacity: 1; color: var(--muted); }
+.coll-tracks li.can-play:hover .coll-play .i-play, .coll-tracks .coll-play:focus-visible .i-play { color: var(--text, #fff); }
+.coll-tracks li.can-play { cursor: pointer; } /* the whole row plays it */
+.coll-tracks li.can-play:hover { background: rgba(255, 255, 255, 0.04); }
+.coll-tracks li.selected .coll-play .i-play { color: var(--accent, var(--red)); }
+.coll-tracks li.playing .coll-play .i-play { opacity: 0; }
+.coll-tracks li.playing .i-eq { opacity: 1; }
+.coll-tracks li.playing:hover .i-eq, .coll-tracks li.playing .coll-play:focus-visible .i-eq { opacity: 0; }
+.coll-tracks li.playing:hover .i-pause, .coll-tracks li.playing .coll-play:focus-visible .i-pause { opacity: 1; }
+.coll-tracks li.selected > span:nth-child(2), .coll-tracks li.selected .num { color: var(--accent, var(--red)); }
+.coll-tracks .i-eq { display: flex; align-items: flex-end; gap: 2px; color: var(--accent, var(--red)); }
+.coll-tracks .i-eq i { flex: 1; height: 100%; background: currentColor; border-radius: 1px; transform-origin: bottom; animation: coll-eq .9s ease-in-out infinite alternate; }
+.coll-tracks .i-eq i:nth-child(2) { animation-delay: -.3s; animation-duration: .7s; }
+.coll-tracks .i-eq i:nth-child(3) { animation-delay: -.6s; animation-duration: 1.1s; }
+@keyframes coll-eq { from { transform: scaleY(.25); } to { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) { .coll-tracks .i-eq i { animation: none; transform: scaleY(.7); } }
+
+/* the add dialog */
+.coll-add .coll-msg { min-height: 1.2em; margin: 8px 0 0; font-size: 0.85rem; color: var(--muted); }
+.coll-add .coll-picked { display: flex; gap: 14px; align-items: center; margin: 12px 0 0; padding: 10px; border: 1px solid var(--accent); border-radius: 10px; }
+.coll-add .coll-picked[hidden], .coll-add .coll-results[hidden] { display: none; }
+.coll-add .coll-picked img, .coll-add .coll-picked .noimg { width: 64px; height: 64px; object-fit: cover; border-radius: 4px; flex: none; background: #1a1a20; }
+.coll-add .coll-picked div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.coll-add .coll-picked span, .coll-add .coll-picked small { font-size: 0.8rem; color: var(--muted); }
+.coll-add [role="option"] .t { display: flex; flex-direction: column; min-width: 0; font-size: 0.88rem; }
+.coll-add [role="option"] .s { font-size: 0.75rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.coll-add [role="option"] img, .coll-add [role="option"] .noimg { width: 44px; height: 44px; object-fit: cover; border-radius: 3px; }
+.coll-add .lib-covers { margin-top: 14px; }
+.coll-add .lib-cover-list span { max-width: 100%; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; text-align: center; }
+.coll-no-back .none-box { display: flex; align-items: center; justify-content: center; width: 74px; height: 74px; border-radius: 6px; border: 1px dashed #3a3a40; color: var(--muted); font-size: 0.75rem; }
+.coll-backs .lib-cover-list img { height: 74px; } /* (record backs are square) */
+/* a book's covers on its card (2026-11-04): all of them at once, wrapping, each its book shape, its source in 2 lines */
+.coll-books .coll-card-fronts .lib-cover-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); overflow: visible; max-height: 520px; overflow-y: auto; }
+.coll-books .coll-card-fronts .lib-cover-list button { width: auto; }
+.coll-books .coll-card-fronts .lib-cover-list img { width: 100%; height: auto; aspect-ratio: 2 / 3; }
+.coll-books .coll-card-fronts .lib-cover-list span { max-width: 100%; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; text-align: center; }
+.coll-card-backs { margin-top: 12px; }
+
+/* a record's album on Spotify, under the About and over the track list (Spotify's compact player is 152px tall) */
+.coll-spotify { position: relative; height: 152px; margin: 18px 0 0; border-radius: 12px; background: #282828; overflow: hidden; }
+.coll-spotify iframe { position: relative; display: block; width: 100%; height: 152px; border: 0; border-radius: 12px; opacity: 0; transition: opacity .3s; }
+.coll-spotify.ready iframe { opacity: 1; }
+/* until it's ready: a turning record and a line, in the middle of the grey box */
+.coll-spotify-wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 10px; margin: 0; color: #b3b3b3; font-size: 0.85rem; transition: opacity .3s; }
+.coll-spotify.ready .coll-spotify-wait { opacity: 0; }
+.coll-spotify-wait .spin { width: 22px; height: 22px; border-radius: 50%; background: radial-gradient(circle, #1ed760 0 3px, #111 3.5px 5px, transparent 5.5px), repeating-radial-gradient(circle, #181818 0 1.5px, #2c2c2c 1.5px 2.5px); box-shadow: inset 0 0 0 1px #3a3a3a; animation: spin 1.1s linear infinite; position: relative; }
+.coll-spotify-wait .spin::after { content: ""; position: absolute; inset: 2px; border-radius: 50%; background: conic-gradient(from 0deg, transparent 0 80%, rgba(255,255,255,.28) 88%, transparent 96%); }
+@media (prefers-reduced-motion: reduce) { .coll-spotify-wait .spin { animation-duration: 3s; } }
+.coll-card-backs .coll-msg { margin: 6px 0 0; font-size: 0.8rem; color: var(--muted); }
+.coll-cover-wait { flex: none; align-self: center; margin: 0 8px; font-size: 0.78rem; color: var(--muted); }
+.coll-add .lib-submits { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+
+@media (max-width: 640px) {
+  .coll-sleeves .coll-row { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 42px 18px; padding-right: 14px; } /* (room for the taller tab) */
+  .coll-covers .coll-row, .coll-stack .coll-row { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 20px 14px; }
+  .game-cap { min-height: 60px; gap: 4px 8px; }
+  .coll-genres::before { content: "Genre"; }
+  .coll-vinyl .lib-back { grid-template-columns: 1fr; }
+  .coll-vinyl .lib-front { position: relative; width: 160px; }
+  .coll-books .lib-front { position: relative; width: 140px; margin-left: 4px; } /* the record is placed against it */
+}
+
+/* "Not recognizing your Spotify Premium?" (spotify-help.js; Nick, 2026-11-02): a small link under the
+   players, and its box of steps */
+.sp-help-line { margin: 8px 0 0; font-size: 0.78rem; }
+.page-head .sp-help-line { margin-top: 10px; }
+.sp-help-link { color: var(--muted); text-decoration: underline; text-decoration-color: rgba(255, 255, 255, 0.25); text-underline-offset: 3px; }
+.sp-help-link:hover, .sp-help-link:focus-visible { color: #1ed760; text-decoration-color: currentColor; }
+.lib-dialog.sp-help { width: min(520px, calc(100vw - 32px)); padding: 28px 28px 24px; overflow: auto; }
+.sp-help h2 { margin: 0 44px 10px 0; font-family: var(--display); font-weight: 600; font-size: 1.3rem; letter-spacing: -0.02em; }
+.sp-help p, .sp-help li { font-size: 0.9rem; line-height: 1.55; color: #d4d2cc; }
+.sp-help p { margin: 0 0 12px; }
+.sp-help ol { margin: 0 0 12px; padding-left: 22px; }
+.sp-help li + li { margin-top: 4px; }
+.sp-help a { color: #1ed760; }
+.sp-help code { font-size: 0.85em; padding: 1px 5px; border-radius: 4px; background: rgba(255, 255, 255, 0.08); }
+.sp-help details { margin: 0 0 8px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
+.sp-help details[open] { padding-bottom: 2px; }
+.sp-help summary { cursor: pointer; font-weight: 500; color: var(--fg); }
+.sp-help summary small { color: #1ed760; font-weight: 400; }
+.sp-help details ol { margin-top: 10px; }
+.sp-help .sp-help-note { margin: 14px 0 0; font-size: 0.82rem; color: var(--muted); }
+
+/* the turntable's song while the turntable is scrolled away (collection.js; Nick, 2026-11-02): a small bar at the bottom
+   of the page, the record (tap: back up to the turntable), play/pause, and stop */
+.coll-np { position: fixed; left: 50%; bottom: 16px; z-index: 60; display: flex; align-items: center; gap: 6px; width: min(420px, calc(100vw - 32px)); padding: 6px 6px 6px 6px; border: 1px solid var(--line); border-radius: 14px; background: rgba(18, 18, 22, 0.94); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55); transform: translateX(-50%); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.coll-np[hidden] { display: none; }
+.coll-np button { border: 0; background: none; color: var(--fg); cursor: pointer; font: inherit; }
+.coll-np-open { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; padding: 0; text-align: left; }
+.coll-np-open img { flex: none; width: 44px; height: 44px; border-radius: 6px; object-fit: cover; }
+.coll-np-open span { display: grid; min-width: 0; }
+.coll-np-open b, .coll-np-open small { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.coll-np-open b { font-weight: 500; font-size: 0.9rem; }
+.coll-np-open small { font-size: 0.75rem; color: var(--muted); }
+.coll-np-play, .coll-np-stop { position: relative; flex: none; width: 40px; height: 40px; border-radius: 50%; }
+.coll-np-play { background: #1ed760 !important; color: #000 !important; }
+.coll-np-play svg { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; }
+.coll-np-play .i-eq { display: none; }
+.coll-np .i-pause, .coll-np.playing .i-play { display: none; }
+.coll-np.playing .i-pause { display: block; }
+.coll-np-stop { font-size: 1.4rem !important; line-height: 1; color: var(--muted) !important; }
+.coll-np-stop:hover, .coll-np-open:hover b { color: var(--fg) !important; }
+.coll-np-play:focus-visible, .coll-np-stop:focus-visible, .coll-np-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- the Vinyl page's turntable (collection.js makeDeck; Nick, 2026-11-02) ----------
+   in the page head, under the count and over the search (Nick, 2026-11-02; 20% smaller than first built): the playing record's sleeve on a stand with a NOW PLAYING sign under it, the
+   turntable (a walnut plinth, the platter with the record spinning on it, the tone arm), Spotify's slim player under
+   both. The table is drawn in its own units, 320 x 250 (the arm's SVG uses the same), so it scales as one */
+.page-head.has-deck { margin-bottom: 22px; } /* (the search close under the player: Nick, 2026-11-02) */
+.deck { width: min(416px, 100%); margin-top: 26px; padding: 13px; border: 1px solid var(--line); border-radius: 15px; background: rgba(12, 12, 15, 0.8); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.deck-row { display: flex; align-items: flex-start; gap: 14px; }
+.deck-stand { flex: 0 0 112px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.deck-sleeve { display: block; width: 100%; aspect-ratio: 1; padding: 0; border: 0; border-radius: 4px; background: #18181c; box-shadow: 0 12px 26px rgba(0, 0, 0, 0.6); overflow: hidden; cursor: pointer; }
+.deck-sleeve img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.deck.empty .deck-sleeve { background: transparent; box-shadow: none; outline: 2px dashed rgba(255, 255, 255, 0.16); outline-offset: -2px; cursor: default; }
+.deck.empty .deck-sleeve img { visibility: hidden; }
+.deck-sleeve:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+/* the sign: dim, then lit like a neon tube while it plays */
+.deck-sign { margin: 0; min-width: 0; text-align: center; }
+.deck-lit { display: inline-block; padding: 3px 7px 2px; border: 1.5px solid currentColor; border-radius: 5px; white-space: nowrap; font-family: var(--display); font-weight: 800; font-size: 0.53rem; letter-spacing: 0.13em; text-transform: uppercase; color: #5d5d66; transition: color .4s, text-shadow .4s, box-shadow .4s; }
+.deck.playing .deck-lit { color: var(--accent); text-shadow: 0 0 6px var(--accent), 0 0 14px color-mix(in srgb, var(--accent) 60%, transparent); box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 55%, transparent), inset 0 0 8px color-mix(in srgb, var(--accent) 40%, transparent); }
+@media (prefers-reduced-motion: no-preference) { .deck.playing .deck-lit { animation: deck-neon 1.2s steps(1) 1; } }
+@keyframes deck-neon { 0% { opacity: .3; } 12% { opacity: 1; } 20% { opacity: .4; } 28%, 100% { opacity: 1; } }
+.deck-song, .deck-who { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.deck-song { margin-top: 7px; font-weight: 500; font-size: 0.74rem; color: var(--fg); }
+.deck-who { margin-top: 2px; font-size: 0.64rem; color: var(--muted); }
+/* the turntable */
+.deck-table { position: relative; flex: 1; min-width: 0; aspect-ratio: 320 / 250; border-radius: 11px; container-type: inline-size;
+  background: repeating-linear-gradient(91deg, rgba(0, 0, 0, 0.09) 0 2px, transparent 2px 7px, rgba(255, 255, 255, 0.025) 7px 8px, transparent 8px 13px), linear-gradient(140deg, #6a4428, #432817 55%, #2e1b0f);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 -4px 0 rgba(0, 0, 0, 0.35), 0 14px 30px rgba(0, 0, 0, 0.55); }
+/* the platter (centred at 125, 125; 216 across): a metal rim with strobe dots, a rubber mat, the record, the spindle */
+.deck-platter { position: absolute; left: 5.3125%; top: 6.8%; width: 67.5%; aspect-ratio: 1; border-radius: 50%; cursor: pointer;
+  background: radial-gradient(circle, transparent 0 66%, rgba(0, 0, 0, 0.25) 70%), repeating-conic-gradient(#d9d9de 0 1.6deg, #8e8e96 1.6deg 3.2deg);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.35); }
+.deck-mat { position: absolute; inset: 2.4%; border-radius: 50%; background: radial-gradient(circle, #262629 0 30%, #161618 31%); }
+.coll-disc.deck-disc { top: 3.7%; left: 3.7%; width: 92.6%; transform: none; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1), 0 2px 6px rgba(0, 0, 0, 0.6); }
+.deck.empty .deck-disc { opacity: 0; }
+.deck-spindle { position: absolute; left: 50%; top: 50%; z-index: 2; width: 3.4%; aspect-ratio: 1; border-radius: 50%; transform: translate(-50%, -50%); background: radial-gradient(circle at 35% 35%, #fff, #a0a0a6 55%, #55555b); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); }
+/* the tone arm (its pivot at 282, 42): on its rest, swung onto the record while it plays */
+.deck-arm { position: absolute; inset: 0; z-index: 3; width: 100%; height: 100%; overflow: visible; pointer-events: none; filter: drop-shadow(0 4px 3px rgba(0, 0, 0, 0.5)); }
+.deck-arm .arm-g { transform-box: view-box; transform-origin: 282px 42px; transition: transform 1s cubic-bezier(.35, .6, .3, 1); }
+.deck-arm .arm-base { fill: #26262b; stroke: #8f8f97; stroke-width: 2; }
+.deck-arm .arm-cap { fill: #a3a3aa; }
+.deck-arm .arm-weight { fill: #3b3b42; stroke: #77777f; stroke-width: 1; }
+.deck-arm .arm-tube { fill: none; stroke: #dcdce1; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+.deck-arm .arm-head { fill: #1b1b20; stroke: #a8a8b0; stroke-width: 1.2; }
+.deck-arm .arm-rest { fill: #1d1d22; stroke: #6f6f77; stroke-width: 1.5; }
+/* 33 / 45 and the start button (its light on while it plays) */
+.deck-speed { position: absolute; right: 2.6%; top: 46%; display: flex; flex-direction: column; gap: 1.4cqw; font-family: var(--display); font-size: 3cqw; font-weight: 700; font-style: normal; color: rgba(255, 255, 255, 0.35); }
+.deck-speed i { font-style: normal; }
+.deck-speed i.on { color: #f3e7c9; text-shadow: 0 0 6px rgba(243, 231, 201, 0.5); }
+.deck-start { position: absolute; left: 66%; top: 82%; width: 10.5cqw; height: 10.5cqw; padding: 0; border: 0; border-radius: 50%; cursor: pointer; color: #e9e9ee;
+  background: radial-gradient(circle at 40% 35%, #4a4a52, #1e1e23 70%); box-shadow: 0 2px 5px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.18); }
+.deck-start svg { position: absolute; left: 50%; top: 50%; width: 38%; height: 38%; transform: translate(-50%, -50%); }
+.deck-start .i-eq, .deck-start .i-pause, .deck.playing .deck-start .i-play { display: none; }
+.deck.playing .deck-start .i-pause { display: block; }
+.deck-led { position: absolute; right: -2cqw; top: -0.6cqw; width: 2cqw; height: 2cqw; border-radius: 50%; background: #3a1414; }
+.deck.playing .deck-led { background: #ff4d4d; box-shadow: 0 0 6px #ff4d4d; }
+.deck-start:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+/* a browser that wants a tap before it plays: the button pulses */
+@media (prefers-reduced-motion: no-preference) { .deck.needs-tap .deck-start { animation: deck-tap 1.1s ease-in-out infinite; } }
+@keyframes deck-tap { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 70%, transparent); } 50% { box-shadow: 0 0 0 2.4cqw transparent; } }
+.deck.needs-tap .deck-start { color: var(--accent); }
+/* Spotify's slim player under it (its Log in), and the help link */
+.deck-strip.coll-spotify { height: 80px; margin: 11px 0 0; }
+.deck-strip.coll-spotify iframe { height: 80px; }
+/* under it: the Crackle switch (the record's crackle under the music; Nick, 2026-11-02) and the help link */
+.deck-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 2px 0; }
+.deck .sp-help-line { margin: 0; min-width: 0; text-align: right; font-size: 0.7rem; }
+.deck-crackle { display: inline-flex; flex: none; align-items: center; gap: 7px; padding: 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: 0.72rem; cursor: pointer; }
+.deck-crackle .sw { position: relative; width: 26px; height: 15px; border-radius: 999px; background: rgba(255, 255, 255, 0.16); transition: background .2s; }
+.deck-crackle .sw::after { content: ""; position: absolute; left: 2px; top: 2px; width: 11px; height: 11px; border-radius: 50%; background: #cfcfd6; transition: transform .2s, background .2s; }
+.deck-crackle[aria-pressed="true"] { color: var(--fg); }
+.deck-crackle[aria-pressed="true"] .sw { background: var(--accent); }
+.deck-crackle[aria-pressed="true"] .sw::after { transform: translateX(11px); background: #fff; }
+.deck-crackle:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+/* a record coming off or going on: the deck's own sleeve and disc hidden under the flying ones */
+.deck.swapping .deck-disc, .deck.swapping .deck-sleeve img { opacity: 0; transition: opacity .35s; }
+/* the flight (collection.js flyToDeck): the sleeve and its record, over everything */
+.deck-fly { position: fixed; inset: 0; z-index: 70; pointer-events: none; }
+.deck-fly-sleeve { position: absolute; z-index: 2; display: block; aspect-ratio: 1; object-fit: cover; border-radius: 3px; box-shadow: 0 26px 50px rgba(0, 0, 0, 0.6); }
+.deck-fly .deck-fly-disc { z-index: 1; }
+.deck-fly.over .deck-fly-disc { z-index: 3; }
+/* the shelf: a ▶ under each record */
+.rec-slot { position: relative; display: flex; flex-direction: column; min-width: 0; }
+.shelf-play { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; padding: 5px 12px 5px 9px; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 999px; background: rgba(0, 0, 0, 0.6); color: #fff; font: inherit; font-size: 0.74rem; font-weight: 500; cursor: pointer; transition: border-color .15s, background .15s, color .15s; }
+.shelf-play svg { width: 10px; height: 10px; }
+.shelf-play:hover, .shelf-play:focus-visible { border-color: var(--accent); background: var(--accent); color: #000; outline: none; }
+.rec-slot.lifted .record .sleeve, .rec-slot.lifted .record .disc { opacity: 0.18; transition: opacity .2s; }
+/* the card's line where its player was */
+.coll-deck-line { margin: 18px 0 0; }
+.coll-deck-btn { display: inline-flex; align-items: center; gap: 8px; margin: 0; }
+.coll-deck-btn svg { width: 12px; height: 12px; }
+.coll-deck-btn .i-eq, .coll-deck-btn .i-pause { display: none; }
+.coll-deck-btn.playing .i-play { display: none; }
+.coll-deck-btn.playing .i-eq { display: inline-flex; align-items: flex-end; gap: 2px; width: 12px; height: 12px; }
+.coll-deck-btn.playing .i-eq i { flex: 1; height: 100%; background: currentColor; border-radius: 1px; transform-origin: bottom; animation: coll-eq .9s ease-in-out infinite alternate; }
+.coll-deck-btn.playing .i-eq i:nth-child(2) { animation-delay: -.3s; animation-duration: .7s; }
+.coll-deck-btn.playing .i-eq i:nth-child(3) { animation-delay: -.6s; animation-duration: 1.1s; }
+.coll-deck-wait { display: inline-flex; align-items: center; gap: 10px; font-size: 0.85rem; color: var(--muted); }
+.coll-deck-wait .spin { width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle, #1ed760 0 2.5px, #111 3px 4px, transparent 4.5px), repeating-radial-gradient(circle, #181818 0 1.5px, #2c2c2c 1.5px 2.5px); animation: spin 1.1s linear infinite; }
+@media (max-width: 899px) {
+  .deck { margin-top: 22px; padding: 11px; }
+  .deck-row { gap: 11px; }
+  .deck-stand { flex-basis: 31%; gap: 8px; }
+  .deck-lit { font-size: 0.5rem; letter-spacing: 0.08em; padding: 3px 5px 2px; white-space: nowrap; }
+}
+/* the start button and platter waiting for Spotify's player to be ready (a click before it only crackled: Nick, 2026-11-02) */
+.deck.not-ready .deck-start { opacity: 0.4; cursor: progress; }
+.deck.not-ready .deck-platter { cursor: progress; }
+/* a line under the sleeve too long for it: scrolled past within its width, two copies so it comes round again,
+   pausing at its start (collection.js marquee; Nick, 2026-11-02) */
+.deck-song.marquee, .deck-who.marquee { text-overflow: clip; text-align: left; -webkit-mask-image: linear-gradient(90deg, transparent, #000 6px, #000 calc(100% - 14px), transparent); mask-image: linear-gradient(90deg, transparent, #000 6px, #000 calc(100% - 14px), transparent); }
+.marquee .mq { display: inline-flex; gap: 36px; animation: deck-mq var(--mqs, 8s) linear infinite; }
+@keyframes deck-mq { 0%, 18% { transform: translateX(0); } 100% { transform: translateX(var(--mq)); } }
+/* a record Spotify won't play here (collection.js spotifyOff; Nick, 2026-11-03): the deck says so under its table, its
+   start button off; its card's line says so in place of the turntable button */
+.deck-off { margin: 10px 2px 0; padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); border-radius: 8px; background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--fg); font-size: 0.74rem; line-height: 1.4; }
+.deck.off .deck-start { opacity: 0.35; cursor: not-allowed; }
+.deck.off .deck-platter { cursor: default; }
+.coll-deck-off { display: inline-block; padding: 8px 12px; border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); border-radius: 10px; background: color-mix(in srgb, var(--accent) 10%, transparent); font-size: 0.85rem; color: var(--fg); }

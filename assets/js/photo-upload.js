@@ -30,7 +30,7 @@
       '<form novalidate><h2>Owner login</h2>' +
       '<p class="hint">Enter your admin password. This browser will remember it.</p>' +
       '<label for="ph-admin">Password</label><input id="ph-admin" type="password" autocomplete="current-password">' +
-      '<p class="error" role="alert"></p><button class="open submit" type="submit">Log in</button></form>';
+      '<p class="error" role="alert"></p><button class="pill-btn submit" type="submit">Log in</button></form>';
     document.body.appendChild(d);
     var input = d.querySelector("input"), err = d.querySelector(".error");
     d.addEventListener("close", function () { d.remove(); });
@@ -52,15 +52,12 @@
 
   // ---------- owner bar, Add a photo, Remove ----------
   function owner() {
-    if (document.querySelector(".owner-bar")) return;
-    var bar = document.createElement("div");
-    bar.className = "owner-bar";
-    bar.innerHTML = '<span>Owner mode</span> <a href="?logout">Log out</a>';
+    if (document.querySelector(".photo-add-btn")) return;
+    document.dispatchEvent(new Event("nm-owner")); // "Owner mode · Log out" by the wordmark (footer.js)
     var head = document.querySelector(".page-head");
-    head.parentNode.insertBefore(bar, head.nextSibling);
     var add = document.createElement("button");
     add.type = "button";
-    add.className = "open photo-add-btn";
+    add.className = "pill-btn photo-add-btn";
     add.innerHTML = '<span aria-hidden="true">+</span> Add a photo';
     add.addEventListener("click", openAdd);
     (document.querySelector(".photo-controls") || head).appendChild(add);
@@ -125,7 +122,7 @@
           }).join("") + "</fieldset>" +
           '<p class="photo-info"></p>' +
           '<p class="error" role="alert"></p>' +
-          '<button class="open submit" type="submit" disabled>Add photo</button>' +
+          '<button class="pill-btn submit" type="submit" disabled>Add photo</button>' +
         "</form>";
       document.body.appendChild(dlg);
       dlg.querySelector(".close").addEventListener("click", function () { dlg.close(); });

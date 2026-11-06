@@ -26,7 +26,7 @@ window.GOLF = {
   trackman: [],
   // The Trackman app's Me screen, shown above the Trackman rounds
   trackmanStats: {
-    headline: [["Trackman HCP", "15.3"], ["Last 5 avg", "98.6"]],
+    headline: [["Trackman HCP", "15.3"]], // no "Last 5 avg": the same figures across as On the course (Nick, 2026-10-22)
     stats: [
       ["Avg. drive", "175.1 yds"], ["Longest drive", "263.7 yds"],
       ["Fairways hit", "55%"], ["Missed left", "18%"], ["Missed right", "27%"],
@@ -58,8 +58,8 @@ window.GOLF = {
     ]
   },
   // Real-course rounds come from the Scorecard (extras/scorecard/) on their own: the Golf page's "On the course"
-  // section reads them from the Worker. (birdies held 18Birdies rounds typed in by hand; Lately still reads it.)
-  birdies: [],
+  // section and Home's Lately read them from the Worker. (Until 2026-10-25 a "birdies" list here held 18Birdies
+  // rounds typed in by hand; it had been empty since the Scorecard took over.)
   // All TaylorMade. club, model, loft, and details (shaft, length, grip, ...)
   bag: [
     { club: "Driver", image: "bag/qi4d-driver.jpg", url: "https://www.taylormadegolf.com/Qi4D-Driver/DW-TC441.html", model: "Qi4D Core", loft: "10.5°", details: "Reax Red 50 shaft, Regular flex" },

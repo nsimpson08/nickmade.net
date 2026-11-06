@@ -101,9 +101,9 @@
     var paras = String(d && d.about || "").split(/\n\n/).filter(Boolean);
     var links = [];
     if (d && d.trailer && window.NMTrailer) links.push(NMTrailer.button(d.trailer, d.title || f.title));
-    if (f.review) links.push('<a class="open film-review" href="#' + esc(f.review) + '">My review</a>');
+    if (f.review) links.push('<a class="pill-btn film-review" href="#' + esc(f.review) + '">My review</a>');
     var imdb = d && d.imdbId || f.imdb;
-    if (imdb) links.push('<a class="open" href="https://www.imdb.com/title/' + esc(imdb) + '/" target="_blank" rel="noopener">IMDb</a>');
+    if (imdb) links.push('<a class="pill-btn" href="https://www.imdb.com/title/' + esc(imdb) + '/" target="_blank" rel="noopener">IMDb</a>');
     return '<div class="lib-back">' +
       '<button type="button" class="close" aria-label="Close">&times;</button>' +
       '<div class="lib-front">' + (f.image ? '<img class="film-poster" src="' + esc(f.image) + '" alt="' + esc(f.title) + ' poster art">' : "") + "</div>" +

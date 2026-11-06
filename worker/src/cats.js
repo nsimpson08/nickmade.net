@@ -19,6 +19,8 @@
 //   DELETE /cats/:id?visitorId=       its owner lets it go, or Nick removes it (admin)
 //   POST   /cats/event                (admin) { k: "storm" | "sunbeam" | "stop" } a room event now (the cron starts one now and then)
 //   GET    /cats/times                the last 7 days of history, for the page's weekly newspaper
+//   GET    /cats/mine?visitorId=      { names } this browser's cats (the home page's Get notified offers "My cats" only
+//                                     to a browser that has one)
 //   POST   /cats/:id/photo            (its owner) { visitorId, image: a JPEG data URL, made square and small by the page }
 //                                     -> { cat }: a photo of the real cat, shown on its card to everyone (Nick, 2026-10-16)
 //   DELETE /cats/:id/photo?visitorId= (its owner, or Nick) takes it off
@@ -40,6 +42,8 @@
 //   - the cron keeps a daily copy, cats:snap:YYYY-MM-DD (30 days); Nick can list them (GET /cats/snapshots) and put one
 //     back (POST /cats/restore { date }; the room as it was is snapped first, as cats:snap:before-restore-<time>)
 //   - the private nightly backup copies all of KV too
+
+import { toCatOwners } from "./fans.js";
 
 const ROOM_MAX = 30;
 const CATS_EACH = 2;
@@ -76,6 +80,12 @@ export async function catsRoute(request, url, env, cors, h) {
     const room = await load(env), from = Date.now() - 7 * 24 * HOUR;
     return h.json({ from, to: Date.now(), lines: room.log.filter((e) => e.t >= from).sort((a, b) => a.t - b.t), cats: room.cats.map((c) => ({ id: c.id, name: c.name })) }, 200, cors);
   }
+  if (path === "/cats/mine" && request.method === "GET") {
+    const visitorId = url.searchParams.get("visitorId"), room = await load(env);
+    if (!validId(visitorId)) return h.json({ names: [] }, 200, cors);
+    const me = await ownerHash(h, env, visitorId);
+    return h.json({ names: room.cats.filter((c) => (c.owners || []).includes(me)).map((c) => c.name) }, 200, cors);
+  }
   if (path === "/cats/snapshots" && request.method === "GET") { // (admin) the daily copies kept
     if (!h.isAdmin(request, env)) return h.json({ error: "Unauthorized" }, 401, cors);
     const list = await env.QUEUE.list({ prefix: "cats:snap:" });
@@ -107,6 +117,7 @@ export async function catsRoute(request, url, env, cors, h) {
   if (path === "/cats/tick" && request.method === "POST") { // (admin) run a round of cat life now, as the cron would
     if (!h.isAdmin(request, env)) return h.json({ error: "Unauthorized" }, 401, cors);
     const room = tick(await load(env), Date.now());
+    await catAlerts(env, room, Date.now()); // (and the owners' hungry / wants-attention notifications)
     await save(env, room);
     return h.json({ cats: room.cats.length, log: room.log.slice(-20).reverse() }, 200, cors);
   }
@@ -184,9 +195,15 @@ async function ownedBy(h, env, c, visitorId, request) {
   if (c && c.nick && request && h.isAdmin(request, env)) return true; // Nick in owner mode, on any device (Nick, 2026-10-15)
   return !!c && validId(visitorId) && (c.owners || []).includes(await ownerHash(h, env, visitorId));
 }
+// for "Get notified" (fans.js): this browser's owner key when it owns a cat in the room, else null
+export async function ownsCat(env, h, visitorId) {
+  if (!validId(visitorId)) return null;
+  const me = await ownerHash(h, env, visitorId), room = await load(env);
+  return room.cats.some((c) => (c.owners || []).includes(me)) ? me : null;
+}
 // what everyone sees of a cat (no owners, IPs or codes)
 function view(c) {
-  const { owners, ip, code, nick, kind, ...rest } = c;
+  const { owners, ip, code, nick, kind, alertFed, alertPet, ...rest } = c;
   return rest;
 }
 
@@ -869,6 +886,33 @@ export async function catsTick(env) {
     startEvent(room, "storm", Date.now()); // only storms at random now: the sunbeam comes every day at 2 PM (currentEvent)
     changed = true;
   }
+  if (await catAlerts(env, room, Date.now())) changed = true;
   if (changed) await save(env, room);
   await snapshot(env, room);
+}
+
+// "Get notified" for cat owners (Nick, 2026-10-25: "if their cat ever gets to 25% hungry or 25% needing pets, they get a
+// notification"): a cat whose Fed or Happy meter (the card's: play/cats/room.js fullness() and happiness(), full to
+// empty over 36 h since it was fed and 30 h since it was petted or played with) is down to ALERT_AT, told once to the
+// owners' browsers signed up for "cats" (fans.js toCatOwners); again only after it's been fed (or petted) and run low
+// again. c.alertFed / c.alertPet: the fed / petted time it was told about. Not while it's off on an adventure.
+const ALERT_AT = 0.25;
+async function catAlerts(env, room, now) {
+  if (!env.GOLF || !env.VAPID_PRIVATE) return false;
+  let changed = false;
+  for (const c of room.cats) {
+    if (isAway(c, now) || !(c.owners || []).length) continue;
+    const fed = c.fed || c.born, pet = Math.max(c.petted || 0, c.played || 0, c.born || 0);
+    const hungry = 1 - (now - fed) / (36 * HOUR) <= ALERT_AT && c.alertFed !== fed;
+    const lonely = 1 - (now - pet) / (30 * HOUR) <= ALERT_AT && c.alertPet !== pet;
+    if (!hungry && !lonely) continue;
+    const msg = hungry && lonely ? { title: "🐟 " + c.name + " is hungry and wants attention", body: "Feed and pet " + c.name + " in the Cattery." }
+      : hungry ? { title: "🐟 " + c.name + " is getting hungry", body: c.name + "'s bowl is nearly empty. Feed " + c.name + " in the Cattery." }
+      : { title: "🐾 " + c.name + " wants attention", body: "It's been a while since " + c.name + " got any pets. Say hi in the Cattery." };
+    await toCatOwners(env, c.owners, { ...msg, url: "/play/cats/", tag: "cat-" + c.id }).catch(() => 0);
+    if (hungry) c.alertFed = fed;
+    if (lonely) c.alertPet = pet;
+    changed = true;
+  }
+  return changed;
 }

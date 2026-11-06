@@ -128,13 +128,9 @@
   // the hourly forecast for a point, cached for an hour (and its grid URL for good)
   function forecast(lat, lon) {
     var key = lat.toFixed(3) + "," + lon.toFixed(3);
-    var cached = JSON.parse(get("nm-golfwx-fc2:" + key) || "null");
+    var cached = JSON.parse(get("nm-golfwx-fc3:" + key) || "null");
     if (cached && Date.now() - cached.at < 3600e3) return Promise.resolve(cached.periods);
-    var grid = get("nm-golfwx-grid:" + key);
-    var findGrid = grid ? Promise.resolve(grid) : getJSON("https://api.weather.gov/points/" + key, { Accept: "application/geo+json" })
-      .then(function (d) { set("nm-golfwx-grid:" + key, d.properties.forecastHourly); return d.properties.forecastHourly; },
-        function (e) { throw e.status === 404 ? new Error("us") : e; });
-    return findGrid.then(function (url) { return getJSON(url, { Accept: "application/geo+json" }); }).then(function (d) {
+    return point(lat, lon).then(function (pt) { return getJSON(pt.hourly, { Accept: "application/geo+json" }); }).then(function (d) {
       var periods = d.properties.periods.map(function (p) {
         var speeds = String(p.windSpeed || "0").match(/\d+/g) || ["0"];
         return { t: p.startTime, temp: p.temperature, wind: Math.max.apply(null, speeds.map(Number)), dir: p.windDirection || "",
@@ -142,7 +138,7 @@
       });
       return laterDays(lat, lon, periods).then(function (more) { return periods.concat(more); }, function () { return periods; });
     }).then(function (periods) {
-      set("nm-golfwx-fc2:" + key, JSON.stringify({ at: Date.now(), periods: periods }));
+      set("nm-golfwx-fc3:" + key, JSON.stringify({ at: Date.now(), periods: periods }));
       return periods;
     });
   }
@@ -163,18 +159,119 @@
     var end = periods[periods.length - 1].t.slice(0, 13), until = lastDate(periods);
     if (end.slice(0, 10) > until || end >= until + "T" + LAST) return Promise.resolve([]);
     return getJSON("https://api.open-meteo.com/v1/forecast?latitude=" + lat.toFixed(4) + "&longitude=" + lon.toFixed(4) +
-      "&hourly=temperature_2m,precipitation_probability,wind_speed_10m,wind_direction_10m,weather_code" +
+      "&hourly=temperature_2m,precipitation_probability,precipitation,wind_speed_10m,wind_direction_10m,weather_code" +
       "&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto&forecast_days=" + (DAYS_AHEAD + 2)).then(function (d) {
       var h = d.hourly || {}, out = [];
       (h.time || []).forEach(function (t, i) {
         if (t.slice(0, 13) <= end || t.slice(0, 10) > until || h.temperature_2m[i] == null) return;
         out.push({ t: t, temp: Math.round(h.temperature_2m[i]), wind: Math.round(h.wind_speed_10m[i] || 0),
-          dir: COMPASS[Math.round((h.wind_direction_10m[i] || 0) / 22.5) % 16], rain: h.precipitation_probability[i] || 0,
+          dir: COMPASS[Math.round((h.wind_direction_10m[i] || 0) / 22.5) % 16], rain: h.precipitation_probability[i] || 0, mm: h.precipitation ? h.precipitation[i] || 0 : null,
           sky: skyOf(h.weather_code[i]), src: "om" });
       });
       return out;
     });
   }
+  // the Weather Service's addresses for a point (its hourly forecast, its 12-hour forecast, its raw grid) and its time
+  // zone, looked up once and remembered
+  function point(lat, lon) {
+    var key = lat.toFixed(3) + "," + lon.toFixed(3), saved = JSON.parse(get("nm-golfwx-pt:" + key) || "null");
+    if (saved) return Promise.resolve(saved);
+    return getJSON("https://api.weather.gov/points/" + key, { Accept: "application/geo+json" }).then(function (d) {
+      var p = d.properties, pt = { hourly: p.forecastHourly, daily: p.forecast, grid: p.forecastGridData, tz: p.timeZone };
+      set("nm-golfwx-pt:" + key, JSON.stringify(pt));
+      return pt;
+    }, function (e) { throw e.status === 404 ? new Error("us") : e; });
+  }
+
+  // ---------- each day's rain, three ways (Nick, 2026-10-25: weather.com said 50% for Friday, Google 10%, this page 17%:
+  // "how can we get a more accurate estimate"). The hours' colors stay as they are (each hour's own chance); beside
+  // each day, from 7 AM to 7 PM:
+  //   chance    the Weather Service's daytime chance of rain (its 12-hour forecast, 6 AM to 6 PM: the kind of number the
+  //             weather apps show for a day, always more than any one hour's); past its forecast, the model runs' (below)
+  //   amount    how much is expected, from the Weather Service's grid (quantitativePrecipitation), else Open-Meteo's hours
+  //   agreement the share of Europe's model's 51 runs and the US model's 31 (Open-Meteo's ensemble API, free, no key)
+  //             that are wet (0.04 in. or more from 7 AM to 7 PM); when the Weather Service and the
+  //             two disagree by RAIN_SPREAD points or more and one of them is RAIN_WORRY% or more (two
+  //             ways of saying "probably dry" aren't worth a warning), the day says "Forecasts disagree" with the range
+  // Cached an hour with the forecast; any part that doesn't answer is left out.
+  var RAIN_SPREAD = 25, RAIN_WORRY = 30, WET_MM = 1; // (a run counts as wet at 1 mm, about 0.04 in.: the models' coarse grids forecast a trace of drizzle far too often)
+  function rainFacts(lat, lon) {
+    var key = lat.toFixed(3) + "," + lon.toFixed(3), cached = JSON.parse(get("nm-golfwx-rain:" + key) || "null");
+    if (cached && Date.now() - cached.at < 3600e3) return Promise.resolve(cached.days);
+    var out = {};
+    function day(d) { return out[d] || (out[d] = {}); }
+    function inWindow(t) { var h = +t.slice(11, 13); return h >= FIRST && h < LAST; }
+    return point(lat, lon).then(function (pt) {
+      var geo = { Accept: "application/geo+json" };
+      var periods = getJSON(pt.daily, geo).then(function (d) {
+        d.properties.periods.forEach(function (p) {
+          if (!p.isDaytime) return;
+          var v = p.probabilityOfPrecipitation && p.probabilityOfPrecipitation.value;
+          day(p.startTime.slice(0, 10)).chance = v || 0;
+        });
+      }).catch(function () {});
+      // the grid's amounts come in spans ("2026-10-30T12:00:00+00:00/PT6H", mm): spread evenly over their hours, and
+      // the hours in the place's 7 AM to 7 PM added up
+      var amounts = getJSON(pt.grid, geo).then(function (d) {
+        var fmt = new Intl.DateTimeFormat("en-CA", { timeZone: pt.tz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" });
+        ((d.properties.quantitativePrecipitation || {}).values || []).forEach(function (v) {
+          var m = /^(.+)\/P(?:(\d+)D)?(?:T(?:(\d+)H)?)?/.exec(v.validTime);
+          if (!m || v.value == null) return;
+          var start = Date.parse(m[1]), n = (+(m[2] || 0)) * 24 + (+(m[3] || 0));
+          for (var i = 0; i < n; i++) {
+            var parts = {};
+            fmt.formatToParts(new Date(start + i * 3600e3)).forEach(function (x) { parts[x.type] = x.value; });
+            var t = parts.year + "-" + parts.month + "-" + parts.day + "T" + parts.hour;
+            if (!inWindow(t)) continue;
+            var dd = day(t.slice(0, 10));
+            dd.mm = (dd.mm || 0) + v.value / n;
+          }
+        });
+      }).catch(function () {});
+      var runs = getJSON("https://ensemble-api.open-meteo.com/v1/ensemble?latitude=" + lat.toFixed(4) + "&longitude=" + lon.toFixed(4) +
+        "&hourly=precipitation&models=ecmwf_ifs025,gfs025&timezone=auto&forecast_days=" + (DAYS_AHEAD + 2)).then(function (d) {
+        var h = d.hourly || {}, groups = { eu: /ecmwf/, us: /gefs/ };
+        Object.keys(groups).forEach(function (g) {
+          var members = Object.keys(h).filter(function (k) { return groups[g].test(k); }), totals = {};
+          members.forEach(function (k, mi) {
+            h[k].forEach(function (mm, i) {
+              var t = h.time[i];
+              if (!inWindow(t)) return;
+              var dt = t.slice(0, 10);
+              (totals[dt] = totals[dt] || [])[mi] = ((totals[dt] || [])[mi] || 0) + (mm || 0);
+            });
+          });
+          Object.keys(totals).forEach(function (dt) {
+            var wet = 0;
+            for (var mi = 0; mi < members.length; mi++) if ((totals[dt][mi] || 0) >= WET_MM) wet++;
+            day(dt)[g] = Math.round(100 * wet / members.length);
+          });
+        });
+      }).catch(function () {});
+      return Promise.all([periods, amounts, runs]);
+    }).then(function () {
+      set("nm-golfwx-rain:" + key, JSON.stringify({ at: Date.now(), days: out }));
+      return out;
+    }, function () { return out; });
+  }
+  // a day's rain line: its chance, the amount, and whether the forecasts agree
+  function rainLine(r, hours) {
+    if (!r) return "";
+    var omMm = hours.filter(function (h) { return h.src === "om" && h.mm != null; }), mm = r.mm != null ? r.mm : omMm.length ? omMm.reduce(function (n, h) { return n + h.mm; }, 0) : null;
+    var runs = [r.eu, r.us].filter(function (x) { return x != null; });
+    var chance = r.chance != null ? r.chance : runs.length ? Math.round(runs.reduce(function (a, b) { return a + b; }, 0) / runs.length) : null;
+    if (chance == null && mm == null) return "";
+    var all = (r.chance != null ? [r.chance] : []).concat(runs), lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
+    var inches = mm == null || mm < 0.25 ? "" : "about " + (mm / 25.4 < 0.1 ? (mm / 25.4).toFixed(2) : (mm / 25.4).toFixed(1)) + " in.";
+    var bits = [];
+    if (chance != null) bits.push("<b>" + chance + "%</b> chance of rain" + (r.chance == null ? " (model runs)" : ""));
+    if (inches) bits.push(inches);
+    // the hover line: just each source's number (Nick, 2026-10-25: the long version was too much to pop in and out)
+    var tip = [r.chance != null ? "Weather Service " + r.chance + "%" : "", r.eu != null ? "Europe " + r.eu + "%" : "", r.us != null ? "US " + r.us + "%" : ""].filter(Boolean).join(" · ");
+    return '<span class="gw-rain" tabindex="0" data-tip="' + esc(tip.trim()) + '">' + bits.join(" · ") +
+      (all.length > 1 && hi - lo >= RAIN_SPREAD && hi >= RAIN_WORRY ? ' · <span class="gw-disagree">Forecasts disagree: ' + lo + "–" + hi + "%</span>" : "") + "</span>";
+  }
+
   // the forecast's times are in the place's own time zone ("2026-10-14T13:00:00-05:00"): its date and hour as written
   function days(periods) {
     var byDay = {}, order = [];
@@ -329,11 +426,12 @@
         return '<div class="gw-day"><span class="gw-date">' + esc(dayName(d.date)) + "<small>" + esc(dayFmt(d.date, { month: "short", day: "numeric" })) + "</small></span>" +
           '<span class="gw-window' + (d.best ? "" : " none") + '">' + (d.best ? "<b>" + (d.best.allDay ? "Good all day: " : "") + hr(d.best.start) + " – " + hr(d.best.end) + "</b> <span class=\"meta\">· " +
             (d.best.temp[0] === d.best.temp[1] ? d.best.temp[0] : d.best.temp[0] + "–" + d.best.temp[1]) + "°F · wind up to " + d.best.wind + " mph · " + d.best.rain + "% rain</span>" : esc(d.why)) + "</span>" +
-          course + '<span class="gw-hours">' + cells.join("") + '</span><span class="gw-tip"></span></div>';
+          rainLine((state.rain || {})[d.date], d.hours) + course + '<span class="gw-hours">' + cells.join("") + '</span><span class="gw-tip"></span></div>';
       }).join("") +
       // (the color rules are at the top of the page, extras/golf-weather/index.html .gw-rules: keep them matching rate())
       '<div class="gw-key"><span>Forecast: <a href="https://www.weather.gov/" target="_blank" rel="noopener">National Weather Service</a>' +
         (state.data && state.data.some(function (d) { return d.hours.some(function (x) { return x.src === "om"; }); }) ? ', then <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a>' : "") +
+        (state.rain && Object.keys(state.rain).some(function (k) { return state.rain[k].eu != null; }) ? ' · model runs: <a href="https://open-meteo.com/en/docs/ensemble-api" target="_blank" rel="noopener">Open-Meteo</a> (ECMWF, NOAA GEFS)' : "") +
         (state.courses.length ? ' · courses: <a href="https://opengolfapi.org/" target="_blank" rel="noopener">OpenGolfAPI</a>' : "") +
       (state.course && state.holes.length ? ' · hole layout © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors' : "") + "</span></div>";
   }
@@ -349,7 +447,7 @@
         state.courses = courses;
         state.course = courses.filter(function (c) { return c.id === courseId; })[0] || null;
         var at = state.course || p;
-        return Promise.all([forecast(at.lat, at.lon), state.course ? holes(state.course) : []]).then(function (r) { state.holes = r[1]; return r[0]; });
+        return Promise.all([forecast(at.lat, at.lon), state.course ? holes(state.course) : [], rainFacts(at.lat, at.lon)]).then(function (r) { state.holes = r[1]; state.rain = r[2]; return r[0]; });
       });
     }).then(function (periods) {
       state.data = days(periods);
@@ -365,7 +463,7 @@
     state.course = c;
     var at = c || state.place;
     root.classList.add("loading");
-    Promise.all([forecast(at.lat, at.lon), c ? holes(c) : []]).then(function (r) { state.holes = r[1]; state.data = days(r[0]); render(); remember(); },
+    Promise.all([forecast(at.lat, at.lon), c ? holes(c) : [], rainFacts(at.lat, at.lon)]).then(function (r) { state.holes = r[1]; state.rain = r[2]; state.data = days(r[0]); render(); remember(); },
       function () { say("Couldn't get that course's forecast just now.", true); })
       .then(function () { root.classList.remove("loading"); });
   }
@@ -383,11 +481,11 @@
   root.addEventListener("click", function (e) {
     var b = e.target.closest("[data-course]");
     if (b) return pickCourse(b.dataset.course);
-    var h = e.target.closest(".gw-h[data-tip]");
+    var h = e.target.closest(".gw-h[data-tip], .gw-rain[data-tip]");
     if (h) h.closest(".gw-day").querySelector(".gw-tip").textContent = h.dataset.tip;
   });
   function tip(e) {
-    var h = e.target.closest && e.target.closest(".gw-h[data-tip]");
+    var h = e.target.closest && e.target.closest(".gw-h[data-tip], .gw-rain[data-tip]");
     if (h) h.closest(".gw-day").querySelector(".gw-tip").textContent = h.dataset.tip;
   }
   root.addEventListener("mouseover", tip);

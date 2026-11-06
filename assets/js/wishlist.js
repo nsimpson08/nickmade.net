@@ -47,7 +47,7 @@
   function load() {
     return api("/wishlist?visitorId=" + encodeURIComponent(VID) + (reveal ? "&reveal=1" : "")).then(function (d) {
       items = d.items || []; groups = d.groups || [];
-      if (ADMIN && !d.owner) { ADMIN = null; try { localStorage.removeItem("nm-admin-token"); } catch (e) {} } // an old password
+      if (ADMIN && !d.owner) { ADMIN = null; try { localStorage.removeItem("nm-admin-token"); } catch (e) {} document.dispatchEvent(new Event("nm-owner")); } // an old password (and the tag by the wordmark goes)
       render();
     }, function () { root.innerHTML = '<p class="wl-msg">Couldn’t load the list. Try again in a bit.</p>'; });
   }
@@ -63,10 +63,10 @@
     order.sort(function (a, b) { return a.localeCompare(b); });
     if (byGroup[""]) order.push("");
     var html = "";
-    if (ADMIN) html += '<div class="owner-bar wl-owner"><span>Owner mode</span>' +
-      '<button type="button" class="open wl-add"><span aria-hidden="true">+</span> Add an item</button>' +
+    if (ADMIN) html += '<div class="owner-bar wl-owner">' + // ("Owner mode · Log out" is by the wordmark: footer.js)
+      '<button type="button" class="pill-btn wl-add"><span aria-hidden="true">+</span> Add an item</button>' +
       '<button type="button" class="wl-reveal">' + (reveal ? "Hide what's claimed" : "Show what's claimed") + "</button>" +
-      '<a href="?logout">Log out</a></div>';
+      "</div>";
     if (!items.length) html += '<p class="wl-msg">' + (ADMIN ? "Nothing on the list yet. Add something." : "Nothing on the list right now.") + "</p>";
     var shown = order.filter(function (g) { return !view.off[g || "Other"]; });
     if (items.length) {
@@ -114,11 +114,11 @@
         (it.price ? '<p class="wl-price">' + esc(money(it.price)) + "</p>" : "") +
         (it.note ? '<p class="wl-note">' + esc(it.note) + "</p>" : "") +
         '<div class="wl-actions">' +
-          (it.url ? '<a class="open wl-shop" href="' + esc(it.url) + '" target="_blank" rel="noopener">View' + (host(it.url) ? '<span class="wl-host">&nbsp;at ' + esc(host(it.url)) + "</span>" : "") + "&nbsp;↗</a>" : "") +
+          (it.url ? '<a class="pill-btn wl-shop" href="' + esc(it.url) + '" target="_blank" rel="noopener">View' + (host(it.url) ? '<span class="wl-host">&nbsp;at ' + esc(host(it.url)) + "</span>" : "") + "&nbsp;↗</a>" : "") +
           (ADMIN && !reveal ? "" :
             it.mine ? '<span class="wl-yours">You’re getting this</span> <button type="button" class="wl-undo">Undo</button>' :
             taken ? '<span class="wl-taken">Someone’s getting this</span>' :
-            '<button type="button" class="open wl-claim">I’m getting this</button>') +
+            '<button type="button" class="pill-btn wl-claim">I’m getting this</button>') +
           (ADMIN ? '<button type="button" class="wl-edit">Edit</button><button type="button" class="wl-remove">Remove</button>' : "") +
         "</div>" +
       "</div></li>";
@@ -212,7 +212,7 @@
       '<label for="wl-image">Picture link <span class="optional">(filled in from the link; change it if it’s wrong)</span></label><input id="wl-image" type="url" autocomplete="off" value="' + esc(it && it.image) + '">' +
       '<label class="wl-check"><input type="checkbox" id="wl-star"' + (it && it.star ? " checked" : "") + "> ★ Most wanted</label>" +
       '<p class="error" role="alert"></p>' +
-      '<button class="open submit" type="submit">' + (it ? "Save" : "Add to the list") + "</button></form>";
+      '<button class="pill-btn submit" type="submit">' + (it ? "Save" : "Add to the list") + "</button></form>";
     document.body.appendChild(d);
     var f = d.querySelector("form"), $ = function (s) { return d.querySelector(s); };
     d.addEventListener("close", function () { d.remove(); });
@@ -254,7 +254,7 @@
     d.className = "queue-dialog";
     d.innerHTML = '<form novalidate><h2>Owner login</h2><p class="hint">Enter your admin password. This browser will remember it.</p>' +
       '<label for="wl-admin">Password</label><input id="wl-admin" type="password" autocomplete="current-password">' +
-      '<p class="error" role="alert"></p><button class="open submit" type="submit">Log in</button></form>';
+      '<p class="error" role="alert"></p><button class="pill-btn submit" type="submit">Log in</button></form>';
     document.body.appendChild(d);
     var input = d.querySelector("input"), err = d.querySelector(".error");
     d.addEventListener("close", function () { d.remove(); });
@@ -265,6 +265,7 @@
         if (!r.ok) { err.textContent = "Wrong password."; return; }
         ADMIN = token;
         try { localStorage.setItem("nm-admin-token", token); } catch (e2) {}
+        document.dispatchEvent(new Event("nm-owner"));
         history.replaceState(null, "", location.pathname);
         d.close();
         load();

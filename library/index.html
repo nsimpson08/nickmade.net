@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Library · NickMade</title>
+  <meta name="description" content="Everything Nick Simpson collects: movies, vinyl records, books, and board games.">
+  <!-- link previews (1.7): the image is made by tools/make_og.js -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="NickMade">
+  <meta property="og:title" content="Library · NickMade">
+  <meta property="og:description" content="Everything Nick Simpson collects: movies, vinyl records, books, and board games.">
+  <meta property="og:url" content="https://nickmade.net/library/">
+  <meta property="og:image" content="https://nickmade.net/assets/og/extras.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500&family=Unbounded:wght@500;600;700;800&display=swap">
+  <link rel="stylesheet" href="/assets/css/site.css">
+</head>
+<body class="page-libraries page-library-hub">
+  <header class="topbar">
+    <a class="wordmark" href="/">Nick<span>Made</span></a>
+    <nav>
+      <a href="/games/">Games</a>
+      <a href="/movies/">Movies</a>
+      <a href="/music/">Music</a>
+      <a href="/photography/">Photography</a>
+      <a href="/library/" aria-current="page">Library</a>
+      <a href="/play/">Play</a>
+      <a href="/extras/">Extras</a>
+    </nav>
+  </header>
+
+  <!-- Library (Ver 1.7): the four collections. The movie discs are /library/movies/ (library.js; it was
+       /movies/library/, which now forwards here); the other three are /library/vinyl/, books/ and board-games/ (collection.js, worker/src/collections.js). -->
+  <main class="content">
+    <header class="page-head">
+      <h1>Library</h1>
+      <p>Physical. Media. Forever.</p>
+    </header>
+    <!-- the four collections as video store aisles (Nick, 2026-10-30, "Option A" of three mockups): each a row with its
+         name, its count and a strip of covers fading off the right; Nick's picked covers first (PICKS below) -->
+    <section class="hub-aisles">
+      <a class="hub-aisle hub-discs" href="/library/movies/" style="--c: var(--red)">
+        <div class="hub-lab"><h2>Movies</h2><span class="hub-n" data-count="discs">Movies</span><span class="hub-go">Browse the shelves <span aria-hidden="true">→</span></span></div>
+        <div class="hub-strip" data-hub="discs" aria-hidden="true"></div>
+      </a>
+      <a class="hub-aisle hub-vinyl" href="/library/vinyl/" style="--c: var(--amber)">
+        <div class="hub-lab"><h2>Vinyl</h2><span class="hub-n" data-count="vinyl">Records</span><span class="hub-go">Flip through <span aria-hidden="true">→</span></span></div>
+        <div class="hub-strip" data-hub="vinyl" aria-hidden="true"></div>
+      </a>
+      <a class="hub-aisle hub-games" href="/library/board-games/" style="--c: var(--mint)">
+        <div class="hub-lab"><h2>Board games</h2><span class="hub-n" data-count="games">Games</span><span class="hub-go">Open the closet <span aria-hidden="true">→</span></span></div>
+        <div class="hub-strip" data-hub="games" aria-hidden="true"></div>
+      </a>
+      <a class="hub-aisle hub-books" href="/library/books/" style="--c: var(--sky)">
+        <div class="hub-lab"><h2>Books</h2><span class="hub-n" data-count="books">Books</span><span class="hub-go">Browse the shelves <span aria-hidden="true">→</span></span></div>
+        <div class="hub-strip" data-hub="books" aria-hidden="true"></div>
+      </a>
+    </section>
+  </main>
+  <footer id="site-footer">&copy; 2026 Nick Simpson</footer>
+  <script>
+    // each aisle's count and its strip of covers (up to STRIP): the ones Nick picked first (PICKS, by title, in that
+    // order; Nick, 2026-10-25: not the newest), then the newest. An aisle with nothing yet (Books) shows dim spines
+    // and "Shelving soon". Drawn at once from what this browser saw last
+    // time (localStorage; the covers themselves are in its cache, photos.nickmade.net keeps them a year), then checked
+    // against the Worker and redrawn only if something changed (Nick, 2026-10-25: the cards used to wait on the
+    // Worker every visit, an emoji and then the covers popping in)
+    (function () {
+      var local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+      var API = local ? "http://localhost:8787" : "https://api.nickmade.net";
+      var PICKS = { discs: ["Apocalypto", "The Green Knight", "The Land Before Time"], vinyl: ["I'm Like A Virgin Losing A Child", "Swimming", "good kid, m.A.A.d city"], books: [],
+        games: ["Calico", "Azul", "Scattergories"] }; // (Nick, 2026-10-30)
+      var NOUN = { discs: ["film", "films"], // (the Movies card counts films: discs and VHS tapes alike)
+                  vinyl: ["record", "records"], books: ["book", "books"], games: ["game", "games"] };
+      var STRIP = 14;
+      var SPINES = ["#3b5b7a", "#8a3b2e", "#2f5d4a", "#6b4c8a", "#9a7a2e", "#3a3a44"];
+      function draw(k, v) {
+        document.querySelector('[data-count="' + k + '"]').textContent = v.n ? v.n.toLocaleString("en-US") + " " + NOUN[k][v.n === 1 ? 0 : 1] : "Coming soon";
+        var art = document.querySelector('[data-hub="' + k + '"]');
+        art.innerHTML = "";
+        art.parentNode.classList.toggle("empty", !v.covers.length);
+        if (!v.covers.length) { // nothing on this shelf yet: a row of plain spines
+          for (var n = 0; n < 18; n++) { var sp = document.createElement("span"); sp.className = "hub-spine"; sp.style.background = SPINES[n % SPINES.length]; sp.style.height = (78 + (n * 37 % 23)) + "%"; art.appendChild(sp); }
+          var soon = document.createElement("span"); soon.className = "hub-soon"; soon.textContent = "Shelving soon"; art.appendChild(soon);
+          return;
+        }
+        v.covers.forEach(function (src, n) { var i = document.createElement("img"); i.src = src; i.alt = ""; i.decoding = "async"; i.style.setProperty("--i", n); if (n > 6) i.loading = "lazy"; art.appendChild(i); });
+      }
+      // the movie discs: discs.js (the import) and the Worker's (added on the site, hidden imports), put together the
+      // way the Movie Library does (assets/js/library.js rebuild()) so the count is the same: hidden ones out, a film
+      // on both Blu-ray and 4K once; newest first by the date added
+      function norm(t) { return String(t).toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/&/g, "and").replace(/[^a-z0-9]+/g, " ").trim(); }
+      // every list this page needs, fetched once and shared with the poster wall (wall.js collectHub reads
+      // window.NMHubData; Nick, 2026-10-30: each was fetched twice)
+      var json = function (path) { return fetch(API + path).then(function (r) { return r.ok ? r.json() : {}; }).catch(function () { return {}; }); };
+      var DATA = window.NMHubData = {
+        discs: fetch("/library/movies/discs.js").then(function (r) { return r.ok ? r.text() : ""; }).then(function (code) { var w = {}; try { new Function("window", code)(w); } catch (e) {} return w.DISCS || []; }).catch(function () { return []; }),
+        library: json("/library"), vinyl: json("/collection/vinyl"), books: json("/collection/books"), games: json("/collection/games"),
+      };
+      // a cover's small copy (collection.js small(): its 400 px thumb while made from this cover, Apple's art at 400 px)
+      function small(d) {
+        if (d.thumb && d.thumbOf === d.cover) return d.thumb;
+        if (/^https:\/\/is\d-ssl\.mzstatic\.com\//.test(d.cover || "")) return d.cover.replace(/\/\d+x\d+[a-z]*\.(jpg|png|webp)$/, "/400x400bb.jpg");
+        return d.cover;
+      }
+      function movieDiscs() {
+        return Promise.all([DATA.discs, DATA.library]).then(function (x) {
+          var gone = {}, has4k = {};
+          (x[1].hidden || []).forEach(function (id) { gone[id] = true; });
+          var all = x[0].filter(function (d) { return !gone[d.id]; }).concat(x[1].items || []);
+          function film(d) { return d.imdbId || norm(d.title) + "|" + (d.year || ""); }
+          all.forEach(function (d) { if (d.format === "4k") has4k[film(d)] = true; });
+          return { items: all.filter(function (d) { return !(d.format === "bluray" && has4k[film(d)]); })
+            .sort(function (a, b) { return String(b.added || "").localeCompare(String(a.added || "")); })
+            .map(function (d) { return { title: d.title, cover: d.cover && !/^(https?:)?\/\/|^\//.test(d.cover) ? "/library/movies/" + d.cover : String(d.cover || "").replace("image.tmdb.org/t/p/w500/", "image.tmdb.org/t/p/w342/") }; }) }; // (TMDB's posters at 342 px: plenty for the strip)
+        });
+      }
+      ["discs", "vinyl", "books", "games"].forEach(function (k) {
+        var key = "nm-lib-hub2-" + k, // (hub2: the aisles keep a longer strip than the old cards' three)
+             last = null;
+        try { last = localStorage.getItem(key); if (last) draw(k, JSON.parse(last)); } catch (e) { last = null; }
+        (k === "discs" ? movieDiscs() : DATA[k]).then(function (d) {
+          var items = d.items || [];
+          var withCover = items.filter(function (x) { return x.cover; }), picked = [];
+          PICKS[k].forEach(function (t) { var m = withCover.filter(function (x) { return norm(x.title) === norm(t); })[0]; if (m) picked.push(small(m)); });
+          withCover.forEach(function (x) { var c = small(x); if (picked.length < STRIP && picked.indexOf(c) < 0) picked.push(c); });
+          var v = { n: items.length, covers: picked.slice(0, STRIP) };
+          var now = JSON.stringify(v);
+          if (now === last) return;
+          draw(k, v);
+          try { localStorage.setItem(key, now); } catch (e) {}
+        }).catch(function () {});
+      });
+    })();
+  </script>
+  <script src="/assets/js/wall.js" data-api="https://api.nickmade.net" data-api-local="http://localhost:8787"></script>
+  <script src="/changelog/log.js"></script>
+  <script src="/assets/js/footer.js"></script>
+</body>
+</html>

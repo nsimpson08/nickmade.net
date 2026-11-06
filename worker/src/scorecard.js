@@ -50,6 +50,7 @@
 // Course data is from OpenGolfAPI (https://opengolfapi.org, ODbL, keyless, ~500 calls a day per caller), cached in
 // KV so each course costs one call a month: scorecard:search:<q> (7 days), scorecard:api:<id> (30 days).
 // Nick's own courses (Pecan Hollow, Firewheel Old) are hand-made files in extras/scorecard/courses/, not from here.
+import { aiRun } from "./aimeter.js"; // (every AI call is metered: aimeter.js)
 
 const OGA = "https://api.opengolfapi.org";
 const DAY = 86400;
@@ -387,10 +388,11 @@ async function readCard(request, env, cors, h) {
     max_tokens: part === "nines" ? 5000 : 2500, temperature: 0 };
   for (let tries = 0; tries < 2 && !out; tries++) { // Workers AI sometimes fails a request outright; once more usually works
     if (tries) await new Promise((r) => setTimeout(r, 1500));
-    try { out = await env.AI.run(model, ask); } catch (e) { err = e; }
+    try { out = await aiRun(env, model, ask, "scorecard"); } catch (e) { err = e; }
   }
   // Workers AI's free daily allowance (10,000 neurons, reset at midnight UTC) used up: say so, not "in a moment"
-  if (!out && /4006|daily free allocation/i.test(String(err && (err.message || err)))) {
+  // (or the AI meter's ceiling or off switch: aimeter.js) — to a visitor, the same "done for today"
+  if (!out && /4006|daily free allocation|switched off|allowance is used up/i.test(String(err && (err.message || err)))) {
     return h.json({ error: "The card reader has done all it can for today. Type the numbers in, or try again tomorrow." }, 429, cors);
   }
   if (!out) return h.json({ error: "The card reader couldn't read that one just now. Try again in a moment.", detail: me.owner ? String(err && (err.message || err)) : undefined }, 502, cors);
@@ -713,7 +715,25 @@ async function putRound(request, id, env, cors, h) {
   if (!me.owner && Number.isFinite(r.finishedAt) && !(have && have.finished_at) && h.tellOwner) {
     await h.tellOwner(env, { type: "round", player: str(r.player, 24), course: str(r.courseName, 80), strokes: n(t.strokes, 400), par: n(t.par, 120), holes: n(t.done, 18) });
   }
+  // Nick finished a round on a real course (one for his Golf page): "Get notified" golf (Nick, 2026-10-27: "a
+  // notification option ... for when I play a live golf round only", sent when he finishes). Only a round played
+  // today or yesterday, so a scanned old card brought in later doesn't send one
+  if (me.owner && r.onSite && Number.isFinite(r.finishedAt) && !(have && have.finished_at) && h.fans && recentDay(r.day)) {
+    const strokes = n(t.strokes, 400), par = n(t.par, 120), done = n(t.done, 18), course = str(r.courseName, 80) || "the course";
+    const diff = strokes && par ? strokes - par : null;
+    h.fans("golf", { title: "⛳ Nick shot " + (strokes || "a round") + " at " + course,
+      body: [diff == null ? "" : diff === 0 ? "Even par" : (diff > 0 ? "+" : "") + diff, done ? done + " holes" : ""].filter(Boolean).join(" · "),
+      // the round's own scorecard, opened on the Golf page (its #card= link, as the home Lately strip uses; Nick,
+      // 2026-10-27: "go straight to the scorecard as open dialog on the Golf page")
+      url: "/extras/golf/#card=" + encodeURIComponent(id), name: course }); // (sent after the reply, so the phone on the course isn't kept waiting)
+  }
   return h.json({ ok: true }, 200, cors);
+}
+
+// a round's day (YYYY-MM-DD) is today or yesterday in Plano
+function recentDay(day) {
+  const fmt = (t) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago" }).format(t);
+  return day === fmt(new Date()) || day === fmt(new Date(Date.now() - 864e5));
 }
 
 async function deleteRound(request, url, id, env, cors, h) {

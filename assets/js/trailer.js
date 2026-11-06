@@ -12,7 +12,7 @@
     // the button, first in a case's row of links
     button: function (key, title) {
       if (!/^[\w-]{11}$/.test(key || "")) return "";
-      return '<button type="button" class="open trailer-btn" data-trailer="' + esc(key) + '" data-title="' + esc(title || "") + '" aria-expanded="false">' + PLAY + "<span>Trailer</span></button>";
+      return '<button type="button" class="pill-btn trailer-btn" data-trailer="' + esc(key) + '" data-title="' + esc(title || "") + '" aria-expanded="false">' + PLAY + "<span>Trailer</span></button>";
     },
     // add the button to an open case once its trailer is known (the Library looks it up after the case opens)
     addTo: function (dialog, key, title) {

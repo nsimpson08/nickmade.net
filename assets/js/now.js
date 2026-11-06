@@ -23,7 +23,7 @@
         if (!d.links || !d.links.length) return;
         var bar = document.createElement("p");
         bar.className = "owner-bar home-owner";
-        bar.innerHTML = "<span>Owner mode</span>";
+        // ("Owner mode · Log out" floats at the top left: footer.js)
         d.links.forEach(function (l) {
           var a = document.createElement("a");
           a.href = l.href;
@@ -149,7 +149,7 @@
   function latestRound() {
     return Promise.all([loadData("/extras/golf/scores.js", "GOLF"), loadData("/extras/golf/trackman.js", "GOLF_TRACKMAN"), scorecardRounds()]).then(function (d) {
       var golf = d[0] || {};
-      var rounds = (d[1] || []).concat(golf.trackman || [], golf.xgolf || [], golf.birdies || [], d[2] || [])
+      var rounds = (d[1] || []).concat(golf.trackman || [], golf.xgolf || [], d[2] || [])
         .filter(function (r) { return r && r.date && r.score && r.course && !r.hidden && !r.example; })
         .sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
       return rounds[0] || null;

@@ -2,8 +2,9 @@
 // real pages, driven step by step in headless Chrome at 2x, one screenshot per video frame.
 //   1. Golf: the Score Trend chart (localhost:8000/extras/golf/), the pointer sweeping across the rounds so the
 //      chart's own crosshair and tooltip follow it
-//   2. Video Game Montage Maker, run locally with its password off (REQUIRE_PASSWORD=false PORT=5099 python app.py in
-//      its folder), dark theme: the gamertag typed, Apply, Nick's recent Xbox games load, three get ticked
+//   2. Golf weather (localhost:8000/extras/golf-weather/, the forecast live from the National Weather Service): it
+//      opens on Plano; Hilton Head's ZIP (29928) typed over it, Check, its courses and week load, the pointer runs across today's hours with the page's tooltip
+//      (until 2026-10-25 this was the Video Game Montage Maker, taken off the site)
 // Usage: node record_extras.js <work folder>   (needs puppeteer-core: npm i puppeteer-core@23)
 // Writes <work>/extras-raw/NNNN.png (1920x1200) and <work>/extras-raw/cursor.json [[x, y, click], ...] in 960x600 units.
 const fs = require("fs"), path = require("path");
@@ -49,43 +50,39 @@ const VW = 960, VH = 600;
   at = await move(at, [svg.x + svg.w * 0.95, svg.y + svg.h * 0.4], 24, true);
   await page.mouse.move(0, 0);
 
-  // ---- 2. Montage Maker ----
-  await page.setViewport({ width: 1100, height: 2600, deviceScaleFactor: 2 });
-  await page.goto("http://localhost:5099/", { waitUntil: "networkidle2" });
-  await page.click("#themeToggle");
-  const box = await page.evaluate(() => { const r = document.querySelector("#trueAchievementsUserId").getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
-  clip = { x: 40, y: box.y - 70, width: 1020, height: 1020 * VH / VW };
-  const top = clip.y;
-  const input = [box.x + 60, box.y + box.h / 2];
-  at = [input[0] + 300, input[1] + 220];
+  // ---- 2. Golf weather ----
+  await page.setViewport({ width: 1100, height: 2000, deviceScaleFactor: 2 });
+  await page.goto("http://localhost:8000/extras/golf-weather/", { waitUntil: "networkidle0" });
+  await page.waitForSelector(".gw-day .gw-h", { timeout: 40000 }); // it opens on Plano's week
+  const rect = (sel) => page.evaluate((s) => { const r = document.querySelector(s).getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; }, sel);
+  const form = await rect("#gw-search"), zip = await rect("#gw-zip"), go = await rect("#gw-search button");
+  clip = { x: 40, y: form.y - 26, width: 1020, height: 1020 * VH / VW };
+  at = [zip.x + 420, zip.y + 230];
   for (let i = 0; i < 4; i++) await shot(at[0], at[1]);
+  const input = [zip.x + 50, zip.y + zip.h / 2];
   at = await move(at, input, 12, true);
-  await page.mouse.click(input[0], input[1]);
+  await page.mouse.click(input[0], input[1], { clickCount: 3 }); // (selects Plano's ZIP, to type over it)
   await shot(at[0], at[1], true);
-  for (const ch of "helloJimHalpert") { await page.keyboard.type(ch); await shot(at[0], at[1]); await shot(at[0], at[1]); }
-  const apply = await page.evaluate(() => { const b = [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "Apply").getBoundingClientRect(); return [b.x + b.width / 2, b.y + b.height / 2]; });
-  at = await move(at, apply, 10, true);
-  await page.mouse.click(apply[0], apply[1]);
+  const before = await page.$eval(".gw-best", (e) => e.textContent);
+  for (const ch of "29928") { await page.keyboard.type(ch); await shot(at[0], at[1]); await shot(at[0], at[1]); }
+  const check = [go.x + go.w / 2, go.y + go.h / 2];
+  at = await move(at, check, 10, true);
+  await page.mouse.click(check[0], check[1]);
   await shot(at[0], at[1], true);
-  await page.waitForFunction(() => document.querySelectorAll(".form-check-input").length > 10, { timeout: 30000 });
-  await new Promise((r) => setTimeout(r, 300));
-  for (let i = 0; i < 8; i++) await shot(at[0], at[1]);
-  const spot = (t) => page.evaluate((t) => { const r = [...document.querySelectorAll(".form-check-input")].find((e) => e.value === t).getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; }, t);
-  // tick three games; the view pans down the list on the way to the ones further down
-  for (const [title, pan] of [["Minecraft Dungeons II", 0], ["Forza Horizon 6", 150], ["Gears of War: Reloaded", 270]]) {
-    const c = await spot(title), from = at, y0 = clip.y;
-    for (let i = 1; i <= 12; i++) {
-      const u = ease(i / 12);
-      clip = { ...clip, y: y0 + (top + pan - y0) * u };
-      at = [from[0] + (c[0] - from[0]) * u, from[1] + (c[1] - from[1]) * u];
-      await page.mouse.move(at[0], at[1]);
-      await shot(at[0], at[1]);
-    }
-    await page.mouse.click(c[0], c[1]);
-    await shot(at[0], at[1], true);
-    for (let i = 0; i < 4; i++) await shot(at[0], at[1]);
+  // the week's forecast (the National Weather Service's, live): nearby courses, the best times, then a row per day
+  await page.waitForFunction((b) => { const e = document.querySelector(".gw-best"); return e && e.textContent !== b && document.querySelector(".gw-day .gw-h"); }, { timeout: 40000 }, before);
+  await new Promise((r) => setTimeout(r, 400));
+  for (let i = 0; i < 10; i++) await shot(at[0], at[1]);
+  // across today's hours: the page's own tooltip follows the pointer
+  const cells = await page.evaluate(() => [...document.querySelector(".gw-day").querySelectorAll(".gw-h")].map((e) => { const r = e.getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; }));
+  const bottom = clip.y + clip.height - 40, row = cells[0][1];
+  if (row > bottom) { // pan down so the row is in view
+    const y0 = clip.y;
+    for (let i = 1; i <= 10; i++) { clip = { ...clip, y: y0 + (row - bottom) * ease(i / 10) }; await shot(at[0], at[1]); }
   }
-  for (let i = 0; i < 12; i++) await shot(at[0], at[1]);
+  at = await move(at, cells[2], 14, true);
+  at = await move(at, cells[Math.min(9, cells.length - 1)], 40, true);
+  for (let i = 0; i < 16; i++) await shot(at[0], at[1]);
   fs.writeFileSync(path.join(OUT, "cursor.json"), JSON.stringify(cursor));
   console.log(n + " frames");
   await browser.close();

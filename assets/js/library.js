@@ -1,4 +1,4 @@
-// Movies > Library: every disc Nick owns (movies/library/discs.js, from tools/discs.py), shelved like a video store.
+// Library > Movies: every disc Nick owns (library/movies/discs.js, from tools/discs.py), shelved like a video store.
 // Aisles along the top (All A–Z, New Arrivals, genres, Criterion, Box Sets & TV) plus format chips and a search; each
 // aisle has a hanging sign, and the cases stand face out on shelves. A case's top band shows its format (Blu-ray blue,
 // 4K black, DVD grey). Click one for the back of the case: blurb, cast, edition, and a link to Nick's review if the
@@ -15,6 +15,7 @@
   var API = (local ? script.dataset.apiLocal : script.dataset.api) || "";
   var base = (window.DISCS || []).slice(); // discs.js
   var site = [], hidden = [];             // from the Worker
+  var discEdits = {};                     // (Worker library:edits) Nick's changes to discs.js discs, by id
   var discs = base.slice();
   var countEl = document.getElementById("lib-count");
 
@@ -23,15 +24,43 @@
   // A film on both Blu-ray and 4K is shelved once, as the 4K (Nick, 1.3): the Blu-ray is left off the shelves (it's
   // still in discs.js / the Worker). Matched by IMDb id, or title + year. Applies to site-added discs too.
   function filmKey(d) { return d.imdbId || norm(d.title) + "|" + (d.year || ""); }
+  // Nick's Pick goes on the best copy of a film only (Nick, 2026-10-25: Alien's 4K had it, then the VHS tape too):
+  // 4K, then Blu-ray, then DVD, then VHS; bestFormat holds each title's best on the shelves (rebuild)
+  var RANK = { "4k": 4, bluray: 3, dvd: 2, vhs: 1 }, bestFormat = {};
+  var shelfAs = {}; // (rebuild) each film's best copy, whose sort key all its copies shelve by
+  function shelfOf(d) { return shelfAs[norm(d.title) + "|" + (d.year || "")] || d; }
+  function shelfKey(d) { return sortKey(shelfOf(d)); }
+  function isPick(d) { var k = norm(d.title); return pickOf(k) && (RANK[d.format] || 0) >= (bestFormat[k] || 0); }
+  // picks Nick changed from an open case (owner mode, Nick, 2026-10-30; the Worker's library:picks) win over the lists
+  var pickEdits = { on: [], off: [] };
+  function pickOf(k) { return pickEdits.off.indexOf(k) >= 0 ? false : pickEdits.on.indexOf(k) >= 0 || !!picks[k]; }
   function rebuild() {
     var gone = {}, has4k = {};
     hidden.forEach(function (id) { gone[id] = true; });
+    // Nick's edits laid over a discs.js disc (a picked cover: its spine colour then measured from it, as a site disc's)
+    base.forEach(function (d) {
+      var e = discEdits[d.id];
+      if (!e) return;
+      Object.keys(e).forEach(function (k) {
+        if (k === "cover") { if (e.cover && d.cover !== e.cover) { d.cover = e.cover; delete d.spine; delete d.spineLight; d.coverPicked = true; } return; }
+        d[k] = e[k];
+      });
+    });
     var all = base.filter(function (d) { return !gone[d.id]; }).concat(site);
     all.forEach(function (d) { if (d.format === "4k") has4k[filmKey(d)] = true; });
-    discs = all.filter(function (d) { return !(d.format === "bluray" && has4k[filmKey(d)]); }).sort(function (a, b) {
-      var x = sortKey(a), y = sortKey(b);
-      return x < y ? -1 : x > y ? 1 : (a.year || 0) - (b.year || 0);
+    // every copy of a film is shelved by its best copy's sort key, side by side, best format first (Nick, 2026-11-05:
+    // the Jurassic Park III tape was far from the 4K, which files under its box set "Jurassic World: 5-Movie Collection 03")
+    shelfAs = {};
+    all.forEach(function (d) {
+      var k = norm(d.title) + "|" + (d.year || ""), cur = shelfAs[k];
+      if (!cur || (RANK[d.format] || 0) > (RANK[cur.format] || 0)) shelfAs[k] = d;
     });
+    discs = all.filter(function (d) { return !(d.format === "bluray" && has4k[filmKey(d)]); }).sort(function (a, b) {
+      var x = shelfKey(a), y = shelfKey(b);
+      return x < y ? -1 : x > y ? 1 : (a.year || 0) - (b.year || 0) || (RANK[b.format] || 0) - (RANK[a.format] || 0);
+    });
+    bestFormat = {};
+    discs.forEach(function (d) { var k = norm(d.title); bestFormat[k] = Math.max(bestFormat[k] || 0, RANK[d.format] || 0); });
   }
   rebuild(); // straight away, before the Worker's discs arrive
 
@@ -91,7 +120,7 @@
     });
   }
   function colourSiteDiscs() {
-    var todo = site.filter(function (d) { return d.cover && !d.spine; });
+    var todo = site.concat(base.filter(function (d) { return d.coverPicked; })).filter(function (d) { return d.cover && !d.spine; });
     if (todo.length) Promise.all(todo.map(spineFor)).then(function () { if (state.view === "spines") render(); });
   }
 
@@ -111,6 +140,9 @@
 
   var FORMAT = { "4k": "4K Ultra HD", bluray: "Blu-ray", dvd: "DVD", vhs: "VHS" };
   var FORMATS = ["4k", "bluray", "dvd", "vhs"]; // best first: the order of the chips, counts and add options
+  var GROUPS = { hd: ["4k", "bluray"], sd: ["dvd", "vhs"] }; // the HD and SD chips
+  // is this disc in that chip's format (one of the formats, a group, or Dolby Vision)
+  function inFormat(d, f) { return f === "dv" ? (d.hdr || []).indexOf("dv") >= 0 : GROUPS[f] ? GROUPS[f].indexOf(d.format) >= 0 : d.format === f; }
   // DVDs were on the shelves with nothing saying "DVD" in 1.3 (no format chip, count, band, label, or add option);
   // since 1.4 they're shown like the rest, and VHS tapes joined them (Nick). false hides DVDs again.
   var SHOW_DVD = true;
@@ -136,7 +168,8 @@
     return String(t).toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/&/g, "and").replace(/[^a-z0-9]+/g, " ").trim();
   }
   function letter(d) {
-    var c = norm(d.sort || d.title).charAt(0).toUpperCase();
+    var b = shelfOf(d); // (under its best copy's letter, where it's shelved)
+    var c = norm(b.sort || b.title).charAt(0).toUpperCase();
     return /[A-Z]/.test(c) ? c : "#";
   }
   function month(date) {
@@ -188,11 +221,15 @@
   root.innerHTML =
     '<div class="lib-bar">' +
       '<div class="lib-aisles" role="toolbar" aria-label="Aisles">' +
-        aisles.map(function (a) { return '<button type="button" data-aisle="' + esc(a.key) + '">' + esc(a.name) + "</button>"; }).join("") +
+        // Nick's Picks wears the board games filter's star (Nick, 2026-10-30)
+        aisles.map(function (a) { return '<button type="button" data-aisle="' + esc(a.key) + '">' + (a.key === "picks" ? '<span class="star" aria-hidden="true">★</span>' : "") + esc(a.name) + "</button>"; }).join("") +
       "</div>" +
       '<div class="lib-tools">' +
         '<div class="lib-formats" role="group" aria-label="Format">' +
           '<button type="button" data-format="">All formats</button>' +
+          // HD and SD (Nick, 2026-10-25: so "Pick for tonight" can leave the tapes out): groups of the formats below
+          '<button type="button" data-format="hd" class="fg">HD</button>' +
+          '<button type="button" data-format="sd" class="fg">SD</button>' +
           '<button type="button" data-format="4k" class="f-4k">4K</button>' +
           // Dolby Vision (Nick, 1.4): 4K discs with it, between 4K and Blu-ray
           '<button type="button" data-format="dv" class="f-dv">Dolby Vision</button>' +
@@ -207,8 +244,8 @@
         "</div>" +
         '<label class="lib-search"><span class="sr-only">Search the library</span>' +
           '<input type="search" placeholder="Search titles, directors, actors" autocomplete="off"></label>' +
-        '<button type="button" class="open lib-pick">Pick for tonight</button>' +
-        '<button type="button" class="open lib-add-btn" hidden><span aria-hidden="true">+</span> Add a disc</button>' +
+        '<button type="button" class="pill-btn lib-pick">Pick for tonight</button>' +
+        '<button type="button" class="pill-btn lib-add-btn" hidden><span aria-hidden="true">+</span> Add a disc</button>' +
       "</div>" +
       '<nav class="lib-letters" aria-label="Jump to a letter" hidden></nav>' + // A–Z view only, pinned with the rest
     "</div>" +
@@ -250,8 +287,7 @@
   });
 
   function matches(d) {
-    if (state.format === "dv") { if ((d.hdr || []).indexOf("dv") < 0) return false; }
-    else if (state.format && d.format !== state.format) return false;
+    if (state.format && !inFormat(d, state.format)) return false;
     if (state.q) {
       var hay = norm([d.title, d.director, (d.starring || []).join(" "), d.edition, (d.films || []).join(" ")].join(" "));
       if (hay.indexOf(state.q) < 0) return false;
@@ -260,7 +296,7 @@
     if (a === "new" || a === "all") return true;
     if (a === "criterion") return !!d.criterion;
     if (a === "box") return d.kind === "box" || d.kind === "tv";
-    if (a === "picks") return !!picks[norm(d.title)];
+    if (a === "picks") return isPick(d);
     if (a.indexOf("g:") === 0) return (d.genres || []).indexOf(a.slice(2)) >= 0;
     return true;
   }
@@ -275,19 +311,19 @@
   // ---------- shelves ----------
   function caseHtml(d, big) {
     var stickers = "";
-    if (picks[norm(d.title)]) stickers += '<span class="sticker pick">Nick’s Pick</span>';
+    if (isPick(d)) stickers += '<span class="sticker pick">Nick’s Pick</span>';
     // bottom right: a box set's sticker (the HDR isn't on the front: Nick, 1.4; it's on the back of the case and the
     // Dolby Vision chip)
     if (d.kind === "box") stickers += '<span class="case-tags"><span class="sticker box">Box set' + (d.discs > 1 ? " · " + d.discs + " discs" : "") + "</span></span>";
     // box set covers are store photos of the real front, format banner included (tools/discs.py)
     var retail = d.kind === "box" && d.cover;
     var noBand = !fmtName(d.format); // a DVD while they're hidden: the cover fills the case, like a box set's
-    return '<span class="case f-' + d.format + (picks[norm(d.title)] ? " picked" : "") + (d.steelbook ? " steel" : "") + (d.criterion ? " criterion" : "") + (retail || noBand && d.cover ? " retail" : "") +
+    return '<span class="case f-' + d.format + (isPick(d) ? " picked" : "") + (d.steelbook ? " steel" : "") + (d.criterion ? " criterion" : "") + (retail || noBand && d.cover ? " retail" : "") +
       (noBand ? " no-band" : "") + (big ? " big" : "") + '">' +
       '<span class="case-band">' + BAND[d.format] + (d.threeD ? ' <i>3D</i>' : "") + "</span>" +
       // the blurred fill behind a box set's cover: an absolute URL, since url() in a CSS variable resolves against the
       // stylesheet (assets/css/), not this page
-      '<span class="case-art"' + (retail || noBand && d.cover ? ' style="--art:url(\'' + esc(/^(https?:)?\/\//.test(d.cover) || d.cover.charAt(0) === "/" ? d.cover : "/movies/library/" + d.cover) + '\')"' : "") + ">" +
+      '<span class="case-art"' + (retail || noBand && d.cover ? ' style="--art:url(\'' + esc(/^(https?:)?\/\//.test(d.cover) || d.cover.charAt(0) === "/" ? d.cover : "/library/movies/" + d.cover) + '\')"' : "") + ">" +
         (d.cover ? '<img src="' + esc(d.cover) + '" alt="" loading="lazy" decoding="async">'
           : d.parts ? '<span class="case-parts n' + d.parts.length + '">' + d.parts.map(function (src) { // a set with no cover: its films' posters
               return '<img src="' + esc(src) + '" alt="" loading="lazy" decoding="async">';
@@ -297,13 +333,17 @@
       stickers +
     "</span>";
   }
-  function slot(d) {
+  // A–Z in Covers (Nick, 2026-11-05: sorted like the vinyl): one continuous shelf, the first case of each letter with a
+  // divider tab on top of it (the jump links' target), lifting with the case
+  function slot(d, startsLetter) {
     var label = [d.title + (d.year ? " (" + d.year + ")" : ""), fmtName(d.format), edition(d)].filter(Boolean).join(", ");
-    return '<li class="slot">' +
-      '<button type="button" class="slot-btn" data-id="' + esc(d.id) + '" aria-label="' + esc(label) + '">' + caseHtml(d) + "</button>" +
+    return '<li class="slot' + (startsLetter ? " letter-start" : "") + '">' +
+      '<button type="button" class="slot-btn" data-id="' + esc(d.id) + '" aria-label="' + esc(label) + '">' +
+        (startsLetter ? '<span class="case-tab" id="aisle-' + (startsLetter === "#" ? "0" : startsLetter) + '" aria-hidden="true">' + esc(startsLetter) + "</span>" : "") +
+        caseHtml(d) + "</button>" +
       '<span class="ledge" aria-hidden="true"></span>' +
       '<span class="slot-title" aria-hidden="true">' + esc(d.title) + "</span>" +
-      '<span class="slot-meta" aria-hidden="true">' + [d.year, fmtName(d.format)].filter(Boolean).join(" · ") + "</span>" +
+      // (just the title under it: no year or format line, Nick 2026-11-05; the case's band shows the format)
     "</li>";
   }
   // Since 1.3 each case shows the film's real title logo (TMDB) on its cover's edge colour where the import found one
@@ -326,7 +366,7 @@
     // jump links' target)
     return '<li class="spine-slot' + (startsLetter ? " letter-start" : "") + '">' +
       (startsLetter ? '<span class="spine-letter" id="aisle-' + (startsLetter === "#" ? "0" : startsLetter) + '">' + esc(startsLetter) + "</span>" : "") +
-      '<button type="button" class="slot-btn spine f-' + d.format + (picks[norm(d.title)] ? " picked" : "") + (d.criterion ? " criterion" : "") +
+      '<button type="button" class="slot-btn spine f-' + d.format + (isPick(d) ? " picked" : "") + (d.criterion ? " criterion" : "") +
         (d.steelbook ? " steel" : "") + (d.spineLight ? " light" : "") + (d.logo ? " has-logo" : "") +
         '" data-id="' + esc(d.id) + '" aria-label="' + esc(label) + '" title="' + esc(label) + '"' +
         ' style="--tone:' + tone(d.title) + ";--wide:" + wide +
@@ -344,7 +384,7 @@
     var spines = state.view === "spines";
     return '<section class="aisle"' + (id ? ' id="' + id + '"' : "") + ">" +
       '<h2 class="aisle-sign"><span>' + esc(sign) + "</span></h2>" +
-      '<ul class="shelf' + (spines ? " spines" : "") + '">' + list.map(spines ? spineSlot : slot).join("") + "</ul></section>";
+      '<ul class="shelf' + (spines ? " spines" : "") + '">' + list.map(function (d) { return spines ? spineSlot(d) : slot(d); }).join("") + "</ul></section>";
   }
 
   function render() {
@@ -353,7 +393,7 @@
       b.setAttribute("aria-pressed", String(b.dataset.format === state.format));
       // a format with nothing on the shelves yet (VHS until the first tape) has no chip
       var f = b.dataset.format;
-      b.hidden = !!f && f !== state.format && !discs.some(function (d) { return f === "dv" ? (d.hdr || []).indexOf("dv") >= 0 : d.format === f; });
+      b.hidden = !!f && f !== state.format && !discs.some(function (d) { return inFormat(d, f); });
     });
     [].forEach.call(root.querySelectorAll("[data-view]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.view === state.view)); });
     var list = visible();
@@ -372,11 +412,10 @@
       letters = groups.map(function (g) {
         return '<a href="#aisle-' + (g.L === "#" ? "0" : g.L) + '">' + g.L + "</a>";
       }).join("");
-      html = state.view === "spines"
-        ? '<section class="aisle aisle-flow"><ul class="shelf spines">' + groups.map(function (g) {
-            return g.items.map(function (d, i) { return spineSlot(d, i === 0 ? g.L : null); }).join("");
-          }).join("") + "</ul></section>"
-        : groups.map(function (g) { return aisleHtml(g.L, g.items, "aisle-" + (g.L === "#" ? "0" : g.L)); }).join("");
+      var spines = state.view === "spines";
+      html = '<section class="aisle aisle-flow"><ul class="shelf' + (spines ? " spines" : "") + '">' + groups.map(function (g) {
+        return g.items.map(function (d, i) { return (spines ? spineSlot : slot)(d, i === 0 ? g.L : null); }).join("");
+      }).join("") + "</ul></section>";
     } else if (state.aisle === "new" && !state.q) {
       var byMonth = [], idx = {};
       list.forEach(function (d) {
@@ -394,11 +433,25 @@
     nav.hidden = !letters;
     var counts = { "4k": 0, bluray: 0, dvd: 0, vhs: 0 };
     discs.forEach(function (d) { counts[d.format]++; });
-    countEl.innerHTML = "<b>" + discs.length + "</b> on the shelves: " +
-      FORMATS.filter(function (f) { return counts[f] && fmtName(f); }).map(function (f) { return counts[f] + " " + FORMAT[f]; }).join(" · ") +
+    // the count: a big number (films) under the title, its formats under that (Nick, 2026-10-30)
+    var fmts = FORMATS.filter(function (f) { return counts[f] && fmtName(f); }).map(function (f) { return counts[f] + " " + FORMAT[f]; }).join(" · ") +
       (list.length !== discs.length && list.length ? '<span class="lib-showing"> · showing ' + list.length + "</span>" : "");
+    if (countEl.dataset.n !== String(discs.length)) {
+      countEl.dataset.n = discs.length;
+      countEl.innerHTML = '<b class="lib-num">' + discs.length + '</b><span class="lib-noun">films</span><span class="lib-fmts"></span>';
+      countUp(countEl.querySelector(".lib-num"));
+    }
+    countEl.querySelector(".lib-fmts").innerHTML = fmts;
   }
 
+  function countUp(el) {
+    var to = +el.textContent, still = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (still || to < 2 || el.dataset.done) return;
+    el.dataset.done = "1";
+    var t0 = 0, dur = Math.min(1100, 400 + to * 2);
+    function step(t) { t0 = t0 || t; var k = Math.min(1, (t - t0) / dur); el.textContent = Math.round(to * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); }
+    el.textContent = "0"; requestAnimationFrame(step);
+  }
   shelves.addEventListener("click", function (e) {
     var b = e.target.closest(".slot-btn");
     if (!b) return;
@@ -417,7 +470,7 @@
     var more = e.target.closest(".lib-more");
     if (more) {
       var box = more.closest(".lib-about-box");
-      // "expanded", not "open": .open is the site's pill-button class (one line, no wrapping)
+      // "expanded", not "open" (an old clash: .open was the site's pill-button class before it became .pill-btn)
       var open = !box.classList.contains("expanded");
       box.classList.toggle("expanded", open);
       more.textContent = open ? "Show less" : "Show more";
@@ -430,6 +483,23 @@
       if (own) openCase(own, false, opener);
       return;
     }
+    var pk = e.target.closest(".lib-pick-btn");
+    if (pk) return setPick(pk);
+    var cb = e.target.closest(".lib-cover-btn");
+    if (cb) return caseCovers(cb);
+    var eb = e.target.closest(".lib-edit-btn");
+    if (eb) return toggleEdit(eb);
+    var ef = e.target.closest(".lib-case-edit");
+    if (ef) {
+      var ft = e.target.closest(".lib-feat-tags [data-feat]");
+      if (ft) return toggleFeat(ef, ft.dataset.feat);
+      var eo = e.target.closest(".lib-ed-list [data-ed]");
+      if (eo) return pickEditEdition(ef, eo);
+      if (e.target.closest(".lib-edit-cancel")) return toggleEdit(dialog.querySelector(".lib-edit-btn"));
+      return;
+    }
+    var ct = e.target.closest(".lib-case-covers [data-cover]");
+    if (ct) return saveCover(ct);
     var rm = e.target.closest(".remove");
     if (rm) removeDisc(rm);
     if (e.target.closest(".again")) {
@@ -437,17 +507,43 @@
       if (list.length) openCase(list[Math.floor(Math.random() * list.length)], true);
     }
   });
+  // with a case open, the Left and Right arrow keys open the one before or after it, in the order the shelves show now
+  // (the aisle, format and search you're in), round from the last to the first (Nick, 2026-10-25); not while typing
+  document.addEventListener("keydown", function (e) {
+    if (!dialog.open || (e.key !== "ArrowLeft" && e.key !== "ArrowRight") || e.altKey || e.metaKey || e.ctrlKey) return;
+    if (e.target.closest && e.target.closest("input, textarea, select, [contenteditable]")) return;
+    var list = visible(), at = -1;
+    for (var i = 0; i < list.length; i++) if (list[i].id === dialog.dataset.disc) at = i;
+    if (at < 0 || list.length < 2) return;
+    e.preventDefault();
+    var next = list[(at + (e.key === "ArrowRight" ? 1 : -1) + list.length) % list.length];
+    if (window.NMTrailer) NMTrailer.stop(dialog);
+    openCase(next, false, shelves.querySelector('.slot-btn[data-id="' + next.id + '"]') || opener);
+  });
   dialog.addEventListener("close", function () {
     if (window.NMTrailer) NMTrailer.stop(dialog); // no trailer playing on behind a closed case
     if (opener) opener.focus({ preventScroll: true });
   });
-  // the film's official trailer (trailer.js): looked up once the case is open, its button added when there is one
+  // the film's details (Worker /library/film, TMDB), looked up once the case is open: its official trailer
+  // (trailer.js), its button added when there is one; and its tagline (the amber line) for a disc that has none, as the
+  // ones added on the site before the Worker kept it (Nick, 2026-10-25: the VHS tapes had none)
   var films = {};
   function addTrailer(d) {
-    if (!d.imdbId || !API || !window.NMTrailer) return;
+    if (!d.imdbId || !API) return;
     var q = d.imdbId;
     if (!films[q]) films[q] = fetch(API + "/library/film?imdb=" + encodeURIComponent(q)).then(function (r) { return r.json(); }).catch(function () { return {}; });
-    films[q].then(function (f) { if (dialog.open && dialog.dataset.disc === d.id && f.trailer) NMTrailer.addTo(dialog, f.trailer, d.title); });
+    films[q].then(function (f) {
+      if (!dialog.open || dialog.dataset.disc !== d.id) return;
+      if (f.trailer && window.NMTrailer) NMTrailer.addTo(dialog, f.trailer, d.title);
+      if (!d.tagline && f.tagline && !dialog.querySelector(".lib-tagline")) {
+        d.tagline = f.tagline; // (kept for the next time it's opened)
+        var t = document.createElement("p");
+        t.className = "lib-tagline";
+        t.textContent = f.tagline;
+        var after = dialog.querySelector(".lib-info .lib-disc") || dialog.querySelector(".lib-info .lib-facts") || dialog.querySelector(".lib-info h2");
+        if (after) after.insertAdjacentElement("afterend", t);
+      }
+    });
   }
   // Once the case has turned over, drop the 3D animation: Chrome can keep drawing the layer from its blurry mid-turn
   // raster (the Nick's Pick ribbon's small rotated text showed it); without the class it repaints sharp
@@ -470,8 +566,8 @@
       d.boxSet ? "From the " + d.boxSet.replace(/^The /, "") : ""]).filter(Boolean); // boxSet: tools/discs.py BOX_SETS
     var paras = String(d.about || "").split(/\n\n/).filter(Boolean);
     var links = [];
-    if (onMovies[k]) links.push('<a class="open" href="/movies/#' + slug(onMovies[k]) + '">On my Movies page · ' + esc(onMovies[k]) + "</a>");
-    if (d.imdbId) links.push('<a class="open" href="https://www.imdb.com/title/' + esc(d.imdbId) + '/" target="_blank" rel="noopener">IMDb</a>');
+    if (onMovies[k]) links.push('<a class="pill-btn" href="/movies/#' + slug(onMovies[k]) + '">On my Movies page · ' + esc(onMovies[k]) + "</a>");
+    if (d.imdbId) links.push('<a class="pill-btn" href="https://www.imdb.com/title/' + esc(d.imdbId) + '/" target="_blank" rel="noopener">IMDb</a>');
     dialog.innerHTML =
       '<div class="lib-back">' +
         '<button type="button" class="close" aria-label="Close">&times;</button>' +
@@ -500,8 +596,13 @@
             (d.studio ? "<dt>Studio</dt><dd>" + esc(d.studio) + "</dd>" : "") +
           "</dl>" +
           (links.length || tonight ? '<p class="lib-links">' + links.join("") +
-            (tonight ? '<button type="button" class="open again">Pick another</button>' : "") + "</p>" : "") +
-          (ADMIN ? '<p class="lib-owner"><button type="button" class="remove" data-id="' + esc(d.id) + '">Remove from the shelves</button></p>' : "") +
+            (tonight ? '<button type="button" class="pill-btn again">Pick another</button>' : "") + "</p>" : "") +
+          (ADMIN ? '<p class="lib-owner"><button type="button" class="remove lib-pick-btn" data-id="' + esc(d.id) + '">' + (pickOf(k) ? "Not a Nick’s Pick" : "Make it a Nick’s Pick") + "</button>" +
+            '<button type="button" class="remove lib-edit-btn" data-id="' + esc(d.id) + '" aria-expanded="false">Edit the disc</button>' +
+            (d.imdbId ? '<button type="button" class="remove lib-cover-btn" data-id="' + esc(d.id) + '">Change its cover</button>' : "") +
+            '<button type="button" class="remove" data-id="' + esc(d.id) + '">Remove from the shelves</button></p>' +
+            (d.imdbId ? '<div class="lib-covers lib-case-covers" hidden><div class="lib-cover-list" role="group" aria-label="Cover"></div><p class="lib-cover-msg" role="status"></p></div>' : "") +
+            editForm(d) : "") +
         "</div>" +
       "</div>";
     if (!dialog.open) dialog.showModal();
@@ -519,11 +620,7 @@
 
   // ---------- adding and removing (owner mode) ----------
   function ownerBar() {
-    var bar = document.createElement("div");
-    bar.className = "owner-bar";
-    bar.innerHTML = '<span>Owner mode</span> <a href="?logout">Log out</a>';
-    var head = document.querySelector(".page-head");
-    head.parentNode.insertBefore(bar, head.nextSibling);
+    document.dispatchEvent(new Event("nm-owner")); // "Owner mode · Log out" by the wordmark (footer.js)
     root.querySelector(".lib-add-btn").hidden = false;
   }
   function login() {
@@ -533,7 +630,7 @@
       '<form novalidate><h2>Owner login</h2>' +
       '<p class="hint">Enter your admin password. This browser will remember it.</p>' +
       '<label for="lib-admin">Password</label><input id="lib-admin" type="password" autocomplete="current-password">' +
-      '<p class="error" role="alert"></p><button class="open submit" type="submit">Log in</button></form>';
+      '<p class="error" role="alert"></p><button class="pill-btn submit" type="submit">Log in</button></form>';
     document.body.appendChild(d);
     var input = d.querySelector("input"), err = d.querySelector(".error");
     d.addEventListener("close", function () { d.remove(); });
@@ -553,6 +650,169 @@
     input.focus();
   }
 
+  // Make it a Nick's Pick / Not a Nick's Pick, on the open case (owner mode)
+  function setPick(btn) {
+    var d = discs.filter(function (x) { return x.id === btn.dataset.id; })[0];
+    if (!d || btn.disabled) return;
+    var k = norm(d.title), want = !pickOf(k);
+    btn.disabled = true; btn.textContent = want ? "Making it a Nick’s Pick…" : "Taking it off…";
+    fetch(API + "/library/pick", { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ key: k, on: want }) })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (res) {
+        if (!res.ok || !res.j.picks) throw new Error(res.j.error || "");
+        pickEdits = res.j.picks;
+        btn.disabled = false; btn.textContent = pickOf(k) ? "Not a Nick’s Pick" : "Make it a Nick’s Pick";
+        var front = dialog.querySelector(".lib-front"); if (front) front.innerHTML = caseHtml(d, true);
+        render();
+      })
+      .catch(function (err) { btn.disabled = false; btn.textContent = err.message || "Couldn't save that. Try again"; });
+  }
+  // Edit the disc, on the open case (owner mode; Nick, 2026-11-04: "let me edit the movies in the open disc ... let me
+  // select the quick options of What's on This Disc features"): its edition, extras, HDR (4K) and what's on the disc,
+  // with the add dialog's quick options: the common extras (one tap each), TheDiscDb's editions of the film (one fills
+  // in its extras) and reading the back of the case. Saved with Worker PATCH /library/<id>.
+  function editForm(d) {
+    var tick = function (name, label, on) { return '<label><input type="checkbox" name="' + name + '"' + (on ? " checked" : "") + ">" + label + "</label>"; };
+    var hdr = d.hdr || [];
+    return '<form class="lib-case-edit" data-id="' + esc(d.id) + '" novalidate hidden>' +
+      (d.format === "4k" ? '<fieldset class="who"><legend>HDR</legend>' + tick("hdr-dv", "Dolby Vision", hdr.indexOf("dv") >= 0) +
+        tick("hdr-hdr10+", "HDR10+", hdr.indexOf("hdr10+") >= 0) + tick("hdr-hdr10", "HDR10", hdr.indexOf("hdr10") >= 0) + "</fieldset>" : "") +
+      '<fieldset class="who"><legend>Extras</legend>' + tick("steelbook", "Steelbook", d.steelbook) + tick("threeD", "3D", d.threeD) + tick("criterion", "Criterion", d.criterion) + "</fieldset>" +
+      '<div class="lib-editions" hidden><p class="lib-ed-head">Which edition? <span class="optional">(from TheDiscDb)</span></p><div class="lib-ed-list"></div></div>' +
+      '<label>Edition <span class="optional">(optional)</span><input name="edition" type="text" maxlength="80" value="' + esc(d.edition || "") + '" placeholder="e.g. Collector\u2019s Edition"></label>' +
+      '<label class="lib-edit-feat">On this disc <span class="optional">(one per line)</span></label>' +
+      featTagsHtml() +
+      '<textarea name="features" rows="6" placeholder="Behind-the-scenes documentary\nDeleted scenes\nTrailer">' + esc((d.features || []).join("\n")) + "</textarea>" +
+      READ_BACK +
+      '<p class="lib-edit-msg" role="status"></p>' +
+      '<p class="lib-edit-actions"><button type="submit" class="pill-btn submit">Save</button><button type="button" class="pill-btn lib-edit-cancel">Cancel</button></p>' +
+    "</form>";
+  }
+  var editionsOf = {};
+  function toggleEdit(btn) {
+    var f = dialog.querySelector(".lib-case-edit");
+    if (!f || !btn) return;
+    f.hidden = !f.hidden;
+    btn.setAttribute("aria-expanded", String(!f.hidden));
+    if (f.hidden) return;
+    syncFeatTags(f);
+    f.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    var d = discs.filter(function (x) { return x.id === f.dataset.id; })[0];
+    if (!d || !d.imdbId) return;
+    if (!editionsOf[d.imdbId]) editionsOf[d.imdbId] = fetch(API + "/library/editions?imdbId=" + encodeURIComponent(d.imdbId), { headers: authHeaders() })
+      .then(function (r) { return r.json(); }).then(function (j) { return (j.editions || []).filter(function (e) { return e.features.length; }); })
+      .catch(function () { delete editionsOf[d.imdbId]; return []; });
+    editionsOf[d.imdbId].then(function (eds) {
+      if (!f.isConnected || !eds.length) return;
+      // this disc's format first
+      eds = eds.filter(function (e) { return e.format === d.format; }).concat(eds.filter(function (e) { return e.format !== d.format; }));
+      f._eds = eds;
+      f.querySelector(".lib-ed-list").innerHTML = eds.map(function (e, i) {
+        return '<button type="button" data-ed="' + i + '" aria-pressed="false"><b>' + esc(e.title || "Edition") + "</b>" +
+          "<span>" + [e.year, e.format ? FORMAT[e.format] : "", e.features.length + " extras"].filter(Boolean).join(" · ") + "</span></button>";
+      }).join("");
+      f.querySelector(".lib-editions").hidden = false;
+    });
+  }
+  function pickEditEdition(f, b) {
+    var ed = (f._eds || [])[+b.dataset.ed];
+    if (!ed) return;
+    [].forEach.call(f.querySelectorAll(".lib-ed-list button"), function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+    featBox(f).value = ed.features.join("\n");
+    syncFeatTags(f);
+    var name = f.elements.edition;
+    if (!name.value.trim() && ed.title && !/^\d{4}\s/.test(ed.title)) name.value = ed.title.replace(/\s*\b(4K|UHD|Blu-?ray)\b\s*$/i, "");
+  }
+  function saveEdit(f) {
+    var d = discs.filter(function (x) { return x.id === f.dataset.id; })[0];
+    var msg = f.querySelector(".lib-edit-msg"), btn = f.querySelector(".submit");
+    if (!d || btn.disabled) return;
+    var body = {
+      edition: f.elements.edition.value,
+      features: featLines(f),
+      steelbook: f.elements.steelbook.checked, threeD: f.elements.threeD.checked, criterion: f.elements.criterion.checked,
+    };
+    if (d.format === "4k") body.hdr = ["dv", "hdr10+", "hdr10"].filter(function (k) { return f.elements["hdr-" + k].checked; });
+    btn.disabled = true; msg.textContent = "Saving…";
+    fetch(API + "/library/" + encodeURIComponent(d.id), { method: "PATCH", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify(body) })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (res) {
+        btn.disabled = false;
+        if (!res.ok) { msg.textContent = res.j.error || "Couldn't save it."; return; }
+        if (res.j.item) site = site.map(function (x) { return x.id === d.id ? res.j.item : x; });
+        else discEdits[d.id] = res.j.edits;
+        rebuild();
+        render();
+        var now = discs.filter(function (x) { return x.id === d.id; })[0];
+        if (now) openCase(now, false, opener); // redrawn with the changes
+        var m = dialog.querySelector(".lib-owner");
+        if (m) { var ok = document.createElement("span"); ok.className = "lib-saved"; ok.textContent = "Saved."; m.appendChild(ok); }
+      })
+      .catch(function () { btn.disabled = false; msg.textContent = "Couldn't reach the server. Try again in a bit."; });
+  }
+  dialog.addEventListener("submit", function (e) {
+    var f = e.target.closest(".lib-case-edit");
+    if (!f) return;
+    e.preventDefault();
+    saveEdit(f);
+  });
+  dialog.addEventListener("input", function (e) { var f = e.target.closest(".lib-case-edit"); if (f && e.target.name === "features") syncFeatTags(f); });
+  dialog.addEventListener("change", function (e) {
+    var f = e.target.closest(".lib-case-edit");
+    if (f && e.target.matches(".lib-read-btn input")) { var file = e.target.files[0]; e.target.value = ""; if (file) readBack(file, f); }
+  });
+
+  // Change its cover, on the open case (owner mode): the film's posters on TMDB (Worker GET /library/covers), the one
+  // it has now first; tapping one saves it (Worker PATCH /library/<id>) and the case and shelf show it
+  var postersOf = {};
+  function caseCovers(btn) {
+    var d = discs.filter(function (x) { return x.id === btn.dataset.id; })[0];
+    var box = dialog.querySelector(".lib-case-covers");
+    if (!d || !box) return;
+    if (!box.hidden) { box.hidden = true; return; }
+    var list = box.querySelector(".lib-cover-list"), msg = box.querySelector(".lib-cover-msg");
+    box.hidden = false; msg.textContent = "Finding its covers…"; list.innerHTML = "";
+    box.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    if (!postersOf[d.imdbId]) postersOf[d.imdbId] = fetch(API + "/library/covers?imdbId=" + encodeURIComponent(d.imdbId), { headers: authHeaders() })
+      .then(function (r) { return r.json(); }).then(function (j) { return j.posters || []; })
+      .catch(function () { delete postersOf[d.imdbId]; return []; });
+    postersOf[d.imdbId].then(function (posters) {
+      if (dialog.dataset.disc !== d.id) return;
+      var now = d.cover ? (/^(https?:)?\/\//.test(d.cover) || d.cover.charAt(0) === "/" ? d.cover : "/library/movies/" + d.cover) : "";
+      var opts = (now ? [{ src: now, thumb: now, from: "Now" }] : []).concat(posters.filter(function (p) { return p.src !== now; })
+        .map(function (p) { return { src: p.src, thumb: p.thumb, from: "Poster" }; }));
+      msg.textContent = posters.length ? "" : "No other covers to be found for this film.";
+      list.innerHTML = opts.map(function (o) {
+        return '<button type="button" data-cover="' + esc(o.src) + '" data-id="' + esc(d.id) + '" aria-pressed="' + String(o.from === "Now") + '" title="' + o.from + '">' +
+          '<img src="' + esc(o.thumb) + '" alt="' + o.from + '" loading="lazy" referrerpolicy="no-referrer"><span>' + o.from + "</span></button>";
+      }).join("");
+    });
+  }
+  function saveCover(tile) {
+    var d = discs.filter(function (x) { return x.id === tile.dataset.id; })[0];
+    var box = tile.closest(".lib-case-covers"), msg = box.querySelector(".lib-cover-msg");
+    if (!d || tile.getAttribute("aria-pressed") === "true" || box.classList.contains("busy")) return;
+    box.classList.add("busy"); msg.textContent = "Saving…";
+    fetch(API + "/library/" + encodeURIComponent(d.id), { method: "PATCH", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ cover: tile.dataset.cover }) })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (res) {
+        box.classList.remove("busy");
+        if (!res.ok) { msg.textContent = res.j.error || "Couldn't save it."; return; }
+        if (res.j.item) { // a site disc
+          site = site.map(function (x) { return x.id === d.id ? res.j.item : x; });
+        } else {
+          discEdits[d.id] = res.j.edits;
+        }
+        rebuild();
+        var now = discs.filter(function (x) { return x.id === d.id; })[0] || d;
+        [].forEach.call(box.querySelectorAll("[data-cover]"), function (b) { b.setAttribute("aria-pressed", String(b === tile)); });
+        msg.textContent = "Saved.";
+        var front = dialog.querySelector(".lib-front"); if (front) front.innerHTML = caseHtml(now, true);
+        render();
+        if (!now.spine) spineFor(now).then(function () { if (state.view === "spines") render(); });
+      })
+      .catch(function () { box.classList.remove("busy"); msg.textContent = "Couldn't reach the server. Try again in a bit."; });
+  }
   function removeDisc(btn) {
     var d = discs.filter(function (x) { return x.id === btn.dataset.id; })[0];
     if (!d || !confirm("Take " + d.title + (fmtName(d.format) ? " (" + fmtName(d.format) + ")" : "") + " off the shelves?")) return;
@@ -574,11 +834,56 @@
   // The add dialog: search IMDb (films and series), pick one, pick the format and any extras, add.
   var addDlg = null, picked = null, searchTimer = null, searchSeq = 0;
   var ADD_HINT = "It goes on the shelves (and New Arrivals) right away.";
-  var FEATURE_TAGS = ["Making Of", "Gag Reel", "Behind the Scenes", "Deleted Scenes", "Audio Commentary"];
-  function featLines() { return addDlg.querySelector("#lib-features").value.split("\n").map(function (l) { return l.trim(); }).filter(Boolean); }
-  function syncFeatTags() {
-    var have = featLines().map(function (l) { return l.toLowerCase(); });
-    [].forEach.call(addDlg.querySelectorAll(".lib-feat-tags button"), function (b) { b.setAttribute("aria-pressed", String(have.indexOf(b.dataset.feat.toLowerCase()) >= 0)); });
+  var FEATURE_TAGS = ["Making Of", "Storyboards", "Gag Reel", "Behind the Scenes", "Deleted Scenes", "Audio Commentary"];
+  // (root: the add dialog, or an open case's edit form)
+  function featBox(root) { return (root || addDlg).querySelector("textarea[name=features]"); }
+  function featLines(root) { return featBox(root).value.split("\n").map(function (l) { return l.trim(); }).filter(Boolean); }
+  function syncFeatTags(root) {
+    var have = featLines(root).map(function (l) { return l.toLowerCase(); });
+    [].forEach.call((root || addDlg).querySelectorAll(".lib-feat-tags button"), function (b) { b.setAttribute("aria-pressed", String(have.indexOf(b.dataset.feat.toLowerCase()) >= 0)); });
+  }
+  function toggleFeat(root, t) {
+    var lines = featLines(root), at = lines.map(function (l) { return l.toLowerCase(); }).indexOf(t.toLowerCase());
+    if (at >= 0) lines.splice(at, 1); else lines.push(t);
+    featBox(root).value = lines.join("\n");
+    syncFeatTags(root);
+  }
+  function featTagsHtml() {
+    return '<div class="lib-feat-tags" role="group" aria-label="Common extras">' + FEATURE_TAGS.map(function (t) {
+      return '<button type="button" data-feat="' + esc(t) + '" aria-pressed="false">' + esc(t) + "</button>";
+    }).join("") + "</div>";
+  }
+  var READ_BACK = '<div class="lib-read-back"><label class="pill-btn lib-read-btn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>' +
+    'Read the back of the case<input type="file" accept="image/*" capture="environment" hidden></label>' +
+    '<span class="lib-read-msg" role="status"></span></div>';
+  // the back of the case: the photo made smaller here (1600 px on its long side, a JPEG: the model reads print fine at
+  // that size, and the upload stays small), its features read by the Worker and added to the box, under any already there
+  function readBack(file, root) {
+    root = root || addDlg;
+    var msg = root.querySelector(".lib-read-msg"), btn = root.querySelector(".lib-read-btn");
+    msg.textContent = "Reading the case…";
+    btn.classList.add("busy");
+    var url = URL.createObjectURL(file), img = new Image();
+    img.onerror = function () { URL.revokeObjectURL(url); btn.classList.remove("busy"); msg.textContent = "That photo wouldn't open. Try another."; };
+    img.onload = function () {
+      var k = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight)), c = document.createElement("canvas");
+      c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      fetch(API + "/library/read-features", { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ image: c.toDataURL("image/jpeg", 0.85) }) })
+        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+        .then(function (res) {
+          btn.classList.remove("busy");
+          if (!res.ok) { msg.textContent = res.j.error || "Couldn't read it."; return; }
+          var have = featLines(root), low = have.map(function (l) { return l.toLowerCase(); });
+          var added = (res.j.features || []).filter(function (f) { return low.indexOf(f.toLowerCase()) < 0; });
+          featBox(root).value = have.concat(added).join("\n");
+          syncFeatTags(root);
+          msg.textContent = !res.j.features.length ? "No special features found on that photo." : added.length ? "Added " + added.length + (added.length === 1 ? " feature" : " features") + ". Check them over." : "Those are already in the box.";
+        })
+        .catch(function () { btn.classList.remove("busy"); msg.textContent = "Couldn't reach the case reader. Try again."; });
+    };
+    img.src = url;
   }
   function openAdd() {
     if (!addDlg) {
@@ -591,11 +896,11 @@
           '<p class="hint">' + ADD_HINT + "</p>" +
           // Scan the barcode (1.4): the exact release, so the title, format, edition and HDR fill in themselves
           '<div class="lib-scan">' +
-            '<button type="button" class="open lib-scan-btn" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V4h3M21 7V4h-3M3 17v3h3M21 17v3h-3M7 8v8M10 8v8M13 8v8M16 8v8"/></svg>Scan the barcode</button>' +
+            '<button type="button" class="pill-btn lib-scan-btn" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V4h3M21 7V4h-3M3 17v3h3M21 17v3h-3M7 8v8M10 8v8M13 8v8M16 8v8"/></svg>Scan the barcode</button>' +
             '<div class="lib-scan-cam" hidden><video muted playsinline></video><span class="lib-scan-line"></span>' +
               '<button type="button" class="lib-scan-stop">Stop</button></div>' +
             '<div class="lib-upc"><input id="lib-upc" type="text" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="or type the barcode numbers" aria-label="Barcode">' +
-              '<button type="button" class="open lib-upc-go">Look up</button></div>' +
+              '<button type="button" class="pill-btn lib-upc-go">Look up</button></div>' +
             '<p class="lib-scan-msg" role="status"></p>' +
             // the other films a scanned tape could be (a remake, the cartoon of a live-action film): one tap picks it
             '<div class="lib-scan-others" hidden></div>' +
@@ -630,15 +935,16 @@
           '<input id="lib-edition" type="text" maxlength="80" placeholder="e.g. Collector\u2019s Edition">' +
           '<label for="lib-features">On this disc <span class="optional">(optional, one per line)</span></label>' +
           // the common extras, one tap each (Nick, 2026-10-16): adds the line, or takes it off again
-          '<div class="lib-feat-tags" role="group" aria-label="Common extras">' + FEATURE_TAGS.map(function (t) {
-            return '<button type="button" data-feat="' + esc(t) + '" aria-pressed="false">' + esc(t) + "</button>";
-          }).join("") + "</div>" +
-          '<textarea id="lib-features" rows="4" placeholder="Behind-the-scenes documentary\nDeleted scenes\nTrailer"></textarea>' +
+          featTagsHtml() +
+          '<textarea id="lib-features" name="features" rows="4" placeholder="Behind-the-scenes documentary\nDeleted scenes\nTrailer"></textarea>' +
+          // a photo of the back of the case, its special features read into the box (Nick, 2026-10-25; Worker
+          // /library/read-features, a Workers AI vision model)
+          READ_BACK +
           '<p class="error" role="alert"></p>' +
           '<div class="lib-submits">' +
-            '<button class="open submit" type="submit" disabled>Add to the shelves</button>' +
+            '<button class="pill-btn submit" type="submit" disabled>Add to the shelves</button>' +
             // adds it, then clears the form and opens the barcode scanner for the next one (Nick, 2026-10-16)
-            '<button class="open submit lib-add-more" type="submit" data-more="1" disabled>Add + another</button>' +
+            '<button class="pill-btn submit lib-add-more" type="submit" data-more="1" disabled>Add + another</button>' +
           "</div>" +
         "</form>";
       document.body.appendChild(addDlg);
@@ -687,12 +993,10 @@
       addDlg.querySelector(".lib-feat-tags").addEventListener("click", function (e) {
         var b = e.target.closest("[data-feat]");
         if (!b) return;
-        var t = b.dataset.feat, lines = featLines(), at = lines.map(function (l) { return l.toLowerCase(); }).indexOf(t.toLowerCase());
-        if (at >= 0) lines.splice(at, 1); else lines.push(t);
-        addDlg.querySelector("#lib-features").value = lines.join("\n");
-        syncFeatTags();
+        toggleFeat(addDlg, b.dataset.feat);
       });
-      addDlg.querySelector("#lib-features").addEventListener("input", syncFeatTags);
+      addDlg.querySelector("#lib-features").addEventListener("input", function () { syncFeatTags(addDlg); });
+      addDlg.querySelector(".lib-read-btn input").addEventListener("change", function (e) { var f = e.target.files[0]; e.target.value = ""; if (f) readBack(f); });
       addDlg.addEventListener("close", stopScan);
       if ("BarcodeDetector" in window && navigator.mediaDevices) addDlg.querySelector(".lib-scan-btn").hidden = false;
       addDlg.querySelector(".lib-scan-btn").addEventListener("click", startScan);
@@ -708,6 +1012,7 @@
   // an empty form (opening the dialog, and after "Add + another")
   function clearAdd() {
     addDlg.querySelector("form").reset();
+    addDlg.querySelector(".lib-read-msg").textContent = "";
     addDlg.querySelector(".hint").textContent = ADD_HINT;
     picked = null;
     hdrUpc = "";
@@ -1030,7 +1335,7 @@
       return discs.filter(function (d) { return d.cover || (d.parts && d.parts.length); }).map(function (d) {
         var src = d.cover || d.parts[0];
         return {
-          src: /^(https?:)?\/\//.test(src) || src.charAt(0) === "/" ? src : "/movies/library/" + src,
+          src: /^(https?:)?\/\//.test(src) || src.charAt(0) === "/" ? src : "/library/movies/" + src,
           title: d.title, year: d.year || "", section: d.kind === "box" ? "Box set" : fmtName(d.format), id: d.id,
         };
       });
@@ -1046,7 +1351,7 @@
   else if (params.has("admin")) login();
 
   render();
-  // A link to one disc (1.4, e.g. from Nick's Office): /movies/library/#disc=<its id> opens its case
+  // A link to one disc (1.4, e.g. from Nick's Office): /library/movies/#disc=<its id> opens its case
   var openedFromLink = false;
   function openFromHash() {
     var m = /[#&]disc=([^&]+)/.exec(location.hash);
@@ -1073,10 +1378,17 @@
       if (!data) return;
       site = data.items || [];
       hidden = data.hidden || [];
+      if (data.picks) pickEdits = { on: data.picks.on || [], off: data.picks.off || [] };
+      if (data.edits && typeof data.edits === "object") discEdits = data.edits;
       rebuild();
       render();
       colourSiteDiscs();
       if (!openedFromLink) openFromHash(); // a disc added on the site
+      // a discs.js disc opened (from a link) before its edits arrived: redrawn with them
+      else if (dialog.open && discEdits[dialog.dataset.disc]) {
+        var od = discs.filter(function (x) { return x.id === dialog.dataset.disc; })[0];
+        if (od) openCase(od, false, opener);
+      }
     })
     .catch(function () { /* the Worker is down: just discs.js */ });
 })();

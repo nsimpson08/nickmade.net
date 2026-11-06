@@ -28,7 +28,7 @@
   function esc(t) { return String(t == null ? "" : t).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
   var PAGE = { // label and colour (the site's section colours)
     site: ["Site", "#9d9b95"], home: ["Home", "#ecebe7"], games: ["Games", "#a78bfa"], movies: ["Movies", "#f5b451"],
-    music: ["Music", "#ff7eb6"], photography: ["Photography", "#7cc4ff"], play: ["Play", "#ff8a66"], extras: ["Extras", "#7ee0b5"],
+    music: ["Music", "#ff7eb6"], photography: ["Photography", "#7cc4ff"], library: ["Library", "#ff4f5e"], play: ["Play", "#ff8a66"], extras: ["Extras", "#7ee0b5"],
   };
   function rgba(hex, a) { var n = parseInt(hex.slice(1), 16); return "rgba(" + (n >> 16) + "," + (n >> 8 & 255) + "," + (n & 255) + "," + a + ")"; }
 
@@ -69,6 +69,11 @@
       ".nm-new .nm-new-text{margin:0;color:#ecebe7}" +
       ".nm-new .nm-new-go{display:inline-block;margin-top:3px;font-size:.88rem;text-decoration:none}" +
       ".nm-new .nm-new-go:hover,.nm-new .nm-new-go:focus-visible{text-decoration:underline;text-underline-offset:3px;outline:none}" +
+      // an item with gold: true: its link in gold that glints, deep gold to pale and back with a glow that breathes
+      // (Nick, 2026-10-25: Get notified)
+      ".nm-new .nm-new-gold{font-weight:600;color:#f2c14e;text-decoration-color:#f2c14e;animation:nm-gold 2.4s ease-in-out infinite}" +
+      "@keyframes nm-gold{0%,100%{color:#d9a032;text-shadow:0 0 4px rgba(242,193,78,.25)}50%{color:#fff1b8;text-shadow:0 0 10px rgba(255,214,102,.75),0 0 2px rgba(255,241,184,.9)}}" +
+      "@media (prefers-reduced-motion:reduce){.nm-new .nm-new-gold{animation:none}}" +
       ".nm-new li.nm-new-missed{display:block;grid-column:1/-1;margin:2px 0 4px;padding-top:12px;border-top:1px solid #1f1f25;color:#9d9b95;font-size:.9rem}" +
       ".nm-new .nm-new-missed b{color:#ecebe7;font-weight:500}" +
       ".nm-new .nm-new-missed a{color:#ecebe7;text-underline-offset:3px}" +
@@ -91,7 +96,7 @@
         var p = PAGE[it.page] || PAGE.site;
         return '<li><span class="nm-new-tag" style="color:' + p[1] + ";border-color:" + rgba(p[1], 0.45) + '">' + p[0] + "</span><div>" +
           '<p class="nm-new-text">' + esc(it.text) + "</p>" +
-          (it.cta && it.link ? '<a class="nm-new-go" style="color:' + p[1] + '" href="' + esc(it.link) + '">' + esc(it.cta) + " &rarr;</a>" : "") + "</div></li>";
+          (it.cta && it.link ? '<a class="nm-new-go' + (it.gold ? " nm-new-gold" : "") + '"' + (it.gold ? "" : ' style="color:' + p[1] + '"') + ' href="' + esc(it.link) + '">' + esc(it.cta) + " &rarr;</a>" : "") + "</div></li>";
       }).join("") +
       missed() +
       "</ul></div><footer>" + (w.more ? '<a href="/changelog/">' + esc(w.more) + "</a>" : "") +

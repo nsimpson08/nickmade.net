@@ -7,7 +7,7 @@
 //   ] },
 //
 // page    which part of the site it's about (gives the line its colored tag):
-//         "site", "home", "games", "movies", "music", "photography", "play", or "extras"
+//         "site", "home", "games", "movies", "music", "photography", "library", "play", or "extras"
 //         The changelog page groups a version's lines by page in that order, whatever order they're written in.
 // game    optional, on a "play" line about one game ("office", "nine", "rapture"): the Play page puts a pulsing dot on
 //         that game's card for returning visitors until they open it (play/index.html). Use it for a new version of a
@@ -16,6 +16,28 @@
 // When to bump: 1.1, 1.2... for new features or sections; 2.0 for a big redesign.
 // New movies, games, or photos don't need a version (that's content; the home Lately strip covers it).
 window.CHANGELOG = [
+  {
+    // the date: set to the release day when it goes live
+    version: "1.7",
+    date: "2026-11-06",
+    title: "Library",
+    changes: [
+      { page: "home", text: "Get notified: sign up on the home page for a notification on your phone or computer when I watch a movie, play a game, finish a round of golf, post a photo, or update the site. No account. On an iPhone, add NickMade to your Home Screen first" },
+      { page: "home", text: "A new Library tile" },
+      { page: "site", text: "Links to NickMade now show a preview card when you share them in Messages, Discord and the like" },
+      { page: "site", text: "A page that doesn't exist now shows a missing tape on the shelf instead of a plain error, with a way back to every section" },
+      { page: "site", text: "The poster wall background comes in twice as fast" },
+      { page: "library", text: "Library: a new section in the menu for all my collections, with my movies and three new shelves" },
+      { page: "library", text: "Movies: my disc library moved here from the Movies page. New HD and SD filters and all show their taglines now. DVD & VHS catalog filled" },
+      { page: "library", text: "Vinyl: my records, full album art cover, sorted into genres, with each record's track list, running time and story a click away. Click a record's sleeve to see its back, or the record to take it out. Play the album on Spotify, or any song from its track list" },
+      { page: "library", text: "Books: my bookshelf with each book's genre, series, release year, and what it's about" },
+      { page: "library", text: "Board games: how many can play, how long a game takes, and how complex it is" },
+      { page: "library", text: "With a case or card open, the left and right arrow keys flip through the shelf" },
+      { page: "play", text: "The Cattery: have a cat there? Turn on Get notified for it and hear when it gets hungry or wants attention" },
+      { page: "extras", text: "Golf weather: each day now shows its overall chance of rain and how much is expected, and says when the forecasts disagree" },
+      { page: "extras", text: "The Video Game Montage Maker is retired" }
+    ]
+  },
   {
     version: "1.6",
     date: "2026-10-15",

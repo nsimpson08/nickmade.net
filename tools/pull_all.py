@@ -11,6 +11,9 @@ Saves backups/full-YYYY-MM-DD-HHMM/ (backups/ is git-ignored, so none of it is e
             gamerscore history, everything. Skipped: Spotify's sign-in tokens (secrets; reconnect with
             tools/spotify_connect.py instead) and the short-lived caches.
   photos/   the files of every photo added from your phone (Photography, owner mode), from photos.nickmade.net
+  covers/   the Library's cover images kept on photos.nickmade.net (covers/...): the movie discs added on the site, and
+            (from 1.7) the records', books' and board games' covers and record backs. A cover still at its catalogue's
+            address isn't copied (the entry in kv.json has its address)
   golf.sql  the Scorecard's database (D1 nickmade-golf): every round and hole, player, recovery code (hashed) and
             approved course file, as SQL inserts
 
@@ -22,7 +25,7 @@ It only reads the live site. Nothing there changes, and a push never sends any o
 other backup: it copies your site adds into list.js; this one is the whole raw copy.) Reads storage with wrangler from
 worker/, so it needs the same Cloudflare login as deploying.
 
-To put an entry back by hand: from worker/, npx wrangler kv key put <key> --path <file with its JSON> --binding QUEUE
+To put an entry back by hand: from worker/, npx wrangler kv key put <key> --path <file with its JSON> --binding QUEUE --remote
 """
 import argparse
 import datetime
@@ -48,9 +51,45 @@ def wrangler(*args, kind="key"):
     return out.stdout
 
 
-def load_local(kv, folder):
+# Library data Nick fills on localhost for the 1.7 release (tools/push_library.py copies it live): --local would
+# overwrite or delete it, so it refuses while any of it differs from live (Nick, 2026-10-30: "literally all current
+# data in all libraries gets pushed live"). Run push_library.py --go first, or add --force-local to throw it away.
+UNPUSHED = re.compile(r"^collection:(vinyl|books|games)$|^library:picks$")
+
+
+def pushed(key, mine, theirs):
+    """Is everything in this local Library entry already live? (covers count once moved to photos.nickmade.net)"""
+    if theirs is None:
+        return False
+    try:
+        mine = json.loads(mine.replace("http://localhost:8787/photos/file/", "https://photos.nickmade.net/"))
+        theirs = json.loads(theirs)
+    except ValueError:
+        return False
+    if key == "library:picks":  # each film's local choice is the live one
+        return all(k in (theirs.get("on") or []) for k in mine.get("on") or []) and \
+            all(k in (theirs.get("off") or []) for k in mine.get("off") or [])
+    live = {d.get("id"): d for d in theirs}
+    return all(live.get(d.get("id")) == d for d in mine)
+
+
+def load_local(kv, folder, force=False):
     """Make the local Worker's storage match kv: write every entry, delete local ones the live site doesn't have."""
     local = [k["name"] for k in json.loads(wrangler("list", "--local"))]
+    if not force:
+        differ = []
+        for k in local:
+            if UNPUSHED.search(k):
+                mine = wrangler("get", k, "--local").strip()
+                theirs = kv.get(k)
+                theirs = theirs if isinstance(theirs, str) else json.dumps(theirs) if theirs is not None else None
+                if mine in ("", "[]", "Value not found"):
+                    continue
+                if not pushed(k, mine, theirs):
+                    differ.append(k)
+        if differ:
+            sys.exit("NOT loading into localhost: %s on localhost isn't live yet (push it with tools/push_library.py --go "
+                     "first, or add --force-local to throw it away). The backup copy was still saved." % ", ".join(differ))
     gone = [k for k in local if k not in kv and not SKIP.search(k)]
     entries = [{"key": k, "value": v if isinstance(v, str) else json.dumps(v, ensure_ascii=False)} for k, v in kv.items()]
     path = os.path.join(folder, "local-load.json")
@@ -65,6 +104,35 @@ def load_local(kv, folder):
         wrangler("delete", path, "--local", "--force", kind="bulk")
         os.remove(path)
     print("Localhost now matches: wrote %d entries, deleted %d local-only ones" % (len(entries), len(gone)))
+
+
+COVERS = "https://photos.nickmade.net/covers/"
+
+
+def save_covers(kv, folder):
+    """The Library's cover images in the photos bucket, from the movie discs (library) and the shelves (collection:*)."""
+    urls = []
+    for key, items in kv.items():
+        if key == "library" or key.startswith("collection:"):
+            for d in items if isinstance(items, list) else []:
+                urls += [u for u in (d.get("cover"), d.get("back")) if isinstance(u, str) and u.startswith(COVERS)]
+    urls = sorted(set(urls))
+    if not urls:
+        print("No Library covers in the photos bucket yet.")
+        return
+    os.makedirs(os.path.join(folder, "covers"), exist_ok=True)
+    failed = []
+    for n, u in enumerate(urls, 1):
+        print("\r  cover %d of %d" % (n, len(urls)), end="", flush=True)
+        try:
+            req = urllib.request.Request(u, headers={"User-Agent": UA})
+            with urllib.request.urlopen(req, timeout=60) as res, open(os.path.join(folder, "covers", u[len(COVERS):].replace("/", "_")), "wb") as f:
+                f.write(res.read())
+        except Exception as e:  # one that won't load is named, the rest still saved
+            failed.append("%s (%s)" % (u, e))
+    print("\rSaved %d Library covers to %s" % (len(urls) - len(failed), os.path.relpath(folder, ROOT) + "/covers/"))
+    for f in failed:
+        print("  ! couldn't save " + f)
 
 
 GOLF_TABLES = ["round_holes", "rounds", "course_records", "courses", "player_keys", "players"]  # children first
@@ -108,8 +176,9 @@ def load_golf_local(path):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--local", action="store_true", help="then load the copy into the local Worker (localhost)")
+    ap.add_argument("--force-local", action="store_true", help="with --local: load even over Library data not pushed live yet")
     args = ap.parse_args()
-    names = sorted(k["name"] for k in json.loads(wrangler("list")))
+    names = sorted(k["name"] for k in json.loads(wrangler("list", "--remote")))
     stamp = datetime.datetime.now().strftime("%Y-%m-%d-%H%M")
     folder = os.path.join(ROOT, "backups", "full-" + stamp)
     os.makedirs(folder, exist_ok=True)
@@ -120,7 +189,7 @@ def main():
             skipped.append(name)
             continue
         print("\r  reading %d of %d: %-40s" % (i, len(names), name[:40]), end="", flush=True)
-        raw = wrangler("get", name, "--text")
+        raw = wrangler("get", name, "--text", "--remote")
         try:
             kv[name] = json.loads(raw)
         except ValueError:
@@ -146,9 +215,10 @@ def main():
         print("\rSaved %d photo files to %s" % (len(urls), os.path.relpath(folder, ROOT) + "/photos/"))
     else:
         print("No photos added from the phone yet.")
+    save_covers(kv, folder)
     golf = backup_golf(folder)
     if args.local:
-        load_local(kv, folder)
+        load_local(kv, folder, args.force_local)
         if golf:
             load_golf_local(golf)
 

@@ -1174,7 +1174,7 @@
   // ---------- the things you can click ----------
   function fmt(n) { return Number(n).toLocaleString("en-US"); }
   function stars(r) { return r ? new Array(Math.floor(r) + 1).join("★") + (r % 1 ? "½" : "") : ""; }
-  var PAGES = ["/games/", "/movies/", "/movies/library/", "/music/", "/photography/", "/play/", "/extras/", "/extras/golf/", "/changelog/"];
+  var PAGES = ["/games/", "/movies/", "/library/movies/", "/music/", "/photography/", "/play/", "/extras/", "/extras/golf/", "/changelog/"];
   // light: [x, y, z, radius, strength (or a function), colour] for the night
   var things = [
     { id: "monitor", name: "Main monitor", text: "Worky worky worky work.", go: "/changelog/", label: "What’s new on the site", click: function () { SFX.blip(); }, light: [91, 10, 60, 50, 0.55] },
@@ -1182,7 +1182,7 @@
     { id: "vhs-shelf", name: "Shelf of VHS tapes", text: "NixFlix! Main 2024 hobby, modern movies in VHS, custom VHS slipcovers.", go: "/photography/#photo=pxl-20261001-003513280-mp-2", label: "See the photo", click: function () { SFX.click(); boxOf("vhs-shelf").pick = 2 + Math.floor(Math.random() * 46); } },
     { id: "dude", name: "The Dude", text: "The Dude abides.", go: "/movies/#the-big-lebowski", label: "The Big Lebowski", click: function () { SFX.boing(); }, say: "THE DUDE ABIDES." },
     { id: "desk-lamp", dayLight: [116, 16, 50, 46, function () { return state.lamp ? 0.6 : 0; }, [1, 0.8, 0.45]], name: "Desk lamp", text: "", click: function () { state.lamp = !state.lamp; SFX.click(); }, light: [116, 16, 60, 60, function () { return state.lamp ? 1 : 0; }, [1, 0.85, 0.6]] },
-    { id: "wolf", name: "The Wolf of Wall Street", text: "", go: "/movies/library/#disc=the-wolf-of-wall-street-2013-bluray", label: "Open it in my Library", click: function () { SFX.cash(); } },
+    { id: "wolf", name: "The Wolf of Wall Street", text: "", go: "/library/movies/#disc=the-wolf-of-wall-street-2013-bluray", label: "Open it in my Library", click: function () { SFX.cash(); } },
     { id: "samsung", name: "13\" Samsung TV/VCR", text: "My go-to cozy CRT. Rare for the VHS player to still work in these built-ins!", go: "/extras/golf-game/", label: "Play Nick’s Nine", click: function () { tvSwitch("samsung"); }, light: [149, 28, 50, 34, function () { return state.on.samsung ? 0.6 : 0; }] },
     { id: "golf-ball", name: "TaylorMade golf ball piggy bank", text: "Color Me Mine!", go: "/extras/golf/", label: "My golf rounds", click: function () { SFX.boing(); } },
     { id: "mushroom", name: "Mushroom", text: "1-UP.", click: function () { SFX.oneUp(); }, say: "1UP" },
@@ -1204,7 +1204,7 @@
       if (!soundOn) return "The latest song I played: " + what + ". Turn the sound on to hear it.";
       return music.on ? "Playing my latest track [" + what + "]" : "Stopped [" + what + "]";
     }, note: function () { return music.on ? "Preview · Apple Music" : ""; }, go: "/music/", label: "Music", click: function () { toggleMusic(); } },
-    { id: "bookcase", name: "Bookcase of VHS tapes", text: "The rest of the tapes. Disney clamshells, mostly. VHS has its own shelf in the Library now.", go: "/movies/library/", label: "My disc library", click: function () { SFX.click(); boxOf("bookcase").pick = 2 + Math.floor(Math.random() * 40); } },
+    { id: "bookcase", name: "Bookcase of VHS tapes", text: "The rest of the tapes. Disney clamshells, mostly. VHS has its own shelf in the Library now.", go: "/library/movies/", label: "My disc library", click: function () { SFX.click(); boxOf("bookcase").pick = 2 + Math.floor(Math.random() * 40); } },
     { id: "door", name: "Door", text: "The way out, back to the Play page.", go: "/play/", label: "Back to Play", click: function () { SFX.click(); } },
     { id: "plant", name: "Plant", text: "I can only keep fake plants alive!", click: function () { SFX.rustle(); } },
     { id: "tv", name: "Big TV", text: function () { var g = state.live.gamerscore; return g ? "Xbox gamerscore: " + fmt(g.total) + (g.gained ? " (+" + fmt(g.gained) + " in the last day)" : "") + ". And what I've been playing." : "Where the Xbox lives."; }, go: "/games/", label: "Games", click: function () { tvSwitch("tv"); if (state.on.tv) setTimeout(SFX.coin, 900); }, light: [133, 137, 55, 60, function () { return state.on.tv ? 0.55 : 0; }] },
