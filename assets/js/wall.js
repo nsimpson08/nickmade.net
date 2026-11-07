@@ -59,6 +59,27 @@
   var ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="1" width="4" height="6" rx="1"/><rect x="6" y="1" width="4" height="9" rx="1"/>' +
     '<rect x="11" y="1" width="4" height="5" rx="1"/><rect x="1" y="8" width="4" height="7" rx="1"/><rect x="6" y="11" width="4" height="4" rx="1"/><rect x="11" y="7" width="4" height="8" rx="1"/></svg>';
   var SPEED = [16, 22]; // px per second, a random speed in this range for each column
+  // The BACKGROUND comes from one picture per page made ahead of time (Nick, 2026-11-07: the live background took 1-2 s,
+  // dozens of separate covers from the Worker, TMDB and R2 on every visit): tools/make_walls.py takes the same pictures
+  // the background would pick, packs them into assets/walls/<page>.webp (a grid of cells, `cols` across, each `w` wide
+  // and `h` tall, the picture at the cell's top left) and writes this line: per page its version, cell size, count and
+  // each tile's shape (one ratio for the page, or a letter per tile: a 2:3, b square, c 3:2, d 16:9). Each tile shows
+  // its cell of that one picture; the interactive wall (Poster wall) still reads everything live.
+  var SPRITES = {"games":{"cols":8,"h":270,"n":48,"r":1.5,"v":"202611070020","w":180},"home":{"cols":8,"h":270,"n":48,"r":"cabdaaddddbcdadbbcaaaddbaccaaabddbbdcdddbdcdacda","v":"202611070020","w":180},"library":{"cols":8,"h":270,"n":48,"r":"bbbbabaaaabaaabbbabbbaabbbaaababaaaababbbabbaaaa","v":"202611070020","w":180},"library-board-games":{"cols":8,"h":270,"n":48,"r":1.0,"v":"202611070020","w":180},"library-books":{"cols":8,"h":270,"n":48,"r":1.5,"v":"202611070020","w":180},"library-movies":{"cols":8,"h":270,"n":48,"r":1.5,"v":"202611070020","w":180},"library-vinyl":{"cols":8,"h":270,"n":48,"r":1.0,"v":"202611070020","w":180},"movies":{"cols":8,"h":270,"n":41,"r":1.5,"v":"202611070020","w":180},"music":{"cols":8,"h":270,"n":48,"r":1.0,"v":"202611070020","w":180},"photography":{"cols":8,"h":270,"n":40,"r":0.6667,"v":"202611070020","w":180}}; // WALLS (tools/make_walls.py rewrites this line)
+  var KEY = location.pathname.replace(/index\.html$/, "").replace(/^\/+|\/+$/g, "").replace(/\//g, "-") || "home"; // "library-vinyl"
+  var SHAPE = { a: 1.5, b: 1, c: 2 / 3, d: 9 / 16 };
+  function spriteItems() {
+    var sp = SPRITES[KEY];
+    if (!sp || !sp.n) return null;
+    var url = "/assets/walls/" + KEY + ".webp?v=" + sp.v, rows = Math.ceil(sp.n / sp.cols), H = rows * sp.h, out = [];
+    for (var i = 0; i < sp.n; i++) {
+      var r = typeof sp.r === "number" ? sp.r : SHAPE[sp.r.charAt(i)] || 1.5;
+      var col = i % sp.cols, row = Math.floor(i / sp.cols), th = sp.w * r;
+      out.push({ sprite: url, ratio: r, bgSize: sp.cols * 100 + "% auto",
+        bgPos: (sp.cols > 1 ? col / (sp.cols - 1) * 100 : 0) + "% " + (H > th ? row * sp.h / (H - th) * 100 : 0) + "%" });
+    }
+    return out;
+  }
 
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
@@ -330,6 +351,8 @@
     return src;
   }
 
+  // for tools/make_walls.py: what this page's background would pick, and each picture's small copy
+  window.NMWall = { items: collectAll, thumb: thumb, max: BG_MAX, home: HOME, key: KEY, ratio: RATIO };
   function shuffle(a) {
     for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; }
     return a;
@@ -340,6 +363,7 @@
 
   function tile(p, i, copy, bg) {
     // the thumbnail, falling back to the full image if there isn't one yet (a poster added since tools/thumbs.py ran)
+    if (p.sprite) return '<div class="wall-tile" style="aspect-ratio:1 / ' + p.ratio + ";background:#111 url(" + p.sprite + ") " + p.bgPos + " / " + p.bgSize + ' no-repeat"></div>';
     var small = thumb(p.src);
     var img = '<img src="' + esc(small) + '"' + (small !== p.src ? ' data-full="' + esc(p.src) + '"' : "") + ' alt="" decoding="async"' +
       ' onload="this.classList.add(\'in\')" onerror="if (this.dataset.full) { this.src = this.dataset.full; this.removeAttribute(\'data-full\'); } else this.classList.add(\'in\')">';
@@ -592,21 +616,34 @@
   function startBg() {
     if (bgWall || bgLoading || !bgOn) return;
     bgLoading = true;
+    var sp = spriteItems();
+    if (sp) { // the page's one picture: drawn at once, faded in when it's loaded (from the cache after the first visit)
+      bgLoading = false;
+      bgItems = shuffle(sp);
+      makeBg();
+      var pic = new Image();
+      pic.onload = pic.onerror = function () { if (bgWall) bgWall.classList.add("in"); };
+      pic.src = sp[0].sprite;
+      return;
+    }
     collectAll().then(function (list) {
       bgLoading = false;
       if (!bgOn || bgWall || !list.length) return;
       bgItems = shuffle(list).slice(0, BG_MAX);
+      if (HOME) bgItems = shuffle(list.filter(function (x, k) { return k % 2 === 0 || x.video; })).slice(0, BG_MAX); // half of each page's share
+      makeBg();
+      requestAnimationFrame(function () { requestAnimationFrame(function () { if (bgWall) bgWall.classList.add("in"); }); });
+    });
+  }
+  function makeBg() {
       bgWall = document.createElement("div");
       bgWall.className = "wall wall-bg" + (still ? " still" : "") + (MUSIC ? " albums" : "") + (CLIPS_PAGE ? " extras" : "") + (PHOTOS ? " photos" : "") + (HOME || HUB ? " wall-home" : "") + (LIBRARY ? " wall-library" : "");
-      if (HOME) bgItems = shuffle(list.filter(function (x, k) { return k % 2 === 0 || x.video; })).slice(0, BG_MAX); // half of each page's share
       bgWall.setAttribute("aria-hidden", "true");
       bgWall.style.setProperty("--wall-shade", String(1 - BG_DIM));
       bgWall.innerHTML = '<div class="wall-cols"></div>';
       document.body.insertBefore(bgWall, document.body.firstChild);
       document.documentElement.classList.add("wall-bg-on"); // readability tweaks for the page on top (site.css)
       buildBg();
-      requestAnimationFrame(function () { requestAnimationFrame(function () { if (bgWall) bgWall.classList.add("in"); }); });
-    });
   }
   function stopBg() {
     if (!bgWall) return;

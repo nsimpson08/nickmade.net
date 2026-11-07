@@ -759,6 +759,7 @@
       .then(function (r) { return r.json(); })
       .then(function (data) {
         var items = data.items || [];
+        if (ADMIN && PAGE === "movies") learnWith(items.concat(data.archive || []));
         hidePlayedQueueGames(items);
         if (window.NMArchive) window.NMArchive.setLive(watchedSection, data.archive);
         if (items.length || ADMIN) renderWatched(items); // visitors keep "Coming soon." until there's one
@@ -804,7 +805,11 @@
         '<label><input type="radio" name="q-where" value="theater">' + WHERE.theater.icon + " Theater</label>" +
       "</fieldset>" +
       '<label for="q-with">Watched with <span class="optional">(only you see this)</span></label>' +
-      '<input id="q-with" type="text" maxlength="120" autocomplete="off" placeholder="Who was there?">' +
+      // one name at a time, like the Journal's "Who I saw" (Nick, 2026-11-06): each a chip, everyone he's watched with
+      // before in the drop-down, so the same person is always spelled the same (saved as "Mel & Katie", as before)
+      '<div class="with-people" id="q-with-box"><span class="with-chips"></span>' +
+        '<input id="q-with" type="text" maxlength="40" list="q-with-list" autocomplete="off" enterkeyhint="done" placeholder="Add a name"></div>' +
+      '<datalist id="q-with-list"></datalist>' +
       '<label for="q-name">Your name</label>' +
       '<input id="q-name" type="text" maxlength="40" autocomplete="nickname" placeholder="So Nick knows who it\'s from">' +
       // optional note shown on the card under "Suggested by"; visitors' suggestions only
@@ -850,6 +855,51 @@
   var reviewLabel = dialog.querySelector('label[for="q-review"]');
   var reviewCount = dialog.querySelector("#q-review-count");
   var withInput = dialog.querySelector("#q-with"), withLabel = dialog.querySelector('label[for="q-with"]');
+  var withBox = dialog.querySelector("#q-with-box"), withNames = [], withSeen = {};
+  // "Mel & Katie, Sammy and Taylor" -> its names
+  function splitWith(s) { return String(s || "").split(/\s*(?:&|,|\+|\band\b)\s*/i).map(function (n) { return n.replace(/\s+/g, " ").trim(); }).filter(Boolean); }
+  // everyone Nick's watched with (his Recently Watched and its Archive), most often first, in the spelling used first
+  function learnWith(list) {
+    (list || []).forEach(function (it) {
+      splitWith(it && it.watchedWith).forEach(function (n) { var k = n.toLowerCase(); withSeen[k] = withSeen[k] || { name: n, n: 0 }; withSeen[k].n++; });
+    });
+    drawWith();
+  }
+  function drawWith() {
+    withBox.querySelector(".with-chips").innerHTML = withNames.map(function (n, i) {
+      return '<span class="with-person">' + esc(n) + '<button type="button" data-unwith="' + i + '" aria-label="Take off ' + esc(n) + '">×</button></span>';
+    }).join("");
+    var picked = withNames.map(function (n) { return n.toLowerCase(); });
+    dialog.querySelector("#q-with-list").innerHTML = Object.keys(withSeen).filter(function (k) { return picked.indexOf(k) < 0; })
+      .sort(function (a, b) { return withSeen[b].n - withSeen[a].n || (a < b ? -1 : 1); })
+      .map(function (k) { return '<option value="' + esc(withSeen[k].name) + '">'; }).join("");
+  }
+  function addWith() {
+    splitWith(withInput.value).forEach(function (n) {
+      var k = n.toLowerCase();
+      if (withNames.some(function (x) { return x.toLowerCase() === k; })) return;
+      withNames.push(withSeen[k] ? withSeen[k].name : n); // (the way it was written before, if it was)
+    });
+    withInput.value = "";
+    drawWith();
+  }
+  function withValue() { if (withInput.value.trim()) addWith(); return withNames.join(" & "); }
+  function setWith(s) { withNames = []; withInput.value = s || ""; addWith(); }
+  // a name picked from the drop-down goes on at once; one typed, on Enter, a comma, or leaving the box
+  withInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addWith(); }
+    else if (e.key === "Backspace" && !withInput.value && withNames.length) { withNames.pop(); drawWith(); }
+  });
+  withInput.addEventListener("input", function (e) {
+    var v = withInput.value.trim().toLowerCase();
+    if (e.inputType === "insertReplacementText" || (!e.inputType && v && withSeen[v])) addWith();
+  });
+  withInput.addEventListener("blur", function () { if (withInput.value.trim()) addWith(); });
+  withBox.addEventListener("click", function (e) {
+    var u = e.target.closest("[data-unwith]");
+    if (u) { withNames.splice(+u.dataset.unwith, 1); drawWith(); withInput.focus(); }
+    else if (e.target === withBox) withInput.focus();
+  });
   var whereField = dialog.querySelector("#q-where");
   function whereValue() { var c = whereField.querySelector("input:checked"); return c ? c.value : ""; }
   function setWhere(w) { whereField.querySelectorAll("input").forEach(function (i) { i.checked = i.value === w; }); }
@@ -988,7 +1038,7 @@
     showCount();
     reviewInput.value = "";
     showReviewCount();
-    withInput.value = "";
+    setWith("");
     setWhere("");
     setWatch("");
     dialog.querySelector('input[name="q-who"][value="public"]').checked = true;
@@ -1012,7 +1062,7 @@
     dateLabel.hidden = dateInput.hidden = !watching;
     rateLabel.hidden = rate.hidden = !watching;
     reviewLabel.hidden = reviewInput.hidden = reviewCount.hidden = !watching;
-    withLabel.hidden = withInput.hidden = whereField.hidden = watchField.hidden = !(watching && ADMIN && PAGE === "movies");
+    withLabel.hidden = withBox.hidden = whereField.hidden = watchField.hidden = !(watching && ADMIN && PAGE === "movies");
     movie.readOnly = !!editing || !!mineEdit;
     if (mineEdit) {
       chosen = { id: it.imdbId };
@@ -1031,7 +1081,7 @@
       setRating(it.rating || 0);
       reviewInput.value = it.review || "";
       showReviewCount();
-      withInput.value = it.watchedWith || "";
+      setWith(it.watchedWith);
       setWhere(it.where || "");
       setWatch(it.watch || "");
     }
@@ -1150,7 +1200,7 @@
       method: "POST",
       headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify(watching
-        ? { page: PAGE, imdbId: chosen.id, date: dateInput.value, rating: rating, poster: pickedPoster(), review: reviewInput.value.trim(), watchedWith: PAGE === "movies" ? withInput.value.trim() : undefined,
+        ? { page: PAGE, imdbId: chosen.id, date: dateInput.value, rating: rating, poster: pickedPoster(), review: reviewInput.value.trim(), watchedWith: PAGE === "movies" ? withValue() : undefined,
             where: PAGE === "movies" ? whereValue() : undefined, watch: PAGE === "movies" ? watchValue() : undefined }
         : { page: PAGE, imdbId: chosen.id, name: ADMIN ? "" : nameInput.value.trim(), visitorId: VID, poster: pickedPoster(),
             comment: ADMIN ? "" : commentInput.value.trim(), commentPrivate: !ADMIN && commentPrivate() }),
@@ -1244,6 +1294,7 @@
   function reloadWatched() {
     // with the owner's login, or the Worker leaves out who he watched with (and a later Edit would then save it empty)
     return fetch(API + "/watched?" + PQ, { cache: "no-store", headers: authHeaders() }).then(function (r) { return r.json(); }).then(function (data) {
+      if (ADMIN && PAGE === "movies") { withSeen = {}; learnWith((data.items || []).concat(data.archive || [])); }
       renderWatched(data.items || [], data.archive);
       resetFields();
       validate();
@@ -1258,7 +1309,7 @@
     fetch(API + "/watched/" + encodeURIComponent(editing.id) + "?" + PQ, {
       method: "PATCH",
       headers: authHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ date: dateInput.value, rating: rating, review: reviewInput.value.trim(), watchedWith: PAGE === "movies" ? withInput.value.trim() : undefined,
+      body: JSON.stringify({ date: dateInput.value, rating: rating, review: reviewInput.value.trim(), watchedWith: PAGE === "movies" ? withValue() : undefined,
         where: PAGE === "movies" ? whereValue() : undefined, watch: PAGE === "movies" ? watchValue() : undefined }),
     })
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
