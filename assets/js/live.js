@@ -972,6 +972,27 @@
       })
       .catch(function () { if (mine === previewSeq) showPoster(r.image, null); });
   }
+  // Editing something in Recently Watched (owner): its poster now is the first choice and stays picked; the same
+  // choices as adding it (fan art, then the official one) come in after it, and picking one saves it as the poster.
+  function editPosterChoices(it) {
+    var mine = ++previewSeq;
+    posterOptions = [{ image: it.image, credit: it.credit }];
+    posterPick = 0;
+    renderChoices();
+    if (!ADMIN || !it.imdbId) return;
+    preview.classList.add("loading");
+    fetch(API + "/poster?" + PQ + "&imdbId=" + encodeURIComponent(it.imdbId), { headers: authHeaders() })
+      .then(function (res) { return res.ok ? res.json() : null; })
+      .then(function (d) {
+        if (mine !== previewSeq) return;
+        preview.classList.remove("loading");
+        ((d && d.options) || []).forEach(function (o) {
+          if (!posterOptions.some(function (x) { return x.image === o.image; })) posterOptions.push(o);
+        });
+        renderChoices();
+      })
+      .catch(function () { if (mine === previewSeq) preview.classList.remove("loading"); });
+  }
 
   var nameLabel = dialog.querySelector('label[for="q-name"]');
   var dateInput = dialog.querySelector("#q-date");
@@ -1073,7 +1094,8 @@
       dialog.querySelector('input[name="q-who"][value="' + (it.commentPrivate ? "private" : "public") + '"]').checked = true;
     }
     dateInput.max = today();
-    if (editing || mineEdit) showPoster(it.image, it.credit);
+    if (editing) editPosterChoices(it);
+    else if (mineEdit) showPoster(it.image, it.credit);
     if (editing) {
       chosen = { id: it.imdbId };
       movie.value = it.title + (it.year ? " (" + it.year + ")" : "");
@@ -1091,7 +1113,7 @@
     hint.textContent = mineEdit
       ? "Change your name or your note. Picked the wrong " + KIND + "? Remove it from the card instead, and you'll get the spot back."
       : editing
-      ? "Change your rating, your review, or the date you " + DID.toLowerCase() + " it."
+      ? "Change your rating, your review, the date you " + DID.toLowerCase() + " it, or its poster."
       : target
       ? "Goes at the end of " + target.title + ". Poster art is picked automatically."
       : watching
@@ -1310,7 +1332,8 @@
       method: "PATCH",
       headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ date: dateInput.value, rating: rating, review: reviewInput.value.trim(), watchedWith: PAGE === "movies" ? withValue() : undefined,
-        where: PAGE === "movies" ? whereValue() : undefined, watch: PAGE === "movies" ? watchValue() : undefined }),
+        where: PAGE === "movies" ? whereValue() : undefined, watch: PAGE === "movies" ? watchValue() : undefined,
+        poster: posterPick > 0 ? pickedPoster() : undefined }), // (the first choice is the poster it has now)
     })
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
       .then(function (res) {

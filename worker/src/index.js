@@ -29,7 +29,8 @@ import { recordSteam, steamView, STEAM_KEY, SteamError } from "./steam.js";
 //   GET    /watched             Recently Watched, newest first (8), and its archive: { items, archive }
 //   POST   /watched             { imdbId, date: "YYYY-MM-DD", rating: 0.5-5 in halves, optional, review: optional, up to
 //                               REVIEW_MAX chars } (admin) -> adds a movie; also drops it from the queue
-//   PATCH  /watched/:id         { rating, date, review } (admin) -> change the rating, date watched and/or review ("" clears it)
+//   PATCH  /watched/:id         { rating, date, review, poster? } (admin) -> change the rating, date watched, review ("" clears it)
+//                               and/or its poster (one of GET /poster's choices)
 //   DELETE /watched/:id         remove one (admin)
 //   GET    /lists?page=movies   Nick's site-added picks for each live section (newest first) and the list.js items he
 //                               removed on the site: { lists: { <key>: [items] }, hidden: { <key>: [titles] } }
@@ -869,6 +870,8 @@ async function editWatched(request, url, env, cors) {
     const watch = cleanWatch(body.watch);
     if (watch) item.watch = watch; else delete item.watch;
   }
+  const poster = cleanPoster(body.poster); // a different poster picked in Edit (the same choices as adding it)
+  if (poster) { item.image = poster.image; item.credit = poster.credit; }
   item.id = item.imdbId + "-" + date;
   // A new date could collide with another viewing of the same movie; keep the edited one
   const kept = items.filter((it) => it === item || it.id !== item.id);
