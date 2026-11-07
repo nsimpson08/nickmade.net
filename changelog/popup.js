@@ -11,9 +11,8 @@ window.WHATS_NEW = {
   version: "1.7",
   kicker: "New since your last visit",
   title: "Ver 1.7: Library",
-  intro: "A new section for everything I collect on physical media, and a way to hear when I post (or when your cat needs you).",
+  intro: "A new section for everything I collect on physical media.",
   items: [
-    { page: "home", link: "/", cta: "Get notified", gold: true, text: "Get notified when I watch a movie, play a game, finish a round of golf, post a photo, or update the site. Have a cat in the Cattery? It can tell you when your cat is hungry or wants attention. No account needed." },
     { page: "library", link: "/library/", cta: "Browse the Library", text: "Library: my movies, vinyl, books and board games, each on its own shelf. Physical. Media. Forever." },
     { page: "library", link: "/library/vinyl/", cta: "Pull out a record", text: "Vinyl: slide a record out of its sleeve, turn it over for the back, and play the album on Spotify from its track list." },
     { page: "library", link: "/library/movies/", cta: "Open the shelf", text: "Movies: my disc library moved into Library, now with HD and SD filters, taglines, and the DVDs and VHS tapes filled in." },

@@ -22,7 +22,6 @@ window.CHANGELOG = [
     date: "2026-11-06",
     title: "Library",
     changes: [
-      { page: "home", text: "Get notified: sign up on the home page for a notification on your phone or computer when I watch a movie, play a game, finish a round of golf, post a photo, or update the site. No account. On an iPhone, add NickMade to your Home Screen first" },
       { page: "home", text: "A new Library tile" },
       { page: "site", text: "Links to NickMade now show a preview card when you share them in Messages, Discord and the like" },
       { page: "site", text: "A page that doesn't exist now shows a missing tape on the shelf instead of a plain error, with a way back to every section" },
@@ -33,7 +32,6 @@ window.CHANGELOG = [
       { page: "library", text: "Books: my bookshelf with each book's genre, series, release year, and what it's about" },
       { page: "library", text: "Board games: how many can play, how long a game takes, and how complex it is" },
       { page: "library", text: "With a case or card open, the left and right arrow keys flip through the shelf" },
-      { page: "play", text: "The Cattery: have a cat there? Turn on Get notified for it and hear when it gets hungry or wants attention" },
       { page: "extras", text: "Golf weather: each day now shows its overall chance of rain and how much is expected, and says when the forecasts disagree" },
       { page: "extras", text: "The Video Game Montage Maker is retired" }
     ]
