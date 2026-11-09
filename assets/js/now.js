@@ -5,6 +5,15 @@
 // Updates itself as those lists change.
 // A spinner shows while they load; parts that can't load are left out, and if none load, the strip hides.
 (function () {
+  // Every date and time on the site is Central (America/Chicago, daylight saving included), whatever the viewer's
+  // own clock says (Nick, 2026-11-07): ct() is now (or t) on Plano's clock.
+  var CT = "America/Chicago";
+  function ct(t) {
+    var p = {};
+    new Intl.DateTimeFormat("en-US", { timeZone: CT, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+      .formatToParts(t == null ? new Date() : new Date(t)).forEach(function (x) { p[x.type] = x.value; });
+    return { y: +p.year, m: +p.month, d: +p.day, h: +p.hour % 24, min: +p.minute, ymd: p.year + "-" + p.month + "-" + p.day };
+  }
   var script = document.currentScript;
   var local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
   var API = (local ? script.dataset.apiLocal : script.dataset.api) || "";
@@ -46,8 +55,7 @@
   function ago(date) {
     var d = new Date(date + "T00:00:00");
     if (isNaN(d)) return "";
-    var today = new Date();
-    today.setHours(0, 0, 0, 0);
+    var today = new Date(ct().ymd + "T00:00:00"); // today on Plano's clock
     var days = Math.round((today - d) / 864e5);
     if (days <= 0) return "today";
     if (days === 1) return "yesterday";
@@ -63,8 +71,7 @@
     if (mins < 2) return "just now";
     if (mins < 60) return mins + "m ago";
     if (mins < 24 * 60) return Math.round(mins / 60) + "h ago";
-    var d = new Date(iso);
-    return ago(d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"));
+    return ago(ct(iso).ymd);
   }
 
   // 4.5 -> ★★★★½

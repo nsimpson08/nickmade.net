@@ -22,6 +22,15 @@
 //               nm-scorecard-approvals course files approved here, still to send
 //               nm-scorecard-ok      whether this browser may see the page (for opening it offline)
 (function () {
+  // Every date and time on the site is Central (America/Chicago, daylight saving included), whatever the viewer's
+  // own clock says (Nick, 2026-11-07): ct() is now (or t) on Plano's clock.
+  var CT = "America/Chicago";
+  function ct(t) {
+    var p = {};
+    new Intl.DateTimeFormat("en-US", { timeZone: CT, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+      .formatToParts(t == null ? new Date() : new Date(t)).forEach(function (x) { p[x.type] = x.value; });
+    return { y: +p.year, m: +p.month, d: +p.day, h: +p.hour % 24, min: +p.minute, ymd: p.year + "-" + p.month + "-" + p.day };
+  }
   var script = document.currentScript;
   var local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
   var API = (local ? script.dataset.apiLocal : script.dataset.api) || "";
@@ -47,7 +56,7 @@
   function buzz() { try { if (navigator.vibrate) navigator.vibrate(8); } catch (e) {} }
   function toPar(v) { return v === 0 ? "E" : (v > 0 ? "+" : "") + v; }
   function rel(d) { return NAMES[String(d)] || (d > 0 ? "+" + d : String(d)); }
-  function fmtDate(d) { var x = new Date(d); return isNaN(x) ? "" : x.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); }
+  function fmtDate(d) { var day = /^\d{4}-\d{2}-\d{2}$/.test(d || ""), x = new Date(day ? d + "T12:00:00Z" : d); return isNaN(x) ? "" : x.toLocaleDateString("en-US", { timeZone: day ? "UTC" : CT, month: "short", day: "numeric", year: "numeric" }); } // (a bare day as written; a time on Plano's clock)
   function fmtYds(n) { return n == null ? "" : Number(n).toLocaleString("en-US"); }
   function monthYear(s) { // "2024-06" -> "Jun 2024"
     var m = /^(\d{4})-(\d{2})/.exec(s || "");
@@ -106,10 +115,9 @@
   // a "YYYY-MM-DD" played-on day as the round's date: now for today, noon that day for an old round
   function dayToIso(d) {
     if (!d || d === today()) return new Date().toISOString();
-    var p = d.split("-");
-    return new Date(+p[0], +p[1] - 1, +p[2], 12).toISOString();
+    return new Date(d + "T18:00:00Z").toISOString(); // (noon that day in Plano: 18:00 UTC is 12 or 1 PM there)
   }
-  function today() { var d = new Date(); return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); }
+  function today() { return ct().ymd; }
 
   // ---------- the gate: owner only until the Worker says it's public ----------
 
@@ -1153,8 +1161,7 @@
   var syncing = false, again = false, syncTimer = null;
   function dayOf(r) {
     if (r.day) return r.day;
-    var d = new Date(r.date || Date.now());
-    return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2);
+    return ct(r.date || Date.now()).ymd;
   }
   function waiting() {
     // a round finished before that fix (2026-10-21) whose finish never went: its finish counts as its last change,

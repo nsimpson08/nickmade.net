@@ -84,7 +84,7 @@ async function vote(request, env, cors, h) {
   }
 
   if (p) { // a cap on vote changes per IP per day, against scripted flipping
-    const rate = "votes:rate:" + p + ":" + new Date().toISOString().slice(0, 10);
+    const rate = "votes:rate:" + p + ":" + new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago" }).format(new Date()); // (Plano's day)
     const n = parseInt(await env.QUEUE.get(rate), 10) || 0;
     if (n >= CHANGES_PER_DAY) return h.json({ error: "That's a lot of voting for one day. Try again tomorrow!" }, 429, cors);
     await env.QUEUE.put(rate, String(n + 1), { expirationTtl: 2 * 86400 });

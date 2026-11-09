@@ -171,7 +171,7 @@ async function save(env, room) {
 // history lines past LOG_MAX, kept by month (cats:log:YYYY-MM, oldest first)
 async function archive(env, lines) {
   const byMonth = {};
-  lines.forEach((e) => { const m = new Date(e.t || Date.now()).toISOString().slice(0, 7); (byMonth[m] = byMonth[m] || []).push(e); });
+  lines.forEach((e) => { const m = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago" }).format(new Date(e.t || Date.now())).slice(0, 7); (byMonth[m] = byMonth[m] || []).push(e); });
   for (const m of Object.keys(byMonth)) {
     const k = "cats:log:" + m, raw = await env.QUEUE.get(k);
     const kept = raw === null ? [] : JSON.parse(raw); // unreadable: throws rather than overwrite it
@@ -180,7 +180,7 @@ async function archive(env, lines) {
 }
 // the cron's daily copy of the whole room
 async function snapshot(env, room) {
-  const k = "cats:snap:" + new Date().toISOString().slice(0, 10);
+  const k = "cats:snap:" + new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago" }).format(new Date()); // (Plano's date)
   if ((await env.QUEUE.get(k)) !== null) return;
   await env.QUEUE.put(k, JSON.stringify(room), { expirationTtl: SNAP_DAYS * 86400 });
 }

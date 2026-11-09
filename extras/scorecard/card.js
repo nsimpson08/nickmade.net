@@ -10,6 +10,15 @@
 //   round: { tee, holes: [hole numbers played], scores: { "<n>": { strokes, putts, fairway, gir, penalties } },
 //            player, date }
 (function () {
+  // Every date and time on the site is Central (America/Chicago, daylight saving included), whatever the viewer's
+  // own clock says (Nick, 2026-11-07): ct() is now (or t) on Plano's clock.
+  var CT = "America/Chicago";
+  function ct(t) {
+    var p = {};
+    new Intl.DateTimeFormat("en-US", { timeZone: CT, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+      .formatToParts(t == null ? new Date() : new Date(t)).forEach(function (x) { p[x.type] = x.value; });
+    return { y: +p.year, m: +p.month, d: +p.day, h: +p.hour % 24, min: +p.minute, ymd: p.year + "-" + p.month + "-" + p.day };
+  }
   var HAND = { font: "Caveat", color: "#1e2a66" };
 
   // ---------- templates ----------
@@ -601,8 +610,8 @@
 
   function dateText(d) {
     if (!d) return "";
-    var x = new Date(d);
-    return isNaN(x) ? "" : x.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    var day = /^\d{4}-\d{2}-\d{2}$/.test(d), x = new Date(day ? d + "T12:00:00Z" : d); // (a bare day as written; a time on Plano's clock)
+    return isNaN(x) ? "" : x.toLocaleDateString("en-US", { timeZone: day ? "UTC" : CT, month: "short", day: "numeric", year: "numeric" });
   }
 
   function roundRect(ctx, x, y, w, h, r) {

@@ -11,6 +11,15 @@
 // in, the rim of its bed).
 (function () {
   "use strict";
+  // Every date and time on the site is Central (America/Chicago, daylight saving included), whatever the viewer's
+  // own clock says (Nick, 2026-11-07): ct() is now (or t) on Plano's clock.
+  var CT = "America/Chicago";
+  function ct(t) {
+    var p = {};
+    new Intl.DateTimeFormat("en-US", { timeZone: CT, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+      .formatToParts(t == null ? new Date() : new Date(t)).forEach(function (x) { p[x.type] = x.value; });
+    return { y: +p.year, m: +p.month, d: +p.day, h: +p.hour % 24, min: +p.minute, ymd: p.year + "-" + p.month + "-" + p.day };
+  }
   var script = document.currentScript;
   var local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
   var API = (local ? script.dataset.apiLocal : script.dataset.api) || "";
@@ -222,7 +231,7 @@
   // the window (on the window wall, y 150-280, z 130-262): the sky by the time of day
   var WIN = { y0: 150, y1: 280, z0: 130, z1: 262 };
   function skyAt(t, z, a) {
-    var hr = t.getHours() + t.getMinutes() / 60, f = (z - WIN.z0) / (WIN.z1 - WIN.z0);
+    var c = ct(t), hr = c.h + c.min / 60, f = (z - WIN.z0) / (WIN.z1 - WIN.z0);
     var night = hr < 6 || hr >= 20.5, dusk = (hr >= 18 && hr < 20.5) || (hr >= 6 && hr < 7.5);
     if (night) {
       if (hash(a * 7 + 1, z * 13) < 0.012) return "#f4f0d8"; // stars
@@ -712,7 +721,7 @@
   };
   function pickIdle(c) {
     var kind = (SPOTS[c.spot] || {}).kind || "floor";
-    var list = IDLE[kind] || IDLE.floor, hr = new Date().getHours(), sleepy = hr >= 22 || hr < 6;
+    var list = IDLE[kind] || IDLE.floor, hr = ct().h, sleepy = hr >= 22 || hr < 6;
     var total = 0, w = list.map(function (o) { var x = o[1] * (o[0] === "sleep" && sleepy ? 3 : 1); total += x; return x; });
     var r = Math.random() * total, pick = list[0];
     for (var i = 0; i < list.length; i++) { r -= w[i]; if (r <= 0) { pick = list[i]; break; } }
@@ -988,8 +997,8 @@
     var h = (Date.now() - t) / 3600e3, d = new Date(t);
     if (h < 20) return "In the last " + Math.max(1, Math.round(h)) + " hour" + (Math.round(h) === 1 ? "" : "s");
     if (h < 48) return "Since yesterday";
-    if (h < 24 * 7) return "Since " + d.toLocaleDateString("en-US", { weekday: "long" });
-    return "Since " + d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    if (h < 24 * 7) return "Since " + d.toLocaleDateString("en-US", { timeZone: CT, weekday: "long" });
+    return "Since " + d.toLocaleDateString("en-US", { timeZone: CT, month: "short", day: "numeric" });
   }
   var NICE_K = { groom: 1, play: 1, nap: 1, headbutt: 1, sunbeam: 1, chase: 1, share: 1, sniff: 1, blink: 1, gift: 1, serenade: 1, treat: 1, date: 1 };
   var MEAN_K = { hiss: 1, swat: 1, stare: 1, steal: 1 };
@@ -1318,7 +1327,7 @@
   // ---------- the seasons (Nick: Halloween, winter, spring): by the visitor's date; ?season=halloween|winter|spring|none previews one ----------
   function season() {
     if (SEASON_PREVIEW) return SEASON_PREVIEW === "none" ? null : SEASON_PREVIEW;
-    var d = new Date(), m = d.getMonth() + 1, day = d.getDate(), md = m * 100 + day;
+    var d = ct(), m = d.m, day = d.d, md = m * 100 + day;
     if (md >= 1010 && md <= 1102) return "halloween";
     if (md >= 1201 || md <= 110) return "winter";
     if (md >= 320 && md <= 531) return "spring";
@@ -1527,7 +1536,7 @@
       var b = e.a === id ? e.bn : e.an, bid = e.a === id ? e.b : e.a;
       line = esc(line).replace("{b}", bid ? catName(bid, b) : "someone").replace("{g}", esc(GIFT_NAME[e.g] || "something")).replace("{s}", esc(spotLabel(e.s)))
         .replace("{c}", e.c ? catName(e.c, e.cn) : "").replace("{p}", esc(e.text || "")).replace("{by}", esc(e.by || "Someone"));
-      var when = Date.now() - x.t < 6 * 86400e3 ? new Date(x.t).toLocaleDateString("en-US", { weekday: "long" }) : new Date(x.t).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      var when = Date.now() - x.t < 6 * 86400e3 ? new Date(x.t).toLocaleDateString("en-US", { timeZone: CT, weekday: "long" }) : new Date(x.t).toLocaleDateString("en-US", { timeZone: CT, month: "short", day: "numeric" });
       return "<li><b>" + when + ".</b> " + line + "</li>";
     }).join("");
   }
@@ -1635,8 +1644,8 @@
   }
 
   // kindness to someone else's cat (once a day each; this browser remembers so the buttons can say so)
-  function kindDone(id, what) { try { return (JSON.parse(localStorage.getItem("nm-cats-kind") || "{}")[id + ":" + what]) === new Date().toDateString(); } catch (e) { return false; } }
-  function kindMark(id, what) { try { var m = JSON.parse(localStorage.getItem("nm-cats-kind") || "{}"), today = new Date().toDateString(); Object.keys(m).forEach(function (k) { if (m[k] !== today) delete m[k]; }); m[id + ":" + what] = today; localStorage.setItem("nm-cats-kind", JSON.stringify(m)); } catch (e) {} }
+  function kindDone(id, what) { try { return (JSON.parse(localStorage.getItem("nm-cats-kind") || "{}")[id + ":" + what]) === ct().ymd; } catch (e) { return false; } }
+  function kindMark(id, what) { try { var m = JSON.parse(localStorage.getItem("nm-cats-kind") || "{}"), today = ct().ymd; Object.keys(m).forEach(function (k) { if (m[k] !== today) delete m[k]; }); m[id + ":" + what] = today; localStorage.setItem("nm-cats-kind", JSON.stringify(m)); } catch (e) {} }
   function giveKind(c, what) {
     var by = ""; try { by = localStorage.getItem("nm-name") || ""; } catch (e) {}
     send(c, { action: "kind", what: what, by: by }).then(function (d) {
@@ -2006,7 +2015,7 @@
     if (s2 < 3600) return Math.floor(s2 / 60) + "m ago";
     if (s2 < 86400) return Math.floor(s2 / 3600) + "h ago";
     var d = Math.floor(s2 / 86400);
-    return d === 1 ? "yesterday" : d < 30 ? d + " days ago" : new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    return d === 1 ? "yesterday" : d < 30 ? d + " days ago" : new Date(t).toLocaleDateString("en-US", { timeZone: CT, month: "short", day: "numeric" });
   }
   function catName(id, fallback) { var c = cats[id]; return '<a class="cat-link" data-cat="' + esc(id) + '">' + esc(c ? c.data.name : fallback || "a cat") + "</a>"; }
   function spotLabel(id) { return (SPOTS[id] || {}).label || "somewhere new"; }
@@ -2487,7 +2496,7 @@
     var lead = stories[0], rest = stories.slice(1, 9);
     var start = new Date("2026-10-15T12:00:00"), no = Math.max(1, Math.floor((Date.now() - start) / (7 * DAY)) + 1);
     var counts = { meet: L.filter(function (e) { return e.b && (NICE_K[e.k] || MEAN_K[e.k]); }).length, gifts: L.filter(function (e) { return e.k === "found"; }).length, adv: L.filter(function (e) { return e.k === "adventure"; }).length };
-    return '<header class="tm-mast"><h2>The Cattery Times</h2><div class="tm-dateline"><span>Week ending ' + new Date(d.to).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) +
+    return '<header class="tm-mast"><h2>The Cattery Times</h2><div class="tm-dateline"><span>Week ending ' + new Date(d.to).toLocaleDateString("en-US", { timeZone: CT, month: "long", day: "numeric", year: "numeric" }) +
       "</span><span>Vol. 1 · No. " + no + "</span><span>Price: one treat</span></div></header>" +
       (lead ? '<article class="tm-lead"><span class="tm-kicker">' + lead.k + "</span><h3>" + lead.h + "</h3><p>" + lead.b + "</p></article>" :
         '<article class="tm-lead"><span class="tm-kicker">Slow news week</span><h3>Nothing to report</h3><p>The cats napped. Check back next week.</p></article>') +

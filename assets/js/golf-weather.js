@@ -20,6 +20,15 @@
 // or across, with a little compass of the holes, only when the wind is over 10 mph. Not every course is mapped; then
 // it says so.
 (function () {
+  // Every date and time on the site is Central (America/Chicago, daylight saving included), whatever the viewer's
+  // own clock says (Nick, 2026-11-07): ct() is now (or t) on Plano's clock.
+  var CT = "America/Chicago";
+  function ct(t) {
+    var p = {};
+    new Intl.DateTimeFormat("en-US", { timeZone: CT, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+      .formatToParts(t == null ? new Date() : new Date(t)).forEach(function (x) { p[x.type] = x.value; });
+    return { y: +p.year, m: +p.month, d: +p.day, h: +p.hour % 24, min: +p.minute, ymd: p.year + "-" + p.month + "-" + p.day };
+  }
   var root = document.getElementById("gw");
   var form = document.getElementById("gw-search");
   var input = document.getElementById("gw-zip");
@@ -385,7 +394,9 @@
   function hr(h) { return (h % 12 || 12) + (h < 12 || h === 24 ? " AM" : " PM"); }
   function dayFmt(d, o) { return new Date(d + "T12:00:00Z").toLocaleDateString("en-US", Object.assign({ timeZone: "UTC" }, o)); }
   function render() {
-    var list = state.data, today = list.length ? list[0].date : "";
+    // Today is today's date on Plano's clock (Nick, 2026-11-07: at 10 PM the first day left in the forecast is
+    // tomorrow, once tonight's hours are past, and it used to be called Today)
+    var list = state.data, today = ct().ymd;
     function dayName(d) { return d === today ? "Today" : dayFmt(d, { weekday: "long" }); }
     var where = state.course ? state.course.name + " · " + state.course.city : state.place.name;
     // the week's best three, a day each (all good first, then by score, then sooner)

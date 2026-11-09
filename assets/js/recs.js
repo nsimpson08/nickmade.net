@@ -6,6 +6,15 @@
 // (click a row, or Play all), moving on to the next song when one ends. Visitors not signed in to Spotify hear
 // 30-second previews, like Recently Listened (recent.js, which shares the player script and pauses when this plays).
 (function () {
+  // Every date and time on the site is Central (America/Chicago, daylight saving included), whatever the viewer's
+  // own clock says (Nick, 2026-11-07): ct() is now (or t) on Plano's clock.
+  var CT = "America/Chicago";
+  function ct(t) {
+    var p = {};
+    new Intl.DateTimeFormat("en-US", { timeZone: CT, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+      .formatToParts(t == null ? new Date() : new Date(t)).forEach(function (x) { p[x.type] = x.value; });
+    return { y: +p.year, m: +p.month, d: +p.day, h: +p.hour % 24, min: +p.minute, ymd: p.year + "-" + p.month + "-" + p.day };
+  }
   var script = document.currentScript;
   var local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
   var API = (local ? script.dataset.apiLocal : script.dataset.api) || "";
@@ -42,7 +51,7 @@
     if (mins < 60) return mins + "m ago";
     if (mins < 1440) return Math.round(mins / 60) + "h ago";
     if (mins < 14 * 1440) return Math.round(mins / 1440) + "d ago";
-    return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    return new Date(iso).toLocaleDateString("en-US", { timeZone: CT, month: "short", day: "numeric" });
   }
   var E = '<abbr class="rec-e" title="Explicit">E</abbr>';
 

@@ -118,7 +118,7 @@ async function add(request, env, cors, h) {
   const items = await getJSON(env, ITEMS, []);
   if (items.length >= MAX_ITEMS) return h.json({ error: "The list is full (" + MAX_ITEMS + " items)." }, 409, cors);
   it.id = crypto.randomUUID().replace(/-/g, "").slice(0, 10);
-  it.added = new Date().toISOString().slice(0, 10);
+  it.added = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago" }).format(new Date()); // (Plano's date: every date Central, Nick 2026-11-07)
   items.push(it); // the bottom of its group: Nick's top is already in his order (Nick, 2026-10-19)
   await env.QUEUE.put(ITEMS, JSON.stringify(items));
   return h.json({ item: it }, 200, cors);

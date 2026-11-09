@@ -12,6 +12,15 @@
 // Then: outlines round objects, the hover outline, and at night the dark with pools of lamp and screen light.
 (function () {
   "use strict";
+  // Every date and time on the site is Central (America/Chicago, daylight saving included), whatever the viewer's
+  // own clock says (Nick, 2026-11-07): ct() is now (or t) on Plano's clock.
+  var CT = "America/Chicago";
+  function ct(t) {
+    var p = {};
+    new Intl.DateTimeFormat("en-US", { timeZone: CT, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+      .formatToParts(t == null ? new Date() : new Date(t)).forEach(function (x) { p[x.type] = x.value; });
+    return { y: +p.year, m: +p.month, d: +p.day, h: +p.hour % 24, min: +p.minute, ymd: p.year + "-" + p.month + "-" + p.day };
+  }
   var script = document.currentScript;
   var local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
   var API = (local ? script.dataset.apiLocal : script.dataset.api) || "";
@@ -224,7 +233,7 @@
   }
 
   // ---------- state ----------
-  var hour = new Date().getHours();
+  var hour = ct().h;
   var state = { night: false, lamp: false, lampHue: 0, live: {}, on: { magnavox: true, "side-monitor": true } }; // on: TVs switched on (the Magnavox starts on, showing the last movie; the second monitor too)
   // Night switches the room's lamps on: the desk lamp and the lava lamp (the floor lamp is always on); day switches the
   // desk lamp off again. Either can still be flipped by hand after.

@@ -69,7 +69,7 @@ async function save(request, env, cors, h) {
   const ghost = Number.isInteger(body.ghost) && body.ghost >= 9 && body.ghost <= 99 ? body.ghost : null;
 
   // a few saves a day per visitor (browser id and hashed IP, like the queue)
-  const day = new Date().toISOString().slice(0, 10);
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago" }).format(new Date()); // (Plano's day)
   const ids = [];
   const vid = await by(body.visitorId, env, h);
   if (vid) ids.push(vid);

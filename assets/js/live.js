@@ -7,6 +7,15 @@
 // In owner mode the + cards are always there, your picks have no "Suggested by", and every site-added one gets a Remove button.
 // Site additions live in Cloudflare, not in this repo; tools/pull_live.py copies them into list.js.
 (function () {
+  // Every date and time on the site is Central (America/Chicago, daylight saving included), whatever the viewer's
+  // own clock says (Nick, 2026-11-07): ct() is now (or t) on Plano's clock.
+  var CT = "America/Chicago";
+  function ct(t) {
+    var p = {};
+    new Intl.DateTimeFormat("en-US", { timeZone: CT, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+      .formatToParts(t == null ? new Date() : new Date(t)).forEach(function (x) { p[x.type] = x.value; });
+    return { y: +p.year, m: +p.month, d: +p.day, h: +p.hour % 24, min: +p.minute, ymd: p.year + "-" + p.month + "-" + p.day };
+  }
   var script = document.currentScript;
   var local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
   var API = (local ? script.dataset.apiLocal : script.dataset.api) || "";
@@ -161,8 +170,7 @@
 
   // Local YYYY-MM-DD for an ISO timestamp
   function localDate(iso) {
-    var d = new Date(iso);
-    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    return ct(iso).ymd;
   }
 
   // "2026-05-19" -> "May 2026"; "2026" stays "2026"
@@ -990,8 +998,14 @@
           if (!posterOptions.some(function (x) { return x.image === o.image; })) posterOptions.push(o);
         });
         renderChoices();
+        if (posterOptions.length < 2) noPosterOptions();
       })
-      .catch(function () { if (mine === previewSeq) preview.classList.remove("loading"); });
+      .catch(function () { if (mine === previewSeq) { preview.classList.remove("loading"); noPosterOptions(); } });
+  }
+  // nothing else found (no fan art, and the official one is the one it has): say so where the choices would be
+  function noPosterOptions() {
+    previewChoices.hidden = false;
+    previewChoices.innerHTML = '<p class="pp-no-options">No Options</p>';
   }
 
   var nameLabel = dialog.querySelector('label[for="q-name"]');
@@ -1038,8 +1052,7 @@
   });
 
   function today() {
-    var d = new Date();
-    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    return ct().ymd;
   }
 
   function submitLabel() {

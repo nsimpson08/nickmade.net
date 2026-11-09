@@ -1545,6 +1545,7 @@ button.queue-slot:hover .plus { transform: rotate(90deg); }
 /* Nick's poster choices beside the big preview: up to 3 fan-art posters + the official one, 2 per row */
 .queue-dialog .pp-choices { display: grid; grid-template-columns: repeat(2, 62px); gap: 8px; align-content: center; }
 .queue-dialog .pp-choices[hidden] { display: none; }
+.queue-dialog .pp-no-options { grid-column: 1 / -1; margin: 0; color: var(--muted, #8a8a8a); font-size: 0.9rem; }
 .queue-dialog .pp-choices button {
   padding: 0;
   aspect-ratio: 2 / 3;
