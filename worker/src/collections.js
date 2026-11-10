@@ -718,11 +718,13 @@ async function dgRelease(env, id) {
 const isScan = (im) => im && im.width && im.height && Math.abs(im.width / im.height - 1) < 0.04 && Math.min(im.width, im.height) >= 550;
 const dgMs = (t) => { const m = /^(?:(\d+):)?(\d+):(\d{2})$/.exec(String(t || "").trim()); return m ? (((+m[1] || 0) * 60 + +m[2]) * 60 + +m[3]) * 1000 : null; };
 // the album's official artwork, from Apple Music's free search (a stock image, not anyone's photo): exact album and artist
-async function itunesArt(title, artist) {
+async function itunesArt(title, artist) { const h = await itunesAlbum(title, artist); return h ? h.art : ""; }
+// (the same, with the year Apple Music has it from)
+async function itunesAlbum(title, artist) {
   const n = (t) => String(t || "").toLowerCase().replace(/\s*[([].*?(deluxe|edition|remaster|anniversary|expanded|version).*?[)\]]/g, "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/&/g, "and").replace(/[^a-z0-9]+/g, " ").trim();
   const r = await fetch("https://itunes.apple.com/search?entity=album&limit=15&country=US&term=" + encodeURIComponent(artist + " " + title), { signal: AbortSignal.timeout(10000) }).then((x) => (x.ok ? x.json() : {})).catch(() => ({}));
   const hit = (r.results || []).find((a) => n(a.collectionName) === n(title) && n(a.artistName) === n(artist));
-  return hit && hit.artworkUrl100 ? hit.artworkUrl100.replace(/\/\d+x\d+bb\./, "/1200x1200bb.") : "";
+  return hit && hit.artworkUrl100 ? { art: hit.artworkUrl100.replace(/\/\d+x\d+bb\./, "/1200x1200bb."), year: +String(hit.releaseDate || "").slice(0, 4) || 0 } : null;
 }
 // a song's own artist, when it isn't the record's (a compilation's: Nick, 2026-11-03: "most of my compilations have
 // songs from all different artist ... put the artist in the track title on the open record box"): { by } or nothing
@@ -1196,32 +1198,39 @@ async function recordBacks(env, id, side) {
   const has = async (u) => { const c = await fetch(u, { method: "HEAD", redirect: "manual" }).catch(() => null); return !!c && (c.status === 307 || c.status === 302 || c.status === 200); };
   const caa = (rid, size) => "https://coverartarchive.org/release/" + rid + "/" + side + "-" + size;
   const place = (x) => [String(x.date || x.released || x.year || "").slice(0, 4), { XE: "Europe", XW: "Worldwide", GB: "UK", XU: "" }[x.country] ?? x.country].filter(Boolean).join(" ");
-  let r = {}, discogsId = dgOnly ? id.slice(3) : "", title = "", artist = "";
+  let r = {}, discogsId = dgOnly ? id.slice(3) : "", title = "", artist = "", year = 0; // (year: the chosen pressing's)
   if (!dgOnly) {
     r = await mbFetch(MB + "/release/" + id + "?fmt=json&inc=url-rels+release-groups+artist-credits").then((x) => (x.ok ? x.json() : {})).catch(() => ({}));
     title = r.title || ""; artist = (r["artist-credit"] || []).map((a) => a.name + (a.joinphrase || "")).join("").trim();
     const discogs = ((r.relations || []).find((x) => x.type === "discogs" && x.url) || {}).url;
     discogsId = (discogs && (/\/release\/(\d+)/.exec(discogs.resource) || [])[1]) || "";
+    year = +String(r.date || "").slice(0, 4) || 0;
   }
   // Discogs: this pressing, then (scans only) up to 6 of the album's other vinyl pressings
+  // (Nick, 2026-11-10: "always try and show imagery from the year's pressing that was chosen": a 2026 reissue showed
+  // 2006 and 2012 sleeves) this pressing's own scans and photos first, then pressings from its year, then the nearest years
   const dgPics = (rel, mine) => {
     const ims = (rel.images || []).filter((im) => (side === "front" ? im.type === "primary" : im.type === "secondary"));
+    const sameYear = !mine && year && +rel.year === year;
     ims.forEach((im) => {
       const scan = isScan(im), where = mine ? "your pressing" : [rel.year, rel.country].filter(Boolean).join(" ") + " pressing";
-      if (scan) push(mine ? 1 : 2, im.uri, im.uri150, "Scan" + (mine ? " " + (++mineN) : "") + " · " + where + " · Discogs", "discogs");
-      else if (mine) push(4, im.uri, im.uri150, "Photo · " + where + " · Discogs", "discogs");
+      if (mine) push(1, im.uri, im.uri150, (scan ? "Scan " + (++mineN) : "Photo") + " · " + where + " · Discogs", "discogs");
+      else if (sameYear) push(2, im.uri, im.uri150, (scan ? "Scan" : "Photo") + " · " + where + " · Discogs", "discogs");
+      else if (scan) push(3, im.uri, im.uri150, "Scan · " + where + " · Discogs", "discogs");
     });
   };
+  const yearOff = (y) => (year && +y ? Math.abs(+y - year) : 99);
   let dgRel = null, mineN = 0;
   if (discogsId) {
     dgRel = await dg(env, "/releases/" + discogsId);
     if (dgRel) {
       if (dgOnly) { title = dgRel.title; artist = (dgRel.artists || []).map((a) => dgName(a.anv || a.name)).join(" & "); }
+      year = +dgRel.year || year;
       dgPics(dgRel, true);
       if (dgRel.master_id) {
         const v = await dg(env, "/masters/" + dgRel.master_id + "/versions?format=Vinyl&per_page=30");
         const others = ((v && v.versions) || []).filter((x) => String(x.id) !== String(discogsId) && !DG_SKIP.test(String(x.format || "")))
-          .sort((a, b) => ((b.country === dgRel.country) - (a.country === dgRel.country))).slice(0, 6);
+          .sort((a, b) => (yearOff(String(a.released || "").slice(0, 4)) - yearOff(String(b.released || "").slice(0, 4))) || ((b.country === dgRel.country) - (a.country === dgRel.country))).slice(0, 6);
         for (const o of others) { const rel = await dg(env, "/releases/" + o.id); if (rel) dgPics(rel, false); }
       }
     }
@@ -1237,13 +1246,19 @@ async function recordBacks(env, id, side) {
       const vinyl = (x) => (x.media || []).some((m) => /vinyl/i.test(m.format || ""));
       const twin = (x) => !!r.barcode && x.barcode === r.barcode;
       (sib.releases || []).filter((x) => x.id !== id && (x["cover-art-archive"] || {})[side])
-        .sort((a, b) => (twin(b) - twin(a)) || (vinyl(b) - vinyl(a)) || ((b.country === r.country) - (a.country === r.country)))
-        .slice(0, 10).forEach((x) => push(twin(x) ? 2 : 3, caa(x.id, 500), caa(x.id, 250),
+        .sort((a, b) => (twin(b) - twin(a)) || (yearOff(String(a.date || "").slice(0, 4)) - yearOff(String(b.date || "").slice(0, 4))) || (vinyl(b) - vinyl(a)) || ((b.country === r.country) - (a.country === r.country)))
+        .slice(0, 10).forEach((x) => push(twin(x) || (year && yearOff(String(x.date || "").slice(0, 4)) === 0) ? 2 : 3, caa(x.id, 500), caa(x.id, 250),
           place(x) + " " + (vinyl(x) ? "vinyl" : ((x.media || [])[0] || {}).format || "") + " pressing" + (twin(x) ? " · your barcode" : "") + " · Cover Art Archive", "caa"));
     }
   }
   // Apple Music's official artwork, first of all for a front
-  if (side === "front" && title) { const a = await itunesArt(title, artist); if (a) tiers[0].push({ src: a, thumb: a.replace("/1200x1200bb.", "/300x300bb."), label: "Official artwork · Apple Music", from: "itunes" }); }
+  // (by the title as Nick has it first: "… (Reimagined)" is its own album there), first only when it's from the
+  // pressing's year, else after that year's pressings
+  if (side === "front" && title) {
+    const mine = ((await list(env, "vinyl")).find((x) => x.id === id || x.id === "mb-" + id) || {}).title;
+    const a = (mine && mine !== title && (await itunesAlbum(mine, artist))) || (await itunesAlbum(title, artist));
+    if (a) tiers[!year || !a.year || Math.abs(a.year - year) <= 1 ? 0 : 3].unshift({ src: a.art, thumb: a.art.replace("/1200x1200bb.", "/300x300bb."), label: "Official artwork" + (a.year ? " · " + a.year : "") + " · Apple Music", from: "itunes" });
+  }
   return tiers.flat().slice(0, 20);
 }
 
