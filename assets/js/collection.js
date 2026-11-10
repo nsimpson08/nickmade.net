@@ -597,6 +597,18 @@
             (KIND === "vinyl" ? '<div class="lib-covers coll-backs coll-card-backs" hidden>' + '<p class="coll-scan"><button type="button" class="pill-btn coll-scan-btn" data-side="back" data-id="' + esc(d.id) + '">Upload your own scan</button><input type="file" accept="image/*" hidden></p>' + '<div class="lib-cover-list" role="group" aria-label="Back cover"></div><p class="coll-msg"></p></div>' : "") : "") +
         "</div>" +
       "</div>";
+    // the record and its sleeve show together once the cover has loaded (Nick, 2026-11-10: the record showed first, a
+    // blip, then the cover over it); at most 4 s, so a cover that never comes doesn't hide the record
+    if (KIND === "vinyl") {
+      var lf0 = dialog.querySelector(".lib-front"), im0 = lf0 && lf0.querySelector("img.coll-cover");
+      if (im0 && !(im0.complete && im0.naturalWidth)) {
+        lf0.classList.add("cover-wait");
+        var shown = function () { lf0.classList.remove("cover-wait"); };
+        im0.addEventListener("load", shown, { once: true });
+        im0.addEventListener("error", shown, { once: true });
+        setTimeout(shown, 4000);
+      }
+    }
     if (!dialog.open) dialog.showModal();
     dialog.dataset.item = d.id;
     if (KIND === "games") loadHowTo();

@@ -3708,6 +3708,9 @@ img.developing { animation: develop 2.6s cubic-bezier(0.3, 0, 0.2, 1) both; }
    comes, and stays half out, the album's cover printed on its label */
 .coll-vinyl .lib-back { grid-template-columns: 330px 1fr; }
 .coll-vinyl .lib-front { width: 240px; }
+/* (until its cover has loaded, the record and sleeve wait hidden, then show together: collection.js cover-wait) */
+.coll-vinyl .lib-front > * { transition: opacity .15s; }
+.coll-vinyl .lib-front.cover-wait > * { opacity: 0; }
 .coll-vinyl .coll-cover { position: relative; z-index: 1; aspect-ratio: 1; object-fit: cover; }
 .coll-disc { position: absolute; z-index: 0; top: 3%; left: 3%; width: 94%; aspect-ratio: 1; border-radius: 50%;
   background: conic-gradient(from 20deg, transparent 0 8%, rgba(255, 255, 255, 0.07) 13%, transparent 18% 58%, rgba(255, 255, 255, 0.05) 63%, transparent 68%),

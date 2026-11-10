@@ -20,15 +20,20 @@ const C = { mint: "#7ee0b5", violet: "#a78bfa", amber: "#f5b451", pink: "#ff7eb6
 // name: [title, line, color, picture]  picture: "tile:<section>", "shot:<path>", "tiles" (home) or "" (words only)
 const CARDS = {
   home: ["NickMade", "Games, movies, music, photography, and extras from Nick Simpson.", C.coral, "tiles"],
-  games: ["Games", "Nick Simpson's favorite games, reviewed.", C.violet, "tile:games"],
-  movies: ["Movies", "Nick Simpson's favorite movies, reviewed.", C.amber, "tile:movies"],
+  games: ["Games", "Nick's favorite games, reviewed.", C.violet, "tile:games"],
+  movies: ["Movies", "Nick's favorite movies, reviewed.", C.amber, "tile:movies"],
+  // the other library pages had Extras' card (Nick, 2026-11-10: "showed the wrong card for library vinyl")
+  libraryhub: ["Library", "Everything Nick collects: movies, vinyl records, books, and board games.", C.amber, "shot:/library/"],
+  vinyl: ["Vinyl Library", "Nick's vinyl records, in crates by artist.", C.amber, "shot:/library/vinyl/"],
+  books: ["Book Library", "Nick's bookshelf.", C.amber, "shot:/library/books/"],
+  boardgames: ["Board Game Library", "Nick's board game shelf.", C.amber, "shot:/library/board-games/"],
   library: ["Movie Library", "Every movie Nick owns on 4K, Blu\u2011ray, DVD, and VHS, shelved like a video store.", C.amber, "shot:/library/movies/"],
-  music: ["Music", "What Nick Simpson is listening to.", C.pink, "tile:music"],
+  music: ["Music", "What Nick is listening to.", C.pink, "tile:music"],
   photography: ["Photography", "Photography by Nick Simpson, in full resolution.", C.sky, "tile:photography"],
   play: ["Play", "Browser games by Nick Simpson. Free to play, nothing to install.", C.coral, "tile:play"],
   cats: ["The Cattery", "Make your own pixel-art cat and move it in with everyone else's.", C.coral, "shot:/play/cats/"],
   office: ["Nick's Office", "Look around Nick's office in pixel art. Most things lead somewhere.", C.coral, "shot:/play/office/"],
-  extras: ["Extras", "Hobbies, projects, and lists from Nick Simpson.", C.mint, "tile:extras"],
+  extras: ["Extras", "Hobbies, projects, and lists.", C.mint, "tile:extras"],
   golf: ["Golf", "Nick's recent rounds on Trackman, X-Golf, and real courses.", C.mint, "shot:/extras/golf/"],
   golfweather: ["Golf weather", "The best times to play golf this week near any US ZIP code.", C.mint, "shot:/extras/golf-weather/"],
   scorecard: ["Scorecard", "A simple score tracker for real golf courses, even with no signal.", C.mint, "shot:/extras/scorecard/"],
@@ -49,7 +54,7 @@ function card(name, [title, line, color, pic], shot) {
   } else if (pic.startsWith("tile:")) picture = '<img class="frame" src="' + dataUrl(path.join(ROOT, "assets/gifs", pic.slice(5) + ".jpg")) + '">';
   else if (shot) picture = '<img class="frame" src="' + dataUrl(shot) + '">';
   const words = !picture;
-  const url = name === "home" ? "nickmade.net" : "nickmade.net" + ({ cats: "/play/cats", office: "/play/office", library: "/library/movies", golf: "/extras/golf", golfweather: "/extras/golf-weather", scorecard: "/extras/scorecard", rapture: "/extras/rapture" }[name] || "/" + name);
+  const url = name === "home" ? "nickmade.net" : "nickmade.net" + ({ cats: "/play/cats", office: "/play/office", library: "/library/movies", libraryhub: "/library", vinyl: "/library/vinyl", books: "/library/books", boardgames: "/library/board-games", golf: "/extras/golf", golfweather: "/extras/golf-weather", scorecard: "/extras/scorecard", rapture: "/extras/rapture" }[name] || "/" + name);
   return `<!doctype html><html><head><meta charset="utf-8">${FONTS}<style>
   * { box-sizing: border-box; margin: 0; }
   body { width: 1200px; height: 630px; overflow: hidden; background: #000; color: #ecebe7; font-family: "Space Grotesk", sans-serif; position: relative;
@@ -85,8 +90,10 @@ function card(name, [title, line, color, pic], shot) {
     if (spec[3].startsWith("shot:")) {
       // the live page at 1040x585, shown at half size in the card (sharp), after it has drawn
       await page.setViewport({ width: 1040, height: 585, deviceScaleFactor: 1 });
+      await page.bringToFront(); // (a tab behind the cards' gets no animation frames: the counts stuck at 22, shelves empty)
       await page.goto(SITE + spec[3].slice(5), { waitUntil: "networkidle2", timeout: 45000 }).catch(() => {});
-      await new Promise((r) => setTimeout(r, 4000));
+      // (the library shelves fill in from the Worker, then their cover wall: longer)
+      await new Promise((r) => setTimeout(r, /^\/library\//.test(spec[3].slice(5)) ? 15000 : 4000));
       shot = path.join(tmp, name + ".jpg");
       await page.screenshot({ path: shot, type: "jpeg", quality: 92 });
     }
