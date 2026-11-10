@@ -78,7 +78,7 @@ Personal site, served by GitHub Pages from the root of `main`. Plain HTML, no bu
     that page from Discogs itself and hands it over (`POST /collection/discogs`; collection.js `dgFetch`). Pressings that match (same album, discs, label, track count, no edition of their own) are one choice, the
     newest US one; versions that differ say how ("10th anniversary, milky clear", "12 tracks"). Owner card: change the
     front or back cover (Apple Music's official artwork, then scans of this pressing, then same-barcode pressings, phone
-    photos last), "Upload your own scan" for either side, "Edit pressing and note", and "Read its colour from its
+    photos last), "Upload your own scan" for either side, "Edit title, pressing, and note" (the title is editable too, 2026-11-10), and "Read its colour from its
     photos". The record is drawn in its vinyl's colour (solid, see-through, splatter, marble, split) from its pressing's
     words, refined by Workers AI reading its Discogs photos; the words decide see-through and pattern. Missing album
     summaries are looked up on Wikipedia by search (`/collection/vinyl/about`).

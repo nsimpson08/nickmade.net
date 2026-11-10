@@ -25,7 +25,7 @@
 //   PATCH  /collection/vinyl/:itemId         (admin) { back?, spotify?, front? } a record's back cover, chosen on its card ("" = none),
 //                                            or its Spotify album (a pasted link; "" = no player)
 //   PATCH  /collection/vinyl/:itemId         (admin) { labelPic?, labelPicB?, labelZoom?, labelZoomB?, labelX?, labelY?, labelXB?, labelYB? } its label photos, each one's zoom and position
-//   PATCH  /collection/:kind/:itemId         (admin) { edition?, note? } its pressing/edition and note, from its card
+//   PATCH  /collection/:kind/:itemId         (admin) { edition?, note?, title? (vinyl) } its pressing/edition, note and (a record's) title, from its card
 //   PATCH  /collection/games/:itemId         (admin) { pick?, unopened? } Nick's Pick on a game (a ribbon + its filter);
 //                                            Unopened (owner only: GET leaves it out unless signed in as the owner)
 //   PUT    /collection/vinyl/:itemId/scan?side=front|back|label|labelB  (admin) body: Nick's own scan (JPEG/PNG/WebP) -> { item }
@@ -450,8 +450,11 @@ async function patch(request, env, kind, itemId, cors, h) {
   // its pressing/edition and note, edited on its card (Nick, 2026-10-29: "allow me to edit details on vinyl, the notes and
   // pressing fields"); any kind ("" clears one)
   const pickable = kind === "vinyl" || kind === "books"; // (a book too: Nick, 2026-11-04 "like the other pages")
-  if (typeof body.edition === "string" || typeof body.note === "string" || (pickable && typeof body.pick === "boolean")) {
+  // a record's title too (Nick, 2026-11-10: "let me edit the album titles of all vinyl"); never left empty
+  const titled = kind === "vinyl" && typeof body.title === "string" && clean(body.title, 200);
+  if (typeof body.edition === "string" || typeof body.note === "string" || titled || (pickable && typeof body.pick === "boolean")) {
     const saved = await update(env, kind, itemId, (it) => {
+      if (titled) it.title = titled;
       for (const [k, n] of [["edition", 80], ["note", 280]]) if (typeof body[k] === "string") { const v = clean(body[k], n); if (v) it[k] = v; else delete it[k]; }
       // a record (or book) as one of Nick's Picks, from the same form (Nick, 2026-11-02)
       if (pickable && typeof body.pick === "boolean") { if (body.pick) it.pick = true; else delete it.pick; }

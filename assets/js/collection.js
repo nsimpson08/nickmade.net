@@ -476,7 +476,7 @@
     var fr = e.target.closest(".coll-front-btn");
     if (fr) cardFronts(fr.dataset.id);
     var ed = e.target.closest(".coll-edit-btn");
-    if (ed) { var f = dialog.querySelector(".coll-edit"); f.hidden = !f.hidden; if (!f.hidden) { f.scrollIntoView({ block: "nearest", behavior: "smooth" }); f.elements.edition.focus(); } }
+    if (ed) { var f = dialog.querySelector(".coll-edit"); f.hidden = !f.hidden; if (!f.hidden) { f.scrollIntoView({ block: "nearest", behavior: "smooth" }); (f.elements.title || f.elements.edition).focus(); } }
     if (e.target.closest(".coll-edit-cancel")) dialog.querySelector(".coll-edit").hidden = true;
     var scb = e.target.closest(".coll-scan-btn");
     if (scb) scb.parentNode.querySelector("input[type=file]").click();
@@ -574,10 +574,12 @@
               '<label class="coll-unopened"><input type="checkbox" class="coll-unopened-box" data-id="' + esc(d.id) + '"' + (d.unopened ? " checked" : "") + "> Unopened <small>(only you see this)</small></label> " : "") +
             // a record's Nick's Pick: its own button beside Edit pressing (Nick, 2026-11-02: "its own line choice next to edit pressing")
             (KIND === "vinyl" || KIND === "books" ? '<button type="button" class="remove coll-pick-btn" data-id="' + esc(d.id) + '">' + (d.pick ? "Not a Nick’s Pick" : "Make it a Nick’s Pick") + "</button> " : "") +
-            '<button type="button" class="remove coll-edit-btn" data-id="' + esc(d.id) + '">Edit ' + esc(CFG.edition.replace(/\s*\(optional\)/, "").toLowerCase()) + " and note</button> " +
+            '<button type="button" class="remove coll-edit-btn" data-id="' + esc(d.id) + '">Edit ' + (KIND === "vinyl" ? "title, " : "") + esc(CFG.edition.replace(/\s*\(optional\)/, "").toLowerCase()) + (KIND === "vinyl" ? ", " : " ") + "and note</button> " +
             '<button type="button" class="remove coll-remove" data-id="' + esc(d.id) + '">Remove from the library</button></p>' +
             // (the two fields, shown by the button above: Nick, 2026-10-29)
             '<form class="coll-edit" data-id="' + esc(d.id) + '" hidden>' +
+              // a record's title (Nick, 2026-11-10: "add (Reimagined) to the title ... let me edit the album titles of all vinyl")
+              (KIND === "vinyl" ? '<label>Title<input name="title" type="text" maxlength="200" required value="' + esc(d.title || "") + '"></label>' : "") +
               '<label>' + esc(CFG.edition.replace(/\s*\(optional\)/, "")) + '<input name="edition" type="text" maxlength="80" value="' + esc(d.edition || "") + '" placeholder="' + esc(CFG.editionHint) + '"></label>' +
               '<label><span>Note <span class="optional">(shown on its card)</span></span><textarea name="note" rows="2" maxlength="280">' + esc(d.note || "") + "</textarea></label>" +
               '<p class="coll-edit-row"><button type="submit" class="pill-btn">Save</button> <button type="button" class="remove coll-edit-cancel">Cancel</button> <span class="coll-msg"></span></p>' +
@@ -1578,7 +1580,7 @@
     e.preventDefault();
     var id = f.dataset.id, msg = f.querySelector(".coll-msg"), btn = f.querySelector("[type=submit]");
     btn.disabled = true; msg.textContent = "Saving…";
-    fetch(API + "/collection/" + KIND + "/" + encodeURIComponent(id), { method: "PATCH", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ edition: f.elements.edition.value, note: f.elements.note.value }) })
+    fetch(API + "/collection/" + KIND + "/" + encodeURIComponent(id), { method: "PATCH", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ edition: f.elements.edition.value, note: f.elements.note.value, title: f.elements.title ? f.elements.title.value : undefined }) })
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
       .then(function (res) {
         btn.disabled = false;
