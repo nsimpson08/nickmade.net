@@ -55,6 +55,24 @@
     el.textContent = "0"; requestAnimationFrame(step);
   }
   function authHeaders(h) { h = h || {}; if (ADMIN) h.Authorization = "Bearer " + ADMIN; return h; }
+  // A Worker request that may need Discogs (search, barcode, fronts/backs, add, colour read). Discogs turns Cloudflare's
+  // shared addresses away ("too many"), so the Worker answers { needDiscogs: path }: this page fetches that from Discogs
+  // itself (Nick's own address; Discogs allows it from a browser), hands it to the Worker (POST /collection/discogs,
+  // kept a week) and asks again, as many times as the request needs (a record's backs look at up to 8 pressings).
+  function dgFetch(url, opts, n) {
+    n = n || 0;
+    return fetch(url, opts).then(function (r) {
+      if (r.status !== 503 || n >= 14) return r;
+      return r.clone().json().catch(function () { return {}; }).then(function (j) {
+        if (!j || !/^\//.test(j.needDiscogs || "")) return r;
+        return fetch("https://api.discogs.com" + j.needDiscogs).then(function (d) { if (!d.ok) throw new Error("Discogs " + d.status); return d.json(); })
+          .then(function (data) {
+            return fetch(API + "/collection/discogs", { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ path: j.needDiscogs, data: data }) });
+          })
+          .then(function () { return dgFetch(url, opts, n + 1); }, function () { return r; });
+      });
+    });
+  }
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   function norm(t) { return String(t || "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/&/g, "and").replace(/[^a-z0-9]+/g, " ").trim(); }
   function sortKey(t) { return norm(t).replace(/^(the|a|an) /, ""); }
@@ -1547,7 +1565,7 @@
     tiles();
   }
   function lookAfterAdd(id) {
-    fetch(API + "/collection/vinyl/" + encodeURIComponent(id) + "/look", { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: "{}" })
+    dgFetch(API + "/collection/vinyl/" + encodeURIComponent(id) + "/look", { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: "{}" })
       .then(function (r) { return r.ok ? r.json() : null; })
       // (only its colour is taken from the reply: the rest could be older than a cover picked while the AI read)
       .then(function (j) { if (j && j.item) { items.forEach(function (x) { if (x.id === id) { if (j.item.vinyl) x.vinyl = j.item.vinyl; else delete x.vinyl; } }); render(); } })
@@ -1606,7 +1624,7 @@
     if (btn.disabled) return;
     var was = btn.textContent;
     btn.disabled = true; btn.textContent = "Looking at its photos…";
-    fetch(API + "/collection/vinyl/" + encodeURIComponent(id) + "/look", { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: "{}" })
+    dgFetch(API + "/collection/vinyl/" + encodeURIComponent(id) + "/look", { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: "{}" })
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
       .then(function (res) {
         if (!res.ok || !res.j.item) { btn.disabled = false; btn.textContent = res.j.error || "Couldn't read it."; setTimeout(function () { btn.textContent = was; }, 4000); return; }
@@ -1626,7 +1644,7 @@
     // (a book's: Open Library's, Apple Books' and Google Books', Worker /collection/books/covers)
     var url = KIND === "books" ? API + "/collection/books/covers?id=" + encodeURIComponent(d.source) + "&t=" + encodeURIComponent(d.title || "") + "&a=" + encodeURIComponent(String(d.creator || "").split(",")[0])
       : API + "/collection/vinyl/fronts?id=" + encodeURIComponent(d.source);
-    if (!frontsOf[d.source]) frontsOf[d.source] = fetch(url, { headers: authHeaders() })
+    if (!frontsOf[d.source]) frontsOf[d.source] = dgFetch(url, { headers: authHeaders() })
       .then(function (res) { return res.json(); }).then(function (j) { return j.fronts || j.covers || []; })
       .catch(function () { delete frontsOf[d.source]; return []; });
     frontsOf[d.source].then(function (opts) {
@@ -1859,7 +1877,7 @@
     msg.textContent = byCode ? "Looking it up…" : "Searching…";
     // the catalogues can be slow (Open Library now and then takes 10 s or more): say so rather than look stuck
     var slow = setTimeout(function () { if (my === seq) msg.textContent = "Still searching " + CFG.source + " (it can be slow)…"; }, 4000);
-    fetch(API + "/collection/" + KIND + "/" + path, { headers: authHeaders() })
+    dgFetch(API + "/collection/" + KIND + "/" + path, { headers: authHeaders() })
       .then(function (r) { return r.json(); })
       .then(function (d) {
         clearTimeout(slow);
@@ -1933,7 +1951,7 @@
   var backPick = null, backSeq = 0, backReq = null, backsOf = {};
   // the choices for a record (Worker /collection/vinyl/backs), asked once per record per visit
   function loadBacks(id) {
-    if (!backsOf[id]) backsOf[id] = fetch(API + "/collection/vinyl/backs?id=" + encodeURIComponent(id), { headers: authHeaders() })
+    if (!backsOf[id]) backsOf[id] = dgFetch(API + "/collection/vinyl/backs?id=" + encodeURIComponent(id), { headers: authHeaders() })
       .then(function (res) { return res.json(); }).then(function (d) { return d.backs || []; })
       .catch(function () { delete backsOf[id]; return []; });
     return backsOf[id];
@@ -1979,7 +1997,7 @@
     var btn = more ? addDlg.querySelector(".coll-more") : addDlg.querySelector(".submit"), label0 = btn.textContent, err = addDlg.querySelector(".error");
     [].forEach.call(addDlg.querySelectorAll(".submit"), function (b) { b.disabled = true; });
     btn.textContent = "Getting the details…";
-    (KIND === "vinyl" && backReq ? backReq : Promise.resolve()).then(function () { return fetch(API + "/collection/" + KIND, {
+    (KIND === "vinyl" && backReq ? backReq : Promise.resolve()).then(function () { return dgFetch(API + "/collection/" + KIND, {
       method: "POST", headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ id: picked.id, edition: addDlg.querySelector("#coll-edition").value, note: addDlg.querySelector("#coll-note").value, unopened: KIND === "games" && addDlg.querySelector("#coll-unopened").checked || undefined, cover: coverPick || undefined, back: backPick === null ? undefined : backPick }),
     }); })

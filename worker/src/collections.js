@@ -62,7 +62,12 @@ export async function collectionsRoute(request, url, env, cors, h) {
   const lk = /^\/collection\/vinyl\/([\w.-]{1,120})\/look$/.exec(url.pathname);
   if (lk && request.method === "POST") {
     if (!h.isAdmin(request, env)) return h.json({ error: "Unauthorized" }, 401, cors);
-    return lookFill(env, h, lk[1], cors);
+    try { return await lookFill(env, h, lk[1], cors); }
+    catch (e) { if (e instanceof NeedDiscogs) return h.json({ needDiscogs: e.path, error: "Discogs is busy. Try again in a minute." }, 503, cors); throw e; }
+  }
+  if (url.pathname === "/collection/discogs" && request.method === "POST") {
+    if (!h.isAdmin(request, env)) return h.json({ error: "Unauthorized" }, 401, cors);
+    return dgGiven(request, env, h, cors);
   }
   const m = /^\/collection\/(vinyl|books|games)(?:\/(search|barcode|howto|[\w.-]{1,120}))?$/.exec(url.pathname);
   if (!m) return null;
@@ -91,10 +96,11 @@ export async function collectionsRoute(request, url, env, cors, h) {
     if (sub === "covers" && kind === "books" && request.method === "GET") return h.json({ covers: await bookCovers(url.searchParams.get("id") || "", env, url.searchParams.get("t") || "", url.searchParams.get("a") || "") }, 200, cors);
     if (sub === "search" && request.method === "GET") return h.json({ results: await search(env, kind, (url.searchParams.get("q") || "").trim().slice(0, 100)) }, 200, cors);
     if (sub === "barcode" && request.method === "GET") return h.json({ results: await barcode(env, kind, (url.searchParams.get("code") || "").replace(/[^\dXx]/g, "")) }, 200, cors);
-    if (!sub && request.method === "POST") return add(request, env, kind, cors, h);
+    if (!sub && request.method === "POST") return await add(request, env, kind, cors, h);
     if (sub && request.method === "DELETE") return remove(env, kind, sub, cors, h);
     if (sub && request.method === "PATCH") return patch(request, env, kind, sub, cors, h);
   } catch (e) {
+    if (e instanceof NeedDiscogs) return h.json({ needDiscogs: e.path, error: "Discogs is busy. Try again in a minute." }, 503, cors);
     return h.json({ error: e.message || "Something went wrong. Try again in a bit." }, 502, cors);
   }
   return null;
@@ -132,7 +138,7 @@ async function search(env, kind, q) {
     const mb = await mbSearch(vinylQuery(q), q);
     // the album asked for first, from either (MusicBrainz's near misses, "The Movies" for Watching Movies..., after),
     // and of it, the plain version before the special editions
-    return rankVinyl(mb.concat(await dgSearch(env, "q=" + encodeURIComponent(q), mb).catch(() => [])), q).slice(0, 12);
+    return rankVinyl(mb.concat(await dgSearch(env, "q=" + encodeURIComponent(q), mb).catch((e) => { if (e instanceof NeedDiscogs) throw e; return []; })), q).slice(0, 12);
   }
   if (kind === "books") return olSearch("q=" + encodeURIComponent(q));
   return bggSearch(env, q);
@@ -604,11 +610,40 @@ function rankVinyl(list, q) {
 // "Unofficial" (Nick, 2026-11-03: his Talking Heads Chicago, August 28, 1978 is one; every pressing of it is). Its
 // images aren't copied (see keepCover's callers).
 const DG = "https://api.discogs.com";
+// Discogs counts asks by the address they come from, and Cloudflare's are shared with everyone else's Workers: from
+// here it's "too many" (429) nearly all the time, token or not (Nick, 2026-11-10: a release link that "couldn't get
+// details" live, fine locally). So an answer is kept a week (dgc:<path>), and when Discogs won't answer, the request
+// stops with NeedDiscogs: the page (owner only) fetches that path from Discogs itself, from Nick's own address, hands it
+// over (POST /collection/discogs) and asks again (collection.js's dgRelay).
+export class NeedDiscogs extends Error { constructor(path) { super("Discogs is busy."); this.path = path; } }
+const DG_KEEP = 7 * 86400;
+const DG_PATH = /^\/(releases\/\d{1,10}|masters\/\d{1,10}(\/versions\?[\w=&%.+-]{0,200})?|database\/search\?[\w=&%.+'*()!~-]{0,400})$/;
 async function dg(env, path) {
+  const kept = await env.QUEUE.get("dgc:" + path, "json").catch(() => null);
+  if (kept) return kept;
   const headers = { "User-Agent": MB_UA };
   if (env.DISCOGS_TOKEN) headers.Authorization = "Discogs token=" + env.DISCOGS_TOKEN;
-  const r = await fetch(DG + path, { headers, signal: AbortSignal.timeout(15000) }).catch(() => null);
-  return r && r.ok ? r.json() : null;
+  for (let tries = 0; ; tries++) {
+    const r = await fetch(DG + path, { headers, signal: AbortSignal.timeout(15000) }).catch(() => null);
+    if (r && r.ok) {
+      const j = await r.json();
+      await env.QUEUE.put("dgc:" + path, JSON.stringify(j), { expirationTtl: DG_KEEP }).catch(() => {});
+      return j;
+    }
+    if (r && r.status !== 429 && r.status < 500) return null; // (404: not on Discogs)
+    if (tries >= 1 || (r && r.status === 429)) throw new NeedDiscogs(path); // (a 5xx or no answer gets one more try first)
+    await new Promise((ok) => setTimeout(ok, 1000));
+  }
+}
+// POST /collection/discogs (admin) { path, data }: one of Discogs' answers, fetched by the page for the Worker
+async function dgGiven(request, env, h, cors) {
+  const b = await request.json().catch(() => ({}));
+  const path = String(b.path || "");
+  if (!DG_PATH.test(path) || !b.data || typeof b.data !== "object" || Array.isArray(b.data)) return h.json({ error: "Bad request." }, 400, cors);
+  const s = JSON.stringify(b.data);
+  if (s.length > 2e6) return h.json({ error: "Too big." }, 413, cors);
+  await env.QUEUE.put("dgc:" + path, s, { expirationTtl: DG_KEEP });
+  return h.json({ ok: true }, 200, cors);
 }
 const dgName = (s) => String(s || "").replace(/\s+\(\d+\)$/, "").replace(/\*$/, "").trim(); // "Mac Miller (2)" -> "Mac Miller"
 const DG_SKIP = /test pressing|white label|promo/i;

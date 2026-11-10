@@ -236,7 +236,7 @@
         ? ' <span class="year">Released: ' + esc(releasedOn(it.released)) + "</span>"
         : it.year ? ' <span class="year">' + esc(it.year) + "</span>" : "") + "</figcaption>" +
       (watched && it.rating ? '<div class="rating" aria-label="' + ratingText(it.rating) + '">' + stars(it.rating) + "</div>" : "") +
-      // Nick's short review (1.4), right under the stars: a few lines, the rest a click away (see clampReviews)
+      // Nick's short review (1.4), right under the stars, always whole
       (watched && it.review ? '<p class="watched-review">' + esc(it.review) + "</p>" : "") +
       // who Nick watched it with: owner mode only (the Worker only sends it to him)
       (watched && ADMIN && it.watchedWith ? '<p class="watched-with" title="Only you see this">With ' + esc(it.watchedWith) + "</p>" : "") +
@@ -737,28 +737,6 @@
     g.querySelectorAll(".poster").forEach(function (el) { el.remove(); });
     items.forEach(function (it) { g.appendChild(card(it, "watched")); });
     renderWatchedSlot();
-    clampReviews(g);
-  }
-  // A review longer than its few lines gets "More" (and "Less" once open)
-  function clampReviews(g) {
-    requestAnimationFrame(function () {
-      g.querySelectorAll(".watched-review").forEach(function (p) {
-        if (p.nextElementSibling && p.nextElementSibling.classList.contains("review-more")) return;
-        if (p.scrollHeight <= p.clientHeight + 2) return;
-        var b = document.createElement("button");
-        b.type = "button";
-        b.className = "review-more";
-        b.textContent = "More";
-        b.setAttribute("aria-expanded", "false");
-        b.addEventListener("click", function () {
-          var open = !p.classList.contains("expanded");
-          p.classList.toggle("expanded", open);
-          b.textContent = open ? "Less" : "More";
-          b.setAttribute("aria-expanded", String(open));
-        });
-        p.after(b);
-      });
-    });
   }
 
   if (watchedSection) {

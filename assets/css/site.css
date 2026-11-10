@@ -1594,24 +1594,8 @@ svg.solid, .watched-where svg.solid, .queue-dialog .where svg.solid, .film-where
   line-height: 1.45;
   color: var(--fg);
   overflow-wrap: anywhere;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  overflow: hidden;
+  /* always whole (Nick, 2026-11-09: "make my review always be open fully, take away the More/Less button") */
 }
-.poster.suggested .watched-review.expanded { display: block; -webkit-line-clamp: unset; line-clamp: none; }
-.poster.suggested .review-more {
-  margin: 2px 0 0 11px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--accent);
-  font: inherit;
-  font-size: 0.75rem;
-  cursor: pointer;
-}
-.poster.suggested .review-more:hover, .poster.suggested .review-more:focus-visible { text-decoration: underline; outline: none; }
 .stars {
   position: relative;
   display: inline-block;
