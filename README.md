@@ -72,8 +72,10 @@ Personal site, served by GitHub Pages from the root of `main`. Plain HTML, no bu
   For the 1.7 release the shelves were filled on localhost and are copied to the live site by
   `python3 tools/push_library.py` (a dry run; `--go` to copy): the records, books and board games with their covers,
   and the Movies picks; it stops rather than leave a cover off, and checks live afterwards ("ALL CHECKED")
-  - Records: a pressing MusicBrainz doesn't have is found on Discogs (`DISCOGS_TOKEN`; ids `dg-<release>`), by barcode
-    or name. Pressings that match (same album, discs, label, track count, no edition of their own) are one choice, the
+  - Records: a pressing MusicBrainz doesn't have is found on Discogs (`DISCOGS_TOKEN`; ids `dg-<release>`), by barcode,
+    name, or a pasted discogs.com release link. Discogs limits by address and Cloudflare's shared ones are always over
+    it, so answers are kept a week (KV `dgc:<path>`) and, when Discogs refuses the Worker, the owner's browser fetches
+    that page from Discogs itself and hands it over (`POST /collection/discogs`; collection.js `dgFetch`). Pressings that match (same album, discs, label, track count, no edition of their own) are one choice, the
     newest US one; versions that differ say how ("10th anniversary, milky clear", "12 tracks"). Owner card: change the
     front or back cover (Apple Music's official artwork, then scans of this pressing, then same-barcode pressings, phone
     photos last), "Upload your own scan" for either side, "Edit pressing and note", and "Read its colour from its
@@ -103,8 +105,9 @@ Personal site, served by GitHub Pages from the root of `main`. Plain HTML, no bu
   like a Library case: tagline, synopsis, cast, IMDb, the trailer, and my rating and short review. The Worker looks the
   film up on TMDB (`/library/film`). Links: `/movies/#the-big-lebowski` jumps to a review, `/movies/#film=<IMDb id>`
   opens a film's card
-- Recently Watched/Played take a short review (up to 280 characters) when logged or edited in owner mode, shown under
-  the stars. Recently Watched movies also take a private "Watched with": the Worker only ever sends it to the owner
+- Recently Watched/Played take a short review (up to 280 characters) when logged or edited in owner mode, shown in full
+  under the stars. Edit can also change a Recently Watched poster (the same choices as logging; "No Options" when
+  there are none). Recently Watched movies also take a private "Watched with": the Worker only ever sends it to the owner
 - `tools/pull_all.py`: a full copy of everything the live site keeps outside the repo (the Worker's storage, phone
   photos, the Library's cover images, the Scorecard database) into `backups/`; `--local` also makes localhost match it
   (refused while localhost has Library data that isn't live yet; `--force-local` overrides)
@@ -119,5 +122,8 @@ Personal site, served by GitHub Pages from the root of `main`. Plain HTML, no bu
   `cliplib.py`: `python3 assets/gifs/make_<name>_clip.py <work folder>` (needs Pillow and ffmpeg). Library's is drawn
   (`make_library_clip.py`); Extras' records the real Golf and Golf weather pages first (`node record_extras.js <work>`).
   Bump the `?v=` date on the tile in `index.html` after re-rendering one
+
+Every date and time on the site and in the Worker is Central (America/Chicago, daylight saving included): a bare date
+(YYYY-MM-DD) is shown as written, a timestamp in Central. Only the Workers AI daily counters stay on UTC.
 
 Preview locally with `python3 -m http.server` and open http://localhost:8000.
