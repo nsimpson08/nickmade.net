@@ -363,7 +363,7 @@
       last = k;
       // (a Nick's Pick: the ribbon across the sleeve's corner, as on the board games)
       var rib = d.pick ? '<span class="pick-frame rec-pick" aria-hidden="true"><span class="sticker pick">Nick’s Pick</span></span>' : "";
-      var rec = '<button type="button" class="coll-item record' + (tab ? " first" : "") + (d.pick ? " picked" : "") + '" data-id="' + esc(d.id) + '" title="' + label(d) + (d.pick ? " · Nick’s Pick" : "") + '" aria-label="' + label(d) + (d.pick ? " · Nick’s Pick" : "") + '">' + tab + rib +
+      var rec = '<button type="button" class="coll-item record' + (tab ? " first" : "") + (d.pick ? " picked" : "") + '" data-id="' + esc(d.id) + '" aria-label="' + label(d) + (d.pick ? " · Nick’s Pick" : "") + '">' + tab + rib + // (no hover title: its strip ran past the sleeve, Nick 2026-11-10; the caption shows it all)
         '<span class="disc' + discLook(d) + '" aria-hidden="true"></span>' +
         (d.cover ? img(d, "sleeve") : '<span class="sleeve blank">' + esc(d.title) + "</span>") +
         '<span class="record-cap"><b>' + esc(d.title) + "</b>" + esc(d.creator || "") + "</span></button>";

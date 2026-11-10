@@ -3671,7 +3671,7 @@ img.developing { animation: develop 2.6s cubic-bezier(0.3, 0, 0.2, 1) both; }
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6); transition: transform .35s cubic-bezier(.2, .8, .2, 1); }
 .record:hover .disc, .record:focus-visible .disc { transform: translateX(30%) rotate(40deg); }
 .record-cap { display: flex; flex-direction: column; gap: 1px; min-width: 0; font-size: 0.78rem; color: #fff; text-shadow: 0 1px 2px #000, 0 0 10px rgba(0,0,0,.85); } /* white, shadowed over the collage (Nick, 2026-10-29: the grey was hard to read) */
-.record-cap b { font-weight: 500; font-size: 0.86rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.record-cap b { font-weight: 500; font-size: 0.86rem; color: #fff; overflow-wrap: anywhere; } /* the whole title, wrapped (Nick, 2026-11-10: "don't allow" it cut off) */
 
 /* book covers and board game boxes: on shelves too */
 .coll-covers .coll-row, .coll-stack .coll-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 26px 20px; }
