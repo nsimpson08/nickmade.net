@@ -8,6 +8,7 @@ import { wishlistRoute } from "./wishlist.js";
 import { fansRoute, post as fansPost, fansTick } from "./fans.js";
 import { catsRoute, catsTick } from "./cats.js";
 import { scorecardRoute } from "./scorecard.js";
+import { visitsRoute } from "./visits.js";
 import { recordTrophies, trophiesView, TROPHIES_KEY, PsnError } from "./psn.js";
 import { recordSteam, steamView, STEAM_KEY, SteamError } from "./steam.js";
 
@@ -60,6 +61,7 @@ import { recordSteam, steamView, STEAM_KEY, SteamError } from "./steam.js";
 //   /music/search, /music/recs  Music's "Suggest a song": songs added to Nick's private community playlist, see music.js
 //   GET/POST /votes             upvotes on In the Queue (Movies and Games), see votes.js
 //   /cats ...                   Play > The Cattery: visitors' cats, how they get on, the room's history (see cats.js)
+//   POST /visit, /visit/end     page views for Nick's private Visitors page (visits.js; D1 VISITS, read only by nickmade-owner)
 //   /scorecard/...              Extras > Scorecard, the real-course score tracker (owner only until SCORECARD_PUBLIC), see scorecard.js
 //
 // Storage: one KV namespace (QUEUE). Keys (Movies keeps the original unprefixed names):
@@ -131,6 +133,7 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { headers: cors });
 
     try {
+      if (url.pathname === "/visit" || url.pathname === "/visit/end") return (await visitsRoute(request, url, env)) || json({ error: "Not found" }, 404, cors);
       if (url.pathname === "/search" && request.method === "GET") return await search(url, cors, ctx);
       if (url.pathname === "/xbox/recent" && request.method === "GET") return await xboxRecent(request, env, cors);
       if (url.pathname === "/xbox/import" && request.method === "POST") return await xboxImport(request, env, cors, ctx);

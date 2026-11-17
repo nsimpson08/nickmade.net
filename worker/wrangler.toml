@@ -66,3 +66,10 @@ binding = "AI"
 # [limits]
 # cpu_ms = 5000
 
+
+# Visits (src/visits.js, Nick 2026-11-16): every page view on the site, for the Visitors page in nickmade-owner (the
+# only reader). Created with: npx wrangler d1 create nickmade-visits. Tables are made by visits.js. Kept forever.
+[[d1_databases]]
+binding = "VISITS"
+database_name = "nickmade-visits"
+database_id = "215ba9db-3629-4483-871c-baae35d7a4b5"

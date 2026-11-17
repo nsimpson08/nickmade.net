@@ -117,6 +117,8 @@ Personal site, served by GitHub Pages from the root of `main`. Plain HTML, no bu
   haven't seen. Add an entry at the top for each new feature (1.1, 1.2...); new movies/games/photos don't need one
 - `assets/js/back-close.js`: on every page, the phone's Back button closes what's open (a photo, a case or card, the
   poster wall) instead of leaving the page
+- `assets/js/visit.js`: on every page (loaded by footer.js), counts the page view for Nick's private Visitors page
+  (Worker `POST /visit`, `worker/src/visits.js`, D1 nickmade-visits; read only by the owner app). Nothing from owner-mode browsers
 - `robots.txt`: asks AI crawlers (GPTBot, CCBot, Google-Extended...) to stay out; search engines are still allowed
 - `assets/gifs/`: the home tiles' looping videos (`<name>.mp4` + `<name>.jpg` poster), one script each sharing
   `cliplib.py`: `python3 assets/gifs/make_<name>_clip.py <work folder>` (needs Pillow and ffmpeg). Library's is drawn

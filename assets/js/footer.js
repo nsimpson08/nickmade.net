@@ -3,7 +3,8 @@
 // the newest version get a small pulsing dot beside it until they open the changelog. That's remembered in their
 // own browser only (localStorage "nm-seen-version"); first-time visitors start up to date, with no dot.
 // It also loads whats-new.js (the newest version's features, once, for returning visitors), adds the "Back to top" button (below) to every page with this footer except Home and Photography, and loads
-// back-close.js (the phone's Back button closes an open photo or dialog instead of leaving the page).
+// back-close.js (the phone's Back button closes an open photo or dialog instead of leaving the page), and visit.js
+// (counts the page view for Nick's private Visitors page).
 (function () {
   // Owner mode (the site's one password, localStorage nm-admin-token): "Owner mode · Log out" beside the NickMade
   // wordmark at the top of every page, on Home (no top bar) floating at the top left (Nick, 2026-10-25: it used to be
@@ -36,6 +37,10 @@
   var bc = document.createElement("script");
   bc.src = "/assets/js/back-close.js";
   document.head.appendChild(bc);
+  // counts the page view for Nick's private Visitors page (assets/js/visit.js)
+  var vs = document.createElement("script");
+  vs.src = "/assets/js/visit.js";
+  document.head.appendChild(vs);
   // returning visitors: a pop-up about the newest version, once (assets/js/whats-new.js)
   var wn = document.createElement("script");
   wn.src = "/assets/js/whats-new.js";
