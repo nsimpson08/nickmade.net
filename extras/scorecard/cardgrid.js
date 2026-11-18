@@ -210,6 +210,10 @@
       // that's the first, the holes start one column later (Waterview, Shining Mountain): the first has clearly less than
       // the last, or less than every other of the ten (a tiny card's counts are close: Shining Mountain's 500 px "Int")
       if (run.length === 10 && nines.length && (run[0][3] <= run[9][3] - 2 || run.slice(1).every(function (c) { return run[0][3] < c[3]; }))) { run.shift(); i2++; }
+      // ... and the same blank column in a longer run (Aviara, Nick 2026-11-17: "INTL", 10-18, In, Tot, HCP, Net all one
+      // width, so hole 10 was read as INTL and every back-nine score sat a column early): it has clearly less printed
+      // in it than every one of the nine columns after it (a hole's number is in every tee's row)
+      else if (run.length > 10 && nines.length && run.slice(1, 10).every(function (c) { return c[3] >= run[0][3] + 2; })) { run.shift(); i2++; }
       if (run.length >= 9 && med > 14) {
         // nine holes, then that nine's total (Out / In / TOT 9), and again for a second nine in the same run
         var k = 0;
@@ -239,17 +243,44 @@
     // a front and back nine split by a divider column of another width: the second run's nine is already found above
     if (!nines.length) return null;
     // a back nine's "In, Out, Tot" (Stone River): the column after In repeats the front's Out, so the round's total
-    // goes in the one after that. A repeat: the two columns' pixels, down the grid, nearly the same
-    var same = function (a, b) {
+    // goes in the one after that. A repeat: the same digits in the same places, down the grid. A plain pixel
+    // difference isn't enough on its own: a card whose rows are bands of colour (Aviara, 2026-11-17) has the same
+    // background in every column, so its Tot measured "the same" as Out. So the ink is compared too (each spot against
+    // its own line across the cell): 0 = the same ink, 1 = none shared
+    var pixels = function (a, b) {
       var n = 0, diff = 0, aw = wid(a), bw = wid(b);
       for (var yy = gy0; yy <= gy1; yy += 2) for (var f = 0.15; f <= 0.85; f += 0.07) {
         diff += Math.abs(im.g[yy * w + Math.round(a[0] + aw * f)] - im.g[yy * w + Math.round(b[0] + bw * f)]); n++;
       }
-      return n && diff / n < 10;
+      return n ? diff / n : 99;
+    };
+    var inkOf = function (c, yy) {
+      var v = [], cw = wid(c);
+      for (var f = 0.12; f <= 0.88; f += 0.04) v.push(im.g[yy * w + Math.round(c[0] + cw * f)]);
+      var m = v.slice().sort(function (x, y) { return x - y; })[v.length >> 1];
+      return v.map(function (x) { return Math.abs(x - m) > 60; });
+    };
+    var apart = function (a, b) { // (ink a row or two above or below the other's counts as shared: a scan is a little crooked)
+      var A = [], B = [], miss = 0, all = 0;
+      for (var yy = gy0; yy <= gy1; yy++) { A.push(inkOf(a, yy)); B.push(inkOf(b, yy)); }
+      var near = function (M, r, k) {
+        for (var dr = -2; dr <= 2; dr++) if (M[r + dr] && M[r + dr][k]) return true;
+        return false;
+      };
+      for (var r = 0; r < A.length; r++) for (var k = 0; k < A[r].length; k++) {
+        if (A[r][k]) { all++; if (!near(B, r, k)) miss++; }
+        if (B[r][k]) { all++; if (!near(A, r, k)) miss++; }
+      }
+      return all ? miss / all : 1;
     };
     for (var q = 1; q < nines.length; q++) {
       var bk = nines[q], fr = nines[q - 1];
-      if (bk.after && bk.next && fr.total && Math.abs(wid(bk.after) - wid(fr.total)) < wid(fr.total) * 0.2 && same(bk.after, fr.total)) bk.after = bk.next;
+      if (bk.after && bk.next && fr.total && Math.abs(wid(bk.after) - wid(fr.total)) < wid(fr.total) * 0.2) {
+        // both: the plain pixel difference (as before) and the ink clearly closer to Out than In's is (2026-11-17
+        // measures, ink against In's: Stone River's repeat 0.61; Firewheel's Tot 0.96, Aviara's 1.22)
+        var rep = apart(bk.after, fr.total), base = apart(bk.total, fr.total);
+        if (pixels(bk.after, fr.total) < 10 && rep < base * 0.8) bk.after = bk.next;
+      }
     }
 
     // rows, and which of them are blank and light across a nine's hole cells (the rows a player writes in)
