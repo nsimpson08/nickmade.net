@@ -74,6 +74,6 @@ window.GOLF = {
     { club: "PW", image: "bag/rbz-iron.jpg", url: "https://www.taylormadegolf.com/RBZ-SpeedLite-Set/DW-TA197.html", model: "RBZ", loft: "46°", details: "35.75\"" },
     { club: "50° Wedge", image: "bag/mg5-charcoal-wedge.jpg", url: "https://www.taylormadegolf.com/MG5-Wedge/DW-TC647.html", model: "MG5 Charcoal", loft: "50°", details: "9° bounce, SB grind, Stiff flex, Dynamic Gold Tour Issue steel shaft" },
     { club: "SW", image: "bag/rbz-wedge.jpg", url: "https://www.taylormadegolf.com/RBZ-SpeedLite-Set/DW-TA197.html", model: "RBZ", loft: "54°", details: "35.25\"" },
-    { club: "Putter", image: "bag/rbz-putter.jpg", url: "https://www.taylormadegolf.com/RBZ-SpeedLite-Set/DW-TA197.html", model: "RBZ", loft: "3°", details: "34.50\". A MySpider upgrade is planned" }
+    { club: "Putter", image: "bag/myspider-tour-putter.jpg", url: "https://www.taylormadegolf.com/MySpider/DW-TE692-3K.html?lang=en_US#/putterhead", model: "MySpider Tour", loft: "", details: "Short Slant Neck" }
   ]
 };
