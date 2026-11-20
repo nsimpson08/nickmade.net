@@ -8,22 +8,27 @@
 //   POST /visit/end   text/plain JSON { v, i, s: seconds the page was in view } -> 204
 //
 // Not counted: Nick (visit.js sends nothing from a browser that has ever been in owner mode), bots and link-preview
-// fetchers (no JavaScript, and a User-Agent check below).
+// fetchers (no JavaScript, and a User-Agent check below), and bots that run JavaScript but open three pages within a
+// second (Nick, 2026-11-19: Microsoft's link checker, which opens a link sent by Outlook or Teams in a browser in a
+// Microsoft data center and then the home page's links all at once). Those are marked bot = 1, labelled "Bot · <their
+// network>", and hidden, along with any other browser seen on the same internet address and system in the last day
+// (the checker's first look is one page, so it can't be told by itself); after that their views aren't kept.
 //
 // D1 (VISITS, database nickmade-visits). Kept forever (Nick: "don't delete after 90 days").
 //   visitors: one row per browser: id, name (the last name they typed), label (Nick's, from the Visitors page), hidden,
 //             first, last, views, visits (a visit = page views with no gap over 30 minutes), ua, device, city, region,
-//             country, org (their internet provider)
+//             country, org (their internet provider), bot (1 = found to be a bot, above)
 //   views:    one row per page view: id, vid, at, path, title, ref, secs, new (1 = the first view of a visit), ip,
 //             city, region, country, org
 
 const GAP = 30 * 60e3; // a new visit after 30 minutes away
+const AT_ONCE = 1000, AT_ONCE_PAGES = 3; // three pages opened within a second: not a person
 const BOTS = /bot|crawl|spider|slurp|headless|preview|facebookexternalhit|embedly|discordbot|whatsapp|telegram|lighthouse|pingdom|uptime|monitor|curl|wget|python|node-fetch|axios|go-http/i;
 
 let ready = false;
 export async function visitsSetup(db) {
   if (ready) return;
-  await db.batch([
+  const cols = await db.batch([
     db.prepare("CREATE TABLE IF NOT EXISTS visitors (id TEXT PRIMARY KEY, name TEXT, label TEXT, hidden INTEGER NOT NULL DEFAULT 0, " +
       "first TEXT NOT NULL, last TEXT NOT NULL, views INTEGER NOT NULL DEFAULT 0, visits INTEGER NOT NULL DEFAULT 0, ua TEXT, device TEXT, " +
       "city TEXT, region TEXT, country TEXT, org TEXT)"),
@@ -32,7 +37,12 @@ export async function visitsSetup(db) {
     db.prepare("CREATE INDEX IF NOT EXISTS views_vid_at ON views (vid, at)"),
     db.prepare("CREATE INDEX IF NOT EXISTS views_at ON views (at)"),
     db.prepare("CREATE INDEX IF NOT EXISTS views_ip ON views (ip)"),
-  ]);
+    db.prepare("SELECT name FROM pragma_table_info('visitors')"),
+  ]).then((r) => r[r.length - 1].results);
+  // bot: added 2026-11-19
+  if (!cols.some((c) => c.name === "bot")) {
+    try { await db.prepare("ALTER TABLE visitors ADD COLUMN bot INTEGER NOT NULL DEFAULT 0").run(); } catch (e) {}
+  }
   ready = true;
 }
 
@@ -75,7 +85,8 @@ export async function visitsRoute(request, url, env) {
   const ip = request.headers.get("CF-Connecting-IP") || "";
   const city = str(cf.city, 80), region = str(cf.region, 80), country = str(cf.country, 8), org = str(cf.asOrganization, 120);
   const name = str(b.n, 40), path = str(b.p, 300) || "/", title = str(b.t, 200), ref = str(b.r, 300), touch = +b.m || 0;
-  const was = await db.prepare("SELECT last FROM visitors WHERE id = ?").bind(vid).first();
+  const was = await db.prepare("SELECT last, bot FROM visitors WHERE id = ?").bind(vid).first();
+  if (was && was.bot) return none; // a bot already: nothing more kept
   const fresh = !was || now - Date.parse(was.last) > GAP ? 1 : 0;
   await db.batch([
     db.prepare("INSERT OR IGNORE INTO views (id, vid, at, path, title, ref, new, ip, city, region, country, org) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
@@ -85,5 +96,20 @@ export async function visitsRoute(request, url, env) {
       "visits = visitors.visits + ?, ua = excluded.ua, device = excluded.device, city = excluded.city, region = excluded.region, country = excluded.country, org = excluded.org")
       .bind(vid, name || null, at, at, ua.slice(0, 400), deviceOf(ua, touch), city, region, country, org, fresh),
   ]);
+  // three pages from this browser within a second: a bot (two can be a page that sends you straight on to another).
+  // Asked after every view: a bot's pages can all arrive before any of them is saved, so only the last one sees the rest
+  const near = await db.prepare("SELECT COUNT(*) AS n FROM views WHERE vid = ? AND at >= ?").bind(vid, new Date(now - AT_ONCE).toISOString()).first();
+  if (near && near.n >= AT_ONCE_PAGES) await markBot(db, vid, ip, ua, org);
   return none;
+}
+
+// this browser, and any other on the same internet address with the same User-Agent in the last day: labelled (unless
+// Nick named it already), hidden, and bot = 1
+export async function markBot(db, vid, ip, ua, org) {
+  const label = ("Bot · " + (org || "unknown network")).slice(0, 60);
+  const since = new Date(Date.now() - 864e5).toISOString();
+  const ids = ip ? (await db.prepare("SELECT DISTINCT w.vid FROM views w JOIN visitors v ON v.id = w.vid WHERE w.ip = ? AND w.at >= ? AND v.ua = ?").bind(ip, since, ua.slice(0, 400)).all()).results.map((r) => r.vid) : [];
+  if (!ids.includes(vid)) ids.push(vid);
+  await db.batch(ids.map((id) => db.prepare("UPDATE visitors SET bot = 1, hidden = 1, label = COALESCE(label, ?) WHERE id = ?").bind(label, id)));
+  return ids.length;
 }
