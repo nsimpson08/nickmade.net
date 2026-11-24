@@ -51,7 +51,8 @@ const PER_IP = 6;
 const LOG_MAX = 600;
 const NAME_MAX = 16;
 const OWNER_MAX = 24; // like the queue's "Your name"
-const RETIRE_DAYS = 30; // a cat whose owner hasn't been back in this long moves out (frees its spot for someone new); the Cat Maker's welcome screen says "30 days" (play/cats/index.html .maker-stay): change both together
+// (No moving out: Nick, 2026-11-23, "a cat always stays in the room". It was RETIRE_DAYS = 30: a cat whose owner hadn't
+// been back in 30 days moved out; Looney and Barb went that way on 2026-11-18 and were put back.)
 const KEY = "cats:room";
 const VERSION = 3; // the shape of cats:room (see migrate())
 const SNAP_DAYS = 30;
@@ -295,7 +296,6 @@ async function makeCat(request, env, cors, h) {
   try { body = await request.json(); } catch (e) { return h.json({ error: "Bad request" }, 400, cors); }
   if (!validId(body.visitorId)) return h.json({ error: "Your browser didn't send its id. Try reloading." }, 400, cors);
   const room = await load(env);
-  retire(room, Date.now());
   const me = await ownerHash(h, env, body.visitorId);
   // Nick (owner mode) can make as many cats as he likes (Nick, 2026-10-14), past the room's 30, as long as there's a
   // spot free; visitors get one each
@@ -328,7 +328,7 @@ async function makeCat(request, env, cors, h) {
     personality: personality || undefined,
     traits: personality ? traitsFor(personality) : { friendly: r2(Math.random()), playful: r2(Math.random()), bossy: r2(Math.random()), romantic: r2(Math.random()) },
     fed: now, petted: 0, played: 0, seen: now, pinUntil: now + 6 * 3600e3, nextAt: now + gap(),
-    owners: [me], ip, code: newCode(name, room), nick: nick || undefined, // Nick's cats never move out
+    owners: [me], ip, code: newCode(name, room), nick: nick || undefined,
   };
   room.cats.push(c);
   logIt(room, { k: "joined", a: c.id, an: c.name, s: c.spot, t: now });
@@ -751,17 +751,9 @@ function startEvent(room, k, now) {
   logIt(room, { k: "event", e: k, t: now });
 }
 
-// Cats whose owners haven't been back in RETIRE_DAYS move out
-function retire(room, now) {
-  const gone = room.cats.filter((c) => !c.nick && now - (c.seen || c.born) > RETIRE_DAYS * 24 * HOUR);
-  gone.forEach((c) => logIt(room, { k: "movedout", a: c.id, an: c.name, t: now }));
-  if (gone.length) room.cats = room.cats.filter((c) => !gone.includes(c));
-}
-
 // (admin only now: POST /cats/tick, for testing; the cron and GET /cats use live() above) A burst of cat life: meetings between cats (more often between cats in the same part
 // of the room, and between cats that already know each other), cats wandering off to another spot, hungry cats saying so
 export function tick(room, now) {
-  retire(room, now);
   const cats = room.cats;
   if (cats.length >= 2) {
     const rounds = Math.min(24, Math.max(3, cats.length)); // about one meeting per cat each time
@@ -803,9 +795,7 @@ const QUIET = 2 * HOUR;
 function gap() { return (GAP_MIN + (GAP_MAX - GAP_MIN) * Math.sqrt(Math.random())) * 60e3; }
 const CATCH_UP = 120; // at most this many things per call (a room nobody has opened for days doesn't replay all of it)
 export function live(room, now) {
-  const before = room.cats.length;
-  retire(room, now);
-  let changed = room.cats.length !== before;
+  let changed = false;
   const cats = room.cats;
   for (const c of cats) if (!c.nextAt) { c.nextAt = now + gap(); changed = true; } // cats from before the clocks
   for (const c of cats) if (c.away && c.away.until <= now) { comeHome(room, c); changed = true; } // back from an adventure

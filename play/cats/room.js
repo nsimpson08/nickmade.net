@@ -2635,7 +2635,7 @@
   if (ADMIN && !ownerInput.value) ownerInput.value = "Nick";
   var look = CD.randomLook(), previewPose = "sit", gender = null; // "f" / "m", picked in the maker (required)
   var persona = null; // a PERSONALITY key, picked in the maker (required)
-  var GENDER = { f: "girl", m: "boy" }, SHE = { f: "she’ll", m: "he’ll" };
+  var GENDER = { f: "girl", m: "boy" };
   // the preview: the middle of the cat's picture (140 x 100 of its 168 x 136), shown at twice the size
   var pcv = maker.querySelector(".maker-preview canvas"), pctx = pcv.getContext("2d");
   pcv.width = 140; pcv.height = 100;
@@ -2738,9 +2738,6 @@
         if (d.error) { msg.textContent = d.error; return; }
         form.hidden = true; done.hidden = false;
         done.querySelector("h2 span").textContent = d.cat.name;
-        done.querySelector(".maker-stay span").textContent = d.cat.name;
-        done.querySelector(".maker-stay i").textContent = SHE[d.cat.gender] || "they’ll";
-        done.querySelector(".maker-stay").hidden = !!ADMIN; // Nick's cats never move out (cats.js retire())
         done.querySelector("code").textContent = d.code;
         SFX.mew(d.cat.look.seed);
         load(d.cat.id);

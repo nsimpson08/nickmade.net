@@ -477,9 +477,6 @@ button { font: inherit; }
 .maker-code-big { display: flex; gap: 10px; align-items: center; margin: 14px 0 18px; }
 .maker-code-big code { font-size: 1.4rem; }
 .maker-done p { color: var(--muted); line-height: 1.5; }
-.maker-done .maker-stay { font-size: 0.86rem; } /* the 30-day move-out warning (RETIRE_DAYS in worker/src/cats.js) */
-.maker-done .maker-stay[hidden] { display: none; }
-.maker-done .maker-stay i { font-style: normal; } /* she’ll / he’ll, filled in by room.js */
 
 @media (max-width: 680px) {
   .maker-grid { grid-template-columns: 1fr; }
