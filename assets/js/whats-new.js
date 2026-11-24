@@ -9,6 +9,7 @@
   if (window.NMWhatsNew) return;
   window.NMWhatsNew = true;
   if (/^\/changelog\/?$/.test(location.pathname)) return;
+  if (/[?&]wall=1\b/.test(location.search)) return; // (the Cattery on Nick's Wall)
   var seen = null;
   try { seen = localStorage.getItem("nm-seen-version"); } catch (e) { return; }
   if (!seen) return; // a first visit: nothing is "new" yet

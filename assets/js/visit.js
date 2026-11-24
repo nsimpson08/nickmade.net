@@ -11,6 +11,7 @@
   };
   if (store.get("nm-admin-token")) store.set("nm-me", "1");
   if (store.get("nm-me") || navigator.webdriver) return;
+  if (/[?&]wall=1\b/.test(location.search)) return; // (the Cattery on Nick's Wall, the Owner app's TV page: not a visit)
   var local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
   var API = local ? "http://localhost:8787" : "https://api.nickmade.net";
 

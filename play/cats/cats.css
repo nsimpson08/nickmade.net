@@ -12,6 +12,10 @@
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
+/* ?wall=1 (room.js WALL): the room alone, for the Owner app's Wall; the cats' name tags stay */
+html.wall .cats-top, html.wall .cats-pan, html.wall .cats-zoom, html.wall .cats-me, html.wall .cats-hint, html.wall .cats-toast,
+html.wall .cats-recap, html.wall .cats-mode, html.wall .cats-card, html.wall dialog, html.wall #cats-panel, html.wall .site-footer { display: none !important; }
+html.wall .cats-stage { pointer-events: none; }
 body {
   display: flex;
   flex-direction: column;

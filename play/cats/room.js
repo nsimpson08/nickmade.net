@@ -26,6 +26,10 @@
   var reduceMotion = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
   var CD = window.CatDraw;
   var SEASON_PREVIEW = (location.search.match(/[?&]season=(\w+)/) || [])[1]; // ?season=halloween|winter|spring|none (see season())
+  // ?wall=1: the room alone, for Nick's Wall (the Owner app's TV page, 2026-11-24): no buttons, cards or sound; the
+  // cats just live their lives (cats.css html.wall)
+  var WALL = /[?&]wall=1\b/.test(location.search);
+  if (WALL) document.documentElement.classList.add("wall");
 
   // ---------- who's looking ----------
   // the random id this browser keeps (the same one the Movies and Games queues use)
@@ -2815,6 +2819,7 @@
   // ---------- sound (a tiny synth: mews, purrs, crunching; nothing plays until you do something) ----------
   var audio = null, soundOn = true;
   try { soundOn = localStorage.getItem("nm-cats-sound") !== "off"; } catch (e) {}
+  if (WALL) soundOn = false; // (the Wall: never a sound)
   var soundBtn = document.querySelector(".cats-sound");
   soundBtn.setAttribute("aria-pressed", String(soundOn));
   soundBtn.addEventListener("click", function () {
