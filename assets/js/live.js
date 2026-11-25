@@ -967,7 +967,7 @@
     renderChoices();
     if (!ADMIN || !it.imdbId) return;
     preview.classList.add("loading");
-    fetch(API + "/poster?" + PQ + "&imdbId=" + encodeURIComponent(it.imdbId), { headers: authHeaders() })
+    fetch(API + "/poster?" + PQ + "&imdbId=" + encodeURIComponent(it.imdbId) + (/^xbl/.test(it.imdbId) ? "&title=" + encodeURIComponent(it.title || "") : ""), { headers: authHeaders() })
       .then(function (res) { return res.ok ? res.json() : null; })
       .then(function (d) {
         if (mine !== previewSeq) return;

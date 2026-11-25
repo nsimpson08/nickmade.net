@@ -672,6 +672,14 @@ const ART_CHOICES = 3;
 async function previewPoster(request, url, env, cors) {
   if (!isAdmin(request, env)) return json({ error: "Unauthorized" }, 401, cors);
   const imdbId = String(url.searchParams.get("imdbId") || "");
+  // a game added from Xbox ("xbl<titleId>") isn't on IMDb: its fan art is looked up by its name, and the poster it
+  // has (the Edit dialog's first choice) is the official one (Nick, 2026-11-24: Edit found nothing for them, ever)
+  if (/^xbl\d{1,12}$/.test(imdbId)) {
+    const title = String(url.searchParams.get("title") || "").trim().slice(0, 200);
+    if (!title) return json({ error: "Bad title." }, 400, cors);
+    const art = await findPosterSpyArts(title, ART_CHOICES);
+    return json({ options: art.map((a) => ({ image: a.image, credit: { artist: a.artist, url: a.url } })) }, 200, cors);
+  }
   if (!/^tt\d{5,10}$/.test(imdbId)) return json({ error: "Bad id." }, 400, cors);
   const kind = PAGES[pageOf(url.searchParams.get("page"))];
   const official = await lookupMovie(imdbId, kind, { fanArt: false });
